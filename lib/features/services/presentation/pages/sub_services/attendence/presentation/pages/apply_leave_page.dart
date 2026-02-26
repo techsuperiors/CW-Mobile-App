@@ -1,0 +1,609 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../../../../../../../core/constants/app_colors.dart';
+import '../../../../../../../../core/constants/app_strings.dart';
+import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/widgets/responsive_scaffold.dart';
+import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
+import '../../../../../../../../core/widgets/common/app_text_field.dart';
+
+/// Apply Leave form page
+class ApplyLeavePage extends StatefulWidget {
+  const ApplyLeavePage({super.key});
+
+  @override
+  State<ApplyLeavePage> createState() => _ApplyLeavePageState();
+}
+
+class _ApplyLeavePageState extends State<ApplyLeavePage> {
+  final _formKey = GlobalKey<FormState>();
+  final _subjectController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  
+  String? _selectedLeaveType;
+  String? _selectedLeaveDuration;
+  DateTime? _fromDate;
+  String _fromHalfDay = 'First Half';
+  DateTime? _toDate;
+  String _toHalfDay = 'Second Half';
+  bool _clubLeave = true;
+  String? _selectedClubLeaveType;
+  String? _requestTo = 'Riya Rawat';
+  String? _selectedReason;
+
+  @override
+  void dispose() {
+    _subjectController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectDate(BuildContext context, bool isFromDate) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppColors.attendanceTeal,
+              onPrimary: AppColors.textWhite,
+              surface: AppColors.background,
+              onSurface: AppColors.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        if (isFromDate) {
+          _fromDate = picked;
+        } else {
+          _toDate = picked;
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return ResponsiveScaffold(
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
+        leading: GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(width: screenWidth * 0.048,),
+              Icon(
+                Icons.arrow_back_ios,
+                color: Theme.of(context).colorScheme.primary,
+                size: screenWidth * 0.048,
+              ),
+              Flexible(
+                child: Text(
+                  AppStrings.attendance,
+                  style: AppTextStyles.bodyLarge(context).copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        leadingWidth: 110,
+        title: Text(
+          AppStrings.applyLeave,
+          style: AppTextStyles.heading4(context).copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: 0,
+        onTap: (index) {},
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(screenWidth * 0.020),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with icon and description
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(screenWidth * 0.03),
+                    decoration: BoxDecoration(
+                      color: AppColors.attendanceTeal.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.calendar_today,
+                      color: AppColors.attendanceTeal,
+                      size: screenWidth * 0.06,
+                    ),
+                  ),
+                  SizedBox(height: screenHeight * 0.01),
+                  Text(
+                    AppStrings.applyLeave,
+                    style: AppTextStyles.heading3(context).copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: screenHeight * 0.005),
+                  Text(
+                    'Lorem Ipsum is simply dummy text of the printing and typesetting industry.',
+                    style: AppTextStyles.bodySmall(context).copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: screenHeight * 0.03),
+              // Subject
+              AppTextField(
+                label: 'Subject',
+                hint: 'Enter Subject',
+                controller: _subjectController,
+              ),
+              SizedBox(height: screenHeight * 0.02),
+              // Leave Type
+              _buildDropdownField(
+                context,
+                label: 'Leave Type',
+                value: _selectedLeaveType,
+                hint: 'Select Leave Type',
+                items: ['Casual Leave', 'Sick Leave', 'Earned Leave', 'Emergency Leave'],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedLeaveType = value;
+                  });
+                },
+              ),
+              SizedBox(height: screenHeight * 0.02),
+              // Leave Duration
+              _buildDropdownField(
+                context,
+                label: 'Leave Duration (Day or Days)',
+                value: _selectedLeaveDuration,
+                hint: 'Select Day Type',
+                items: ['Single Day', 'Multiple Days'],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedLeaveDuration = value;
+                  });
+                },
+              ),
+              SizedBox(height: screenHeight * 0.02),
+              // From
+              Text(
+                'From',
+                style: AppTextStyles.labelLarge(context),
+              ),
+              SizedBox(height: screenHeight * 0.01),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: _buildDateField(
+                      context,
+                      value: _fromDate != null
+                          ? DateFormat('dd MMM yyyy').format(_fromDate!)
+                          : null,
+                      hint: 'Select Date',
+                      onTap: () => _selectDate(context, true),
+                    ),
+                  ),
+                  SizedBox(width: screenWidth * 0.02),
+                  Expanded(
+                    flex: 1,
+                    child: _buildDropdownField(
+                      context,
+                      value: _fromHalfDay,
+                      items: ['First Half', 'Second Half'],
+           label: ''  ,          onChanged: (value) {
+                        setState(() {
+                          _fromHalfDay = value ?? 'First Half';
+                        });
+                      },
+                      showLabel: false,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: screenHeight * 0.02),
+              // To
+              Text(
+                'To',
+                style: AppTextStyles.labelLarge(context),
+              ),
+              SizedBox(height: screenHeight * 0.01),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: _buildDateField(
+                      context,
+                      value: _toDate != null
+                          ? DateFormat('dd MMM yyyy').format(_toDate!)
+                          : null,
+                      hint: 'Select Date',
+                      onTap: () => _selectDate(context, false),
+                    ),
+                  ),
+                  SizedBox(width: screenWidth * 0.02),
+                  Expanded(
+                    flex: 1,
+                    child: _buildDropdownField(
+                      context,
+                      value: _toHalfDay,
+                      items: ['First Half', 'Second Half'],
+                      onChanged: (value) {
+                        setState(() {
+                          _toHalfDay = value ?? 'Second Half';
+                        });
+                      },
+                      showLabel: false, label: '',
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: screenHeight * 0.02),
+              // Club Leave
+              Text(
+                'Club Leave',
+                style: AppTextStyles.labelLarge(context),
+              ),
+              SizedBox(height: screenHeight * 0.01),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildRadioOption(
+                      context,
+                      label: 'Yes',
+                      value: true,
+                      groupValue: _clubLeave,
+                      onChanged: (value) {
+                        setState(() {
+                          _clubLeave = value;
+                        });
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildRadioOption(
+                      context,
+                      label: 'No',
+                      value: false,
+                      groupValue: _clubLeave,
+                      onChanged: (value) {
+                        setState(() {
+                          _clubLeave = value;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              if (_clubLeave) ...[
+                SizedBox(height: screenHeight * 0.02),
+                _buildDropdownField(
+                  context,
+                  label: 'Select Club Leave Type',
+                  value: _selectedClubLeaveType,
+                  hint: 'Select Club Leave Type',
+                  items: ['Loren Ipsum', 'Option 2', 'Option 3'],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedClubLeaveType = value;
+                    });
+                  },
+                ),
+              ],
+              SizedBox(height: screenHeight * 0.02),
+              // Request To
+              _buildDropdownField(
+                context,
+                label: 'Request To',
+                value: _requestTo,
+                items: ['Riya Rawat', 'Manager 1', 'Manager 2'],
+                onChanged: (value) {
+                  setState(() {
+                    _requestTo = value;
+                  });
+                },
+              ),
+              SizedBox(height: screenHeight * 0.02),
+              // Reason
+              _buildDropdownField(
+                context,
+                label: 'Reason',
+                value: _selectedReason,
+                hint: 'Select Reason',
+                items: ['Personal', 'Medical', 'Family', 'Other'],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedReason = value;
+                  });
+                },
+              ),
+              SizedBox(height: screenHeight * 0.02),
+              // Description
+              AppTextField(
+                label: 'Description',
+                hint: 'Enter Description',
+                controller: _descriptionController,
+                maxLines: 4,
+              ),
+              SizedBox(height: screenHeight * 0.02),
+              // Upload
+              Text(
+                'Upload',
+                style: AppTextStyles.labelLarge(context),
+              ),
+              SizedBox(height: screenHeight * 0.01),
+              _buildUploadButton(context),
+              SizedBox(height: screenHeight * 0.03),
+              // Submit Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (_formKey.currentState!.validate()) {
+                      // Handle submit
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.attendanceTeal,
+                    foregroundColor: AppColors.textWhite,
+                    padding: EdgeInsets.symmetric(vertical: screenHeight * 0.018),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'Submit',
+                    style: AppTextStyles.buttonLarge(context).copyWith(
+                      color: AppColors.textWhite,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: screenHeight * 0.015),
+              // Cancel Button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: screenHeight * 0.018),
+                    side: BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    AppStrings.cancel,
+                    style: AppTextStyles.buttonLarge(context).copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: screenHeight * 0.02),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownField(
+    BuildContext context, {
+    required String? label,
+    required String? value,
+    String? hint,
+    required List<String> items,
+    required Function(String?) onChanged,
+    bool showLabel = true,
+  }) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showLabel && label != null) ...[
+          Text(
+            label,
+            style: AppTextStyles.labelLarge(context),
+          ),
+          SizedBox(height: screenHeight * 0.01),
+        ],
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: DropdownButtonFormField<String>(
+            value: value,
+            decoration: InputDecoration(
+              hintText: hint,
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: screenWidth * 0.04,
+                vertical: screenHeight * 0.018,
+              ),
+            ),
+            items: items.map((String item) {
+              return DropdownMenuItem<String>(
+                value: item,
+                child: Text(
+                  item,
+                  style: AppTextStyles.bodyMedium(context),
+                ),
+              );
+            }).toList(),
+            onChanged: onChanged,
+            icon: Icon(
+              Icons.keyboard_arrow_down,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateField(
+    BuildContext context, {
+    String? value,
+    required String hint,
+    required VoidCallback onTap,
+  }) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: screenWidth * 0.04,
+          vertical: screenHeight * 0.018,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              value ?? hint,
+              style: AppTextStyles.bodyMedium(context).copyWith(
+                color: value != null ? AppColors.textPrimary : AppColors.textSecondary,
+              ),
+            ),
+            Icon(
+              Icons.calendar_today,
+              size: screenWidth * 0.05,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRadioOption(
+    BuildContext context, {
+    required String label,
+    required bool value,
+    required bool? groupValue,
+    required Function(bool) onChanged,
+  }) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return GestureDetector(
+      onTap: () => onChanged(value),
+      child: Row(
+        children: [
+          Container(
+            width: screenWidth * 0.05,
+            height: screenWidth * 0.05,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: groupValue == value
+                    ? AppColors.attendanceTeal
+                    : AppColors.border,
+                width: 2,
+              ),
+            ),
+            child: groupValue == value
+                ? Center(
+                    child: Container(
+                      width: screenWidth * 0.025,
+                      height: screenWidth * 0.025,
+                      decoration: BoxDecoration(
+                        color: AppColors.attendanceTeal,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+          SizedBox(width: screenWidth * 0.02),
+          Text(
+            label,
+            style: AppTextStyles.bodyMedium(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUploadButton(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return GestureDetector(
+      onTap: () {
+        // Handle file upload
+      },
+      child: Container(
+        width: screenWidth * 0.25,
+        height: screenWidth * 0.25,
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.upload,
+              size: screenWidth * 0.06,
+              color: AppColors.textSecondary,
+            ),
+            SizedBox(height: screenHeight * 0.005),
+            Text(
+              'Upload File',
+              style: AppTextStyles.labelSmall(context).copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

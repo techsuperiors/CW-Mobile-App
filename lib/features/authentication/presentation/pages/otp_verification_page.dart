@@ -1,0 +1,434 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
+import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/utils/responsive_utils.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_strings.dart';
+import '../../../../core/widgets/common/app_button.dart';
+import 'forgot_password_page.dart';
+import 'reset_password_page.dart';
+
+/// OTP Verification page matching CollectivWork design
+class OtpVerificationPage extends StatefulWidget {
+  final String email;
+
+  const OtpVerificationPage({
+    super.key,
+    required this.email,
+  });
+
+  @override
+  State<OtpVerificationPage> createState() => _OtpVerificationPageState();
+}
+
+class _OtpVerificationPageState extends State<OtpVerificationPage> {
+  final List<TextEditingController> _otpControllers =
+      List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  Timer? _timer;
+  int _remainingSeconds = 80; // 01:20 in seconds
+  bool _canResend = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    for (var controller in _otpControllers) {
+      controller.dispose();
+    }
+    for (var node in _focusNodes) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remainingSeconds > 0) {
+        setState(() {
+          _remainingSeconds--;
+        });
+      } else {
+        setState(() {
+          _canResend = true;
+        });
+        _timer?.cancel();
+      }
+    });
+  }
+
+  void _resendCode() {
+    if (_canResend) {
+      setState(() {
+        _remainingSeconds = 80;
+        _canResend = false;
+      });
+      _startTimer();
+      // TODO: Call API to resend OTP
+    }
+  }
+
+  String _formatTimer(int seconds) {
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}${AppStrings.sec}';
+  }
+
+  void _handleOtpChange(String value, int index) {
+    if (value.length == 1) {
+      if (index < 5) {
+        _focusNodes[index + 1].requestFocus();
+      } else {
+        _focusNodes[index].unfocus();
+      }
+    } else if (value.isEmpty && index > 0) {
+      _focusNodes[index - 1].requestFocus();
+    }
+  }
+
+  void _handlePaste(String value) {
+    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    for (int i = 0; i < 6 && i < digits.length; i++) {
+      _otpControllers[i].text = digits[i];
+    }
+    if (digits.length >= 6) {
+      _focusNodes[5].unfocus();
+    } else if (digits.isNotEmpty) {
+      _focusNodes[digits.length].requestFocus();
+    }
+  }
+
+  void _handleSubmit() {
+    final otp = _otpControllers.map((c) => c.text).join();
+    if (otp.length == 6) {
+      // TODO: Verify OTP with backend
+      // For now, just show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(AppStrings.otpVerifiedSuccessfully),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      // Navigate to reset password page
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const ResetPasswordPage(),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(AppStrings.pleaseEnterCompleteOtp),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final screenHeight = mediaQuery.size.height;
+    final screenWidth = mediaQuery.size.width;
+    
+    // Responsive spacing helper
+    double responsiveSpacing(double baseSpacing) {
+      if (screenHeight < 600) {
+        return baseSpacing * 0.75;
+      } else if (screenHeight < 700) {
+        return baseSpacing * 0.85;
+      }
+      return baseSpacing;
+    }
+    
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      resizeToAvoidBottomInset: true,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                    // Normal Teal Header Section with curved bottom (just back button)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.loginHeaderTeal,
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(30),
+                          bottomRight: Radius.circular(30),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: screenWidth * 0.06,
+                          vertical: screenHeight * 0.02,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(height: screenHeight * 0.015),
+                            // Back button and title row
+                            InkWell(
+                              onTap: () {
+                                Navigator.pop(context);
+                              },
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.arrow_back,
+                                    color: AppColors.textWhite,
+                                    size: screenWidth * 0.06,
+                                  ),
+                                  SizedBox(width: screenWidth * 0.02),
+                                  Flexible(
+                                    child: Text(
+                                      AppStrings.otp,
+                                      style: AppTextStyles.bodyMedium(context).copyWith(
+                                        color: AppColors.textWhite,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: screenHeight * 0.03),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // White Content Section with title and email
+                    Flexible(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: screenWidth * 0.064, // ~6.4% of screen width
+                          vertical: screenHeight * 0.04, // 4% of screen height
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(height: responsiveSpacing(20)),
+                            // Main title - on white background
+                            Text(
+                              AppStrings.getYourCode,
+                              style: AppTextStyles.heading1(context).copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: responsiveSpacing(12)),
+                            // Instructional text with email - on white background
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
+                              child: RichText(
+                                textAlign: TextAlign.center,
+                                text: TextSpan(
+                                  style: AppTextStyles.bodyMedium(context).copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: AppStrings.weveSentVerificationCode,
+                                    ),
+                                    TextSpan(
+                                      text: ' ${widget.email}.',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
+                                        fontSize: AppTextStyles.bodyMedium(context).fontSize,
+                                      ),
+                                    ),
+                                    const TextSpan(text: ' '),
+                                    TextSpan(
+                                      text: AppStrings.wrongEmail,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.loginHeaderTeal,
+                                        decoration: TextDecoration.underline,
+                                        fontSize: AppTextStyles.bodyMedium(context).fontSize,
+                                      ),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () {
+                                          // Navigate back to forgot password page
+                                          Navigator.pushReplacement(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => const ForgotPasswordPage(),
+                                            ),
+                                          );
+                                        },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: responsiveSpacing(40)),
+                            // OTP Input Fields - Centered
+                            _buildOtpFields(context),
+                            SizedBox(height: responsiveSpacing(32)),
+                            // Verify and Proceed button
+                            AppButton(
+                              label: AppStrings.verifyAndProceed,
+                              onPressed: _handleSubmit,
+                              isPrimary: true,
+                              width: double.infinity,
+                              backgroundColor: AppColors.loginHeaderTeal,
+                            ),
+                            SizedBox(height: responsiveSpacing(24)),
+                            // Resend Code and Timer
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Resend Code link
+                                Flexible(
+                                  child: GestureDetector(
+                                    onTap: _canResend ? _resendCode : null,
+                                    child: Text(
+                                      AppStrings.resendCode,
+                                      style: AppTextStyles.bodyMedium(context).copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: _canResend
+                                            ? AppColors.loginHeaderTeal
+                                            : AppColors.textTertiary,
+                                        decoration: _canResend
+                                            ? TextDecoration.underline
+                                            : TextDecoration.none,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                                // Timer
+                                Flexible(
+                                  child: Text(
+                                    _formatTimer(_remainingSeconds),
+                                    style: AppTextStyles.bodyMedium(context).copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: responsiveSpacing(32)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildOtpFields(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate responsive spacing and field width based on available width
+        // We want 6 fields with 5 gaps between them
+        final availableWidth = constraints.maxWidth;
+        // Use 1.5% of available width for spacing between fields (responsive)
+        final spacing = availableWidth * 0.015;
+        // Calculate field width: (availableWidth - 5*spacing) / 6
+        final fieldWidth = (availableWidth - (5 * spacing)) / 6;
+        final fieldHeight = fieldWidth * 1.2; // Maintain aspect ratio
+        
+        // Clamp values to ensure reasonable sizes on all screens
+        final finalSpacing = spacing.clamp(5.0, 10.0);
+        final finalFieldWidth = fieldWidth.clamp(18.0, 36.0);
+        final finalFieldHeight = finalFieldWidth * 1.2;
+        
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(6, (index) {
+            return Padding(
+              padding: EdgeInsets.only(
+                right: index < 5 ? finalSpacing : 0,
+              ),
+              child: SizedBox(
+                width: finalFieldWidth,
+                height: finalFieldHeight,
+                child: TextFormField(
+                  controller: _otpControllers[index],
+                  focusNode: _focusNodes[index],
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(1),
+                  ],
+                  style: AppTextStyles.heading2(context).copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppColors.background,
+                    contentPadding: EdgeInsets.zero,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                        color: AppColors.border,
+                        width: 1,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                        color: AppColors.border,
+                        width: 1,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                        color: AppColors.loginHeaderTeal,
+                        width: 2,
+                      ),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                        color: AppColors.error,
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  onChanged: (value) => _handleOtpChange(value, index),
+                  onTap: () {
+                    // Select all text when tapped
+                    _otpControllers[index].selection = TextSelection(
+                      baseOffset: 0,
+                      extentOffset: _otpControllers[index].text.length,
+                    );
+                  },
+                ),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+}
