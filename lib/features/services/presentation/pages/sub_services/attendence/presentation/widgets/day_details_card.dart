@@ -3,17 +3,102 @@ import 'package:intl/intl.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
-import '../pages/apply_leave_page.dart';
-import '../pages/regularize_page.dart';
+import '../../../../../../../attendance/domain/entities/attendance_details.dart';
+import '../../../../../../../request/presentation/pages/sub_requets/leaves/presentation/pages/apply_leave_page.dart';
+import '../../../../../../../request/presentation/pages/sub_requets/regularize/presentation/pages/apply_regularize_page.dart';
 
 /// Day details card showing shift timings, logs, and actions
 class DayDetailsCard extends StatelessWidget {
   final DateTime selectedDate;
+  final AttendanceDetails? attendanceDetails;
+  final bool isLoading;
+  final String? errorMessage;
 
   const DayDetailsCard({
     super.key,
     required this.selectedDate,
+    this.attendanceDetails,
+    required this.isLoading,
+    this.errorMessage,
   });
+
+  /// Format time from API response
+  String? _formatTime(String? timeString) {
+    if (timeString == null || timeString.isEmpty) return null;
+    try {
+      final utcDateTime = DateTime.parse(timeString);
+      final localDateTime = utcDateTime.toLocal();
+      final hour = localDateTime.hour;
+      final minute = localDateTime.minute;
+      final second = localDateTime.second;
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+      final displayMinute = minute.toString().padLeft(2, '0');
+      final displaySecond = second.toString().padLeft(2, '0');
+      return '$displayHour:$displayMinute:$displaySecond $period';
+    } catch (e) {
+      return timeString;
+    }
+  }
+
+  /// Get punch in/out logs from activity array
+  List<String> _getPunchInLogs() {
+    if (attendanceDetails?.activity == null) return [];
+    final logs = <String>[];
+    for (var activity in attendanceDetails!.activity!) {
+      if (activity.activityType == 'Punch In' && activity.time != null) {
+        final formatted = _formatTime(activity.time);
+        if (formatted != null) logs.add(formatted);
+      }
+    }
+    return logs;
+  }
+
+  List<String> _getPunchOutLogs() {
+    if (attendanceDetails?.activity == null) return [];
+    final logs = <String>[];
+    for (var activity in attendanceDetails!.activity!) {
+      if (activity.activityType == 'Punch Out' && activity.time != null) {
+        final formatted = _formatTime(activity.time);
+        if (formatted != null) logs.add(formatted);
+      }
+    }
+    return logs;
+  }
+
+  /// Get shift timing for selected date
+  String _getShiftTiming() {
+    if (attendanceDetails?.shift?.shiftDayTiming == null) {
+      return '09:30 AM - 07:30 PM'; // Default
+    }
+    
+    final dayName = DateFormat('EEEE').format(selectedDate);
+    final dayTiming = attendanceDetails!.shift!.shiftDayTiming.firstWhere(
+      (timing) => timing.day == dayName,
+      orElse: () => attendanceDetails!.shift!.shiftDayTiming.first,
+    );
+    
+    return '${dayTiming.punchIn} - ${dayTiming.punchOut}';
+  }
+
+  /// Format break time
+  String _formatBreakTime() {
+    if (attendanceDetails?.breakTime == null) return '--';
+    final breakTimeSeconds = int.tryParse(attendanceDetails!.breakTime ?? '0') ?? 0;
+    final minutes = breakTimeSeconds ~/ 60;
+    return '$minutes min';
+  }
+
+  /// Format hours
+  String _formatHours(double? hours) {
+    if (hours == null) return '--';
+    final hrs = hours.toInt();
+    final mins = ((hours - hrs) * 60).toInt();
+    if (mins == 0) {
+      return '$hrs hr';
+    }
+    return '$hrs hr $mins min';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +106,29 @@ class DayDetailsCard extends StatelessWidget {
     final screenHeight = MediaQuery.of(context).size.height;
     
     final formattedDate = DateFormat('d MMMM yyyy').format(selectedDate);
+
+    if (isLoading) {
+      return Container(
+        margin: EdgeInsets.symmetric(horizontal: screenWidth * 0.020),
+        padding: EdgeInsets.all(screenWidth * 0.042),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (errorMessage != null) {
+      return Container(
+        margin: EdgeInsets.symmetric(horizontal: screenWidth * 0.020),
+        padding: EdgeInsets.all(screenWidth * 0.042),
+        child: Center(
+          child: Text(
+            errorMessage!,
+            style: AppTextStyles.bodyMedium(context).copyWith(
+              color: AppColors.error,
+            ),
+          ),
+        ),
+      );
+    }
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: screenWidth * 0.020),
@@ -64,28 +172,30 @@ class DayDetailsCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '09:30 AM - 07:30 PM',
+                _getShiftTiming(),
                 style: AppTextStyles.bodySmall(context).copyWith(
                   color: AppColors.textSecondary,
                 ),
               ),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.025,
-                  vertical: screenHeight * 0.005,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  AppStrings.wfh,
-                  style: AppTextStyles.labelSmall(context).copyWith(
-                    color: AppColors.success,
-                    fontWeight: FontWeight.w600,
+              if (attendanceDetails?.punchType == 'remote' || 
+                  attendanceDetails?.wfhShowPunch == true)
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: screenWidth * 0.025,
+                    vertical: screenHeight * 0.005,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    AppStrings.wfh,
+                    style: AppTextStyles.labelSmall(context).copyWith(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           SizedBox(height: screenHeight * 0.02),
@@ -108,7 +218,9 @@ class DayDetailsCard extends StatelessWidget {
                   ),
                   SizedBox(height: screenHeight * 0.005),
                   Text(
-                    '10 hr',
+                    attendanceDetails?.shift?.shiftDayTiming.isNotEmpty == true
+                        ? attendanceDetails!.shift!.shiftDayTiming.first.grossHours
+                        : '--',
                     style: AppTextStyles.bodySmall(context).copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -127,7 +239,9 @@ class DayDetailsCard extends StatelessWidget {
                   ),
                   SizedBox(height: screenHeight * 0.005),
                   Text(
-                    '09 hr',
+                    attendanceDetails?.shift?.shiftDayTiming.isNotEmpty == true
+                        ? attendanceDetails!.shift!.shiftDayTiming.first.effectiveHours
+                        : '--',
                     style: AppTextStyles.bodySmall(context).copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -150,7 +264,7 @@ class DayDetailsCard extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => RegularizePage(selectedDate: selectedDate),
+                        builder: (context) => ApplyRegularizePage(selectedDate: selectedDate),
                       ),
                     );
                   },
@@ -211,63 +325,84 @@ class DayDetailsCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Left Column: Outgoing (Punch-out)
+              // Left Column: Punch-in
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLogEntry(context, '10:30:31 AM', true, false),
-                    _buildLogEntry(context, '01:02:42 PM', true, false),
-                    _buildLogEntry(context, '05:01:25 PM', true, false),
-                  ],
+                  children: _getPunchInLogs().isEmpty
+                      ? [_buildLogEntry(context, '--:--:--', true, true)]
+                      : _getPunchInLogs()
+                          .map((log) => _buildLogEntry(context, log, true, false))
+                          .toList(),
                 ),
               ),
               SizedBox(width: screenWidth * 0.04),
-              // Right Column: Incoming (Punch-in)
+              // Right Column: Punch-out
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLogEntry(context, '11:27:58 AM', false, false),
-                    _buildLogEntry(context, '01:58:56 PM', false, false),
-                    _buildLogEntry(context, '--:--:--', false, true), // Missing punch-out
-                  ],
+                  children: _getPunchOutLogs().isEmpty
+                      ? [_buildLogEntry(context, '--:--:--', false, true)]
+                      : _getPunchOutLogs()
+                          .map((log) => _buildLogEntry(context, log, false, false))
+                          .toList(),
                 ),
               ),
               SizedBox(width: screenWidth * 0.04),
             ],
           ),
-          SizedBox(height: screenHeight * 0.02),
-          // Divider
-          Divider(color: AppColors.border, height: 1),
-          SizedBox(height: screenHeight * 0.02),
-          // Adjusted Logs
-          _buildSectionTitle(context, 'Adjusted Logs'),
-          SizedBox(height: screenHeight * 0.01),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left Column: Outgoing (Punch-out)
-              Expanded(
-                child: Column(
+          // Adjusted Logs (if available)
+          if (attendanceDetails?.punchIn != null || attendanceDetails?.punchOut != null)
+            SizedBox(height: screenHeight * 0.02),
+          if (attendanceDetails?.punchIn != null || attendanceDetails?.punchOut != null)
+            Divider(color: AppColors.border, height: 1),
+          if (attendanceDetails?.punchIn != null || attendanceDetails?.punchOut != null)
+            SizedBox(height: screenHeight * 0.02),
+          if (attendanceDetails?.punchIn != null || attendanceDetails?.punchOut != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionTitle(context, 'Adjusted Logs'),
+                SizedBox(height: screenHeight * 0.01),
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildLogEntry(context, '09:30:25 AM', true, false),
+                    // Left Column: Adjusted Punch-in
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLogEntry(
+                            context,
+                            attendanceDetails?.formattedPunchIn ?? '--:--:--',
+                            true,
+                            attendanceDetails?.punchIn == null,
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: screenWidth * 0.04),
+                    // Right Column: Adjusted Punch-out
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLogEntry(
+                            context,
+                            attendanceDetails?.formattedPunchOut ?? '--:--:--',
+                            false,
+                            attendanceDetails?.punchOut == null,
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              SizedBox(width: screenWidth * 0.04),
-              // Right Column: Incoming (Punch-in)
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLogEntry(context, '--:--:--', false, true), // Missing punch-out
-                  ],
-                ),
-              ),
-            ],
-          ),
+                SizedBox(height: screenHeight * 0.02),
+                Divider(color: AppColors.border, height: 1),
+                SizedBox(height: screenHeight * 0.02),
+              ],
+            ),
           SizedBox(height: screenHeight * 0.02),
           // Divider
           Divider(color: AppColors.border, height: 1),
@@ -291,7 +426,7 @@ class DayDetailsCard extends StatelessWidget {
                     ),
                     SizedBox(height: screenHeight * 0.005),
                     Text(
-                      '--',
+                      _formatHours(attendanceDetails?.grossHours),
                       style: AppTextStyles.bodySmall(context).copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -332,7 +467,7 @@ class DayDetailsCard extends StatelessWidget {
                             ),
                             SizedBox(height: screenHeight * 0.005),
                             Text(
-                              '40 min',
+                              _formatBreakTime(),
                               style: AppTextStyles.bodySmall(context).copyWith(
                                 color: AppColors.textSecondary,
                               ),
@@ -358,7 +493,7 @@ class DayDetailsCard extends StatelessWidget {
                     ),
                     SizedBox(height: screenHeight * 0.005),
                     Text(
-                      '--',
+                      _formatHours(attendanceDetails?.effectiveHours),
                       style: AppTextStyles.bodySmall(context).copyWith(
                         color: AppColors.textSecondary,
                       ),

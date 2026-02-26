@@ -12,12 +12,16 @@ import 'core/network/network_info.dart';
 import 'core/utils/app_navigator.dart';
 import 'core/utils/token_storage.dart';
 import 'features/authentication/data/repository/auth_repository.dart';
-import 'features/authentication/presentation/bloc/auth_bloc.dart';
+import 'features/authentication/presentation/bloc/auth_bloc/auth_bloc.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
 import 'features/user/data/datasources/user_profile_remote_datasource.dart';
 import 'features/user/data/repositories/user_profile_repository_impl.dart';
 import 'features/user/domain/usecases/get_user_profile_usecase.dart';
 import 'features/user/presentation/bloc/user_profile_bloc.dart';
+import 'features/leaves/data/datasources/leave_types_remote_datasource.dart';
+import 'features/leaves/data/repositories/leave_types_repository_impl.dart';
+import 'features/leaves/domain/usecases/get_leave_types_usecase.dart';
+import 'features/leaves/presentation/bloc/leave_types_bloc.dart';
 import 'package:dio/dio.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -73,20 +77,27 @@ class _CollectivWorkAppState extends State<CollectivWorkApp> {
     final connectivity = Connectivity();
     final networkInfo = NetworkInfoImpl(connectivity);
     
+    // Shared callback for token expiration - clears navigation stack and navigates to login
+    void handleTokenExpiration() {
+      // Clear navigation stack and navigate to login
+      AppNavigator.pushAndRemoveAll(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    }
+    
     // Create ApiService with token expiration callback
     final apiService = ApiService(
       networkInfo: networkInfo,
-      onTokenExpired: () {
-        // Clear navigation stack and navigate to login
-        AppNavigator.pushAndRemoveAll(
-          MaterialPageRoute(builder: (_) => const LoginPage()),
-        );
-      },
+      onTokenExpired: handleTokenExpiration,
     );
     
-    // Create ApiClient for profile API
+    // Create ApiClient for profile API with token expiration callback
     final dio = Dio();
-    final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+    final apiClient = ApiClient(
+      dio: dio,
+      networkInfo: networkInfo,
+      onTokenExpired: handleTokenExpiration,
+    );
     
     // Create user profile dependencies
     final userProfileRemoteDataSource = UserProfileRemoteDataSourceImpl(apiClient);
@@ -99,6 +110,15 @@ class _CollectivWorkAppState extends State<CollectivWorkApp> {
     // Create UserProfileBloc first
     final userProfileBloc = UserProfileBloc(
       getUserProfileUseCase: getUserProfileUseCase,
+    );
+
+    // Leave types bloc (shared - loaded from dashboard, used by Apply Leave)
+    final leaveTypesRepository = LeaveTypesRepositoryImpl(
+      remoteDataSource: LeaveTypesRemoteDataSourceImpl(apiClient),
+      networkInfo: networkInfo,
+    );
+    final leaveTypesBloc = LeaveTypesBloc(
+      getLeaveTypesUseCase: GetLeaveTypesUseCase(leaveTypesRepository),
     );
     
     final authRepository = AuthRepository(apiService);
@@ -133,13 +153,17 @@ class _CollectivWorkAppState extends State<CollectivWorkApp> {
           : const AppLoadingScreen()),
     );
 
-    // Wrap with MultiBlocProvider
+    // Wrap with MultiBlocProvider and RepositoryProvider for auth
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => authBloc),
         BlocProvider(create: (_) => userProfileBloc),
+        BlocProvider(create: (_) => leaveTypesBloc),
       ],
-      child: materialApp,
+      child: RepositoryProvider<AuthRepository>.value(
+        value: authRepository,
+        child: materialApp,
+      ),
     );
   }
 }

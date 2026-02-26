@@ -1,25 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:dio/dio.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/common/app_section_header.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/network/network_info.dart';
-import '../../../events/data/datasources/upcoming_events_remote_datasource.dart';
-import '../../../events/data/repositories/upcoming_events_repository_impl.dart';
-import '../../../events/domain/usecases/get_upcoming_events_usecase.dart';
+import '../../../events/domain/entities/upcoming_event.dart' as domain;
 
 /// Event data model for widget
-class UpcomingEvent {
+class UpcomingEventWidget {
   final String eventType;
   final String personName;
   final String date;
   final IconData celebratoryIcon;
 
-  const UpcomingEvent({
+  const UpcomingEventWidget({
     required this.eventType,
     required this.personName,
     required this.date,
@@ -28,75 +22,30 @@ class UpcomingEvent {
 }
 
 /// Upcoming events widget
-class UpcomingEvents extends StatefulWidget {
-  const UpcomingEvents({super.key});
+class UpcomingEvents extends StatelessWidget {
+  final List<domain.UpcomingEvent> events;
+  final bool isLoading;
+  final String? errorMessage;
+  final VoidCallback? onRefresh;
 
-  @override
-  State<UpcomingEvents> createState() => _UpcomingEventsState();
-}
+  const UpcomingEvents({
+    super.key,
+    required this.events,
+    required this.isLoading,
+    this.errorMessage,
+    this.onRefresh,
+  });
 
-class _UpcomingEventsState extends State<UpcomingEvents> {
-  List<UpcomingEvent> _events = [];
-  bool _isLoading = true;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadEvents();
-  }
-
-  Future<void> _loadEvents() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Initialize API client and dependencies
-      final networkInfo = NetworkInfoImpl(Connectivity());
-      final dio = Dio();
-      final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
-      final remoteDataSource = UpcomingEventsRemoteDataSourceImpl(apiClient);
-      final repository = UpcomingEventsRepositoryImpl(
-        remoteDataSource: remoteDataSource,
-        networkInfo: networkInfo,
+  /// Convert entities to widget models
+  List<UpcomingEventWidget> _convertToWidgetEvents(List<domain.UpcomingEvent> eventEntities) {
+    return eventEntities.map((entity) {
+      return UpcomingEventWidget(
+        eventType: entity.eventType,
+        personName: entity.personName,
+        date: entity.formattedDate,
+        celebratoryIcon: _getIconFromName(entity.iconName),
       );
-      final getUpcomingEventsUseCase = GetUpcomingEventsUseCase(repository);
-
-      // Fetch events from API
-      final result = await getUpcomingEventsUseCase();
-
-      result.fold(
-        (failure) {
-          setState(() {
-            _errorMessage = failure.message;
-            _isLoading = false;
-          });
-        },
-        (eventEntities) {
-          // Convert entities to widget models
-          final events = eventEntities.map((entity) {
-            return UpcomingEvent(
-              eventType: entity.eventType,
-              personName: entity.personName,
-              date: entity.formattedDate,
-              celebratoryIcon: _getIconFromName(entity.iconName),
-            );
-          }).toList();
-
-          setState(() {
-            _events = events;
-            _isLoading = false;
-          });
-        },
-      );
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Error loading events: ${e.toString()}';
-        _isLoading = false;
-      });
-    }
+    }).toList();
   }
 
   IconData _getIconFromName(String iconName) {
@@ -127,36 +76,38 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
           SizedBox(
             height: MediaQuery.of(context).size.height * 0.02, // 2% of screen height
           ),
-          if (_isLoading)
+          if (isLoading)
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(16.0),
                 child: CircularProgressIndicator(),
               ),
             )
-          else if (_errorMessage != null)
+          else if (errorMessage != null)
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
                     Text(
-                      _errorMessage!,
+                      errorMessage!,
                       style: AppTextStyles.bodyMedium(context).copyWith(
                         color: AppColors.error,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: _loadEvents,
-                      child: const Text('Retry'),
-                    ),
+                    if (onRefresh != null) ...[
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: onRefresh,
+                        child: const Text('Retry'),
+                      ),
+                    ],
                   ],
                 ),
               ),
             )
-          else if (_events.isEmpty)
+          else if (_convertToWidgetEvents(events).isEmpty)
             Container(
               height: MediaQuery.of(context).size.height * 0.25, // Fixed height for consistency
               alignment: Alignment.center,
@@ -180,12 +131,13 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
                 padding: EdgeInsets.zero,
                 scrollDirection: Axis.vertical,
                 physics: const BouncingScrollPhysics(),
-                itemCount: _events.length,
+                itemCount: _convertToWidgetEvents(events).length,
                 separatorBuilder: (context, index) => SizedBox(
                   height: MediaQuery.of(context).size.height * 0.015, // 1.5% of screen height
                 ),
                 itemBuilder: (context, index) {
-                  return _buildEventCard(context, _events[index]);
+                  final widgetEvents = _convertToWidgetEvents(events);
+                  return _buildEventCard(context, widgetEvents[index]);
                 },
               ),
             ),
@@ -194,7 +146,7 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
     );
   }
 
-  Widget _buildEventCard(BuildContext context, UpcomingEvent event) {
+  Widget _buildEventCard(BuildContext context, UpcomingEventWidget event) {
     final tealColor = AppColors.serviceTeal;
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;

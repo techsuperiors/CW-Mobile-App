@@ -37,6 +37,62 @@ class AttendanceDetailsRepositoryImpl
   }
 
   AttendanceDetails _mapModelToEntity(AttendanceDetailsModel model) {
+    // Map OverTime
+    OverTime? overTimeEntity;
+    if (model.overTime != null) {
+      overTimeEntity = OverTime(
+        total: model.overTime!.total,
+        beforePunchIn: model.overTime!.beforePunchIn,
+        afterPunchOut: model.overTime!.afterPunchOut,
+      );
+    }
+
+    // Map Shift
+    Shift? shiftEntity;
+    if (model.shift != null) {
+      shiftEntity = Shift(
+        id: model.shift!.id,
+        shiftDayTiming: model.shift!.shiftDayTiming
+            .map((timing) => ShiftDayTiming(
+                  day: timing.day,
+                  punchIn: timing.punchIn,
+                  punchOut: timing.punchOut,
+                  breakTime: timing.breakTime,
+                  grossHours: timing.grossHours,
+                  effectiveHours: timing.effectiveHours,
+                ))
+            .toList(),
+        weeklyOffDays: model.shift!.weeklyOffDays
+            .map((offDay) => WeeklyOffDay(
+                  day: offDay.day,
+                  offType: offDay.offType,
+                  selectedDay: offDay.selectedDay,
+                  weeklyOccurrence: offDay.weeklyOccurrence,
+                ))
+            .toList(),
+      );
+    }
+
+    // Map Activities
+    List<Activity>? activities;
+    if (model.activity != null) {
+      activities = model.activity!
+          .map((activity) => Activity(
+                action: activity.action,
+                activityType: activity.activityType,
+                activityBy: activity.activityBy,
+                createdAt: activity.createdAt,
+                time: activity.time,
+                penaltyMessage: activity.penaltyMessage,
+                paidDays: activity.paidDays,
+                unPaidDays: activity.unPaidDays,
+                ip: activity.ip,
+                location: activity.location,
+                mode: activity.mode,
+              ))
+          .toList();
+    }
+
     return AttendanceDetails(
       id: model.id,
       clientId: model.clientId,
@@ -46,7 +102,7 @@ class AttendanceDetailsRepositoryImpl
       punchOut: model.punchOut,
       totalTime: model.totalTime,
       breakTime: model.breakTime,
-      overTime: model.overTime,
+      overTime: overTimeEntity,
       punchInIp: model.punchInIp,
       punchOutIp: model.punchOutIp,
       punchInLocation: model.punchInLocation,
@@ -63,13 +119,21 @@ class AttendanceDetailsRepositoryImpl
       leaveType: model.leaveType,
       deductDays: model.deductDays,
       regularizeId: model.regularizeId,
+      remark: model.remark,
+      approvalStatus: model.approvalStatus,
       isProcessed: model.isProcessed,
+      activity: activities,
       createdBy: model.createdBy,
       createdAt: model.createdAt,
       updatedBy: model.updatedBy,
       updatedAt: model.updatedAt,
+      shift: shiftEntity,
       onDuty: model.onDuty,
       wfhShowPunch: model.wfhShowPunch,
+      approvalRequired: model.approvalRequired,
+      punchOutRemarkRequired: model.punchOutRemarkRequired,
+      grossHours: model.grossHours,
+      effectiveHours: model.effectiveHours,
       formattedPunchIn: model.formattedPunchIn,
       formattedPunchOut: model.formattedPunchOut,
       formattedBreakTime: model.formattedBreakTime,

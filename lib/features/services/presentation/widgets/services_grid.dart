@@ -65,7 +65,7 @@ class _ServiceCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: Color(0xffF1F9FE),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: AppColors.border,
@@ -73,33 +73,61 @@ class _ServiceCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
               offset: const Offset(0, 2),
+              spreadRadius: 0,
             ),
           ],
         ),
-        padding: EdgeInsets.all(screenWidth * 0.037), // ~3.7% of screen width
+        padding: EdgeInsets.all(screenWidth * 0.03), // 4% of screen width
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Icon at top-left
-            SvgPicture.asset(
-              service.iconPath,
-              width: smallerDimension * 0.067, // ~6.7% of smaller dimension
-              height: smallerDimension * 0.067,
-              colorFilter: const ColorFilter.mode(
-                AppColors.primaryLight,
-                BlendMode.srcIn,
+            // Icon container with colored background, border, and shadow
+            Container(
+              width: smallerDimension * 0.12, // 12% of smaller dimension
+              height: smallerDimension * 0.12,
+              decoration: BoxDecoration(
+                color: service.backgroundColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: service.iconColor.withOpacity(0.2),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: service.iconColor.withOpacity(0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                    spreadRadius: 0,
+                  ),
+                ],
               ),
+              padding: EdgeInsets.all(smallerDimension * 0.02), // 2% padding
+              child: service.iconPath != null
+                  ? SvgPicture.asset(
+                      service.iconPath!,
+                      width: smallerDimension * 0.08, // 8% of smaller dimension
+                      height: smallerDimension * 0.08,
+                      colorFilter: ColorFilter.mode(
+                        service.iconColor,
+                        BlendMode.srcIn,
+                      ),
+                    )
+                  : Icon(
+                      service.iconData ?? Icons.help_outline,
+                      color: service.iconColor,
+                      size: smallerDimension * 0.06, // 6% of smaller dimension
+                    ),
             ),
             SizedBox(height: screenHeight * 0.015), // 1.5% of screen height
             // Bold title
             Text(
               service.title,
-              style: AppTextStyles.bodyLarge(context).copyWith(
+              style: AppTextStyles.bodyMedium(context).copyWith(
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
                 height: 1.2,

@@ -7,10 +7,12 @@ import '../pages/ticket_detail_page.dart';
 /// Ticket card widget
 class TicketCard extends StatelessWidget {
   final TicketModel ticket;
+  final VoidCallback? onRefresh;
 
   const TicketCard({
     super.key,
     required this.ticket,
+    this.onRefresh,
   });
 
   Color _getPriorityColor(String priority) {
@@ -43,19 +45,28 @@ class TicketCard extends StatelessWidget {
     }
   }
 
+  String _capitalizeFirst(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1).toLowerCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
     return InkWell(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        final result = await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => TicketDetailPage(ticket: ticket),
+            builder: (context) => TicketDetailPage(ticketId: ticket.ticketId),
           ),
         );
+        // If result is true, it means file was uploaded and we should refresh
+        if (result == true && context.mounted && onRefresh != null) {
+          onRefresh!();
+        }
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
@@ -89,18 +100,6 @@ class TicketCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.more_vert,
-                  size: screenWidth * 0.05,
-                  color: AppColors.textSecondary,
-                ),
-                onPressed: () {
-                  // Handle menu
-                },
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
               ),
             ],
           ),
@@ -141,7 +140,7 @@ class TicketCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        '-- ${ticket.priority}',
+                        _capitalizeFirst(ticket.priority),
                         style: AppTextStyles.labelSmall(context).copyWith(
                           color: _getPriorityColor(ticket.priority),
                           fontWeight: FontWeight.w600,

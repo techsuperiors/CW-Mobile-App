@@ -4,6 +4,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/common/app_section_header.dart';
+import '../../../request/presentation/pages/sub_requets/leaves/presentation/pages/apply_leave_page.dart';
+import '../../../request/presentation/pages/sub_requets/wfh/presentation/pages/apply_wfh_page.dart';
+import '../../../request/presentation/pages/sub_requets/regularize/presentation/pages/apply_regularize_page.dart';
 
 /// Quick links widget
 class QuickLinks extends StatelessWidget {
@@ -40,12 +43,6 @@ class QuickLinks extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppSectionHeader(title: AppStrings.quickLinks),
-          // SizedBox(
-          //   height: ResponsiveUtils.responsiveSpacing(
-          //     context,
-          //     mobile: 16.0,
-          //   ),
-          // ),
           SizedBox(
             height: MediaQuery.of(context).size.width * 0.25, // 25% of screen width
             child: ListView.separated(
@@ -62,6 +59,7 @@ class QuickLinks extends StatelessWidget {
                   label: link['label'] as String,
                   iconColor: link['color'] as Color,
                   backgroundColor: link['backgroundColor'] as Color,
+                  onTap: () => _handleQuickLinkTap(context, link['label'] as String),
                 );
               },
             ),
@@ -71,12 +69,38 @@ class QuickLinks extends StatelessWidget {
     );
   }
 
+  void _handleQuickLinkTap(BuildContext context, String label) {
+    if (label == AppStrings.applyLeaveRequest) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ApplyLeavePage(),
+        ),
+      );
+    } else if (label == AppStrings.workFromHomeRequest) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ApplyWfhPage(),
+        ),
+      );
+    } else if (label == AppStrings.raiseRegularizeRequest) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ApplyRegularizePage(),
+        ),
+      );
+    }
+  }
+
   Widget _buildQuickLinkCard(
     BuildContext context, {
     required IconData icon,
     required String label,
     required Color iconColor,
     required Color backgroundColor,
+    required VoidCallback onTap,
   }) {
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;
@@ -93,9 +117,7 @@ class QuickLinks extends StatelessWidget {
       width: cardWidth,
       height: cardHeight,
       child: InkWell(
-        onTap: () {
-          // Handle tap
-        },
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
           decoration: BoxDecoration(

@@ -9,8 +9,8 @@ class GetLeaveTypesUseCase {
 
   GetLeaveTypesUseCase(this.repository);
 
-  Future<Either<Failure, LeaveTypes>> call() {
-    return repository.getLeaveTypes();
+  Future<Either<Failure, LeaveTypes>> call(int userId) {
+    return repository.getLeaveTypes(userId);
   }
 }
 

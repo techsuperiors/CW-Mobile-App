@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'package:flutter/material.dart';
+
 /// Service model for services page
 class ServiceModel {
   final String id;
   final String title;
   final String description;
-  final String iconPath; // SVG icon path
+  final String? iconPath; // SVG icon path (optional)
+  final IconData? iconData; // Material icon (optional)
   final Color iconColor;
   final Color backgroundColor;
 
@@ -13,7 +16,8 @@ class ServiceModel {
     required this.id,
     required this.title,
     required this.description,
-    required this.iconPath,
+    this.iconPath,
+    this.iconData,
     required this.iconColor,
     required this.backgroundColor,
   });
@@ -24,6 +28,7 @@ class ServiceModel {
     String? title,
     String? description,
     String? iconPath,
+    IconData? iconData,
     Color? iconColor,
     Color? backgroundColor,
   }) {
@@ -32,6 +37,7 @@ class ServiceModel {
       title: title ?? this.title,
       description: description ?? this.description,
       iconPath: iconPath ?? this.iconPath,
+      iconData: iconData ?? this.iconData,
       iconColor: iconColor ?? this.iconColor,
       backgroundColor: backgroundColor ?? this.backgroundColor,
     );

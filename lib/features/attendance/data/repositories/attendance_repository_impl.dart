@@ -49,5 +49,36 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       return Left(const NetworkFailure(AppStrings.noInternetConnection));
     }
   }
+
+  @override
+  Future<Either<Failure, PunchInResult>> punchOut({
+    required String punchOutLocation,
+    required double latitude,
+    required double longitude,
+  }) async {
+    if (await networkInfo.isConnected) {
+      try {
+        final request = PunchOutRequest(
+          punchOutLocation: punchOutLocation,
+          latitude: latitude,
+          longitude: longitude,
+        );
+        
+        final response = await remoteDataSource.punchOut(request);
+        
+        return Right(PunchInResult(
+          success: response.success,
+          message: response.message ?? 'Punch-out successful',
+          data: response.data,
+        ));
+      } on ServerException catch (e) {
+        return Left(ServerFailure(e.message));
+      } catch (e) {
+        return Left(ServerFailure(AppStrings.unexpectedError));
+      }
+    } else {
+      return Left(const NetworkFailure(AppStrings.noInternetConnection));
+    }
+  }
 }
 

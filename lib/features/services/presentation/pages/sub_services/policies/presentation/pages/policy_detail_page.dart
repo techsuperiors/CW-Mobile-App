@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../domain/models/policy_model.dart';
@@ -68,9 +69,7 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
       ),
       bottomNavigationBar: BottomNavBar(
         currentIndex: 0, // Services is active
-        onTap: (index) {
-          // Handle navigation if needed
-        },
+        onTap: NavigationHelper.getBottomNavHandler(context),
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(

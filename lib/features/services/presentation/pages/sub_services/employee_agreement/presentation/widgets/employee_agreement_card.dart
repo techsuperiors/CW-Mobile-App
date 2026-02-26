@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../domain/models/employee_agreement_model.dart';
 import '../pages/employee_agreement_detail_page.dart';
+import '../bloc/agreement_bloc.dart';
 
 /// Card widget for displaying employee agreement information
 class EmployeeAgreementCard extends StatelessWidget {
@@ -16,14 +18,23 @@ class EmployeeAgreementCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {
+      onTap: () async {
         // Navigate to agreement detail page when tapped
-        Navigator.push(
+        // Pass the bloc using BlocProvider.value so the detail page can access it
+        final bloc = context.read<AgreementBloc>();
+        final result = await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => EmployeeAgreementDetailPage(agreement: agreement),
+            builder: (context) => BlocProvider.value(
+              value: bloc,
+              child: EmployeeAgreementDetailPage(agreement: agreement),
+            ),
           ),
         );
+        
+        // If consent was submitted successfully, the refresh is already triggered
+        // in the detail page, so we don't need to do anything here
+        // The BlocBuilder in the list page will automatically update
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
@@ -42,33 +53,13 @@ class EmployeeAgreementCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title and Kebab Menu
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    'Assign Agreement',
-                    style: AppTextStyles.bodyLarge(context).copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(
-                    Icons.more_vert,
-                    size: MediaQuery.of(context).size.width * 0.053, // ~5.3% of screen width
-                    color: AppColors.textSecondary,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () {
-                    // Handle kebab menu tap
-                  },
-                ),
-              ],
+            // Title
+            Text(
+              agreement.agreementName,
+              style: AppTextStyles.bodyLarge(context).copyWith(
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
             SizedBox(height: MediaQuery.of(context).size.height * 0.02), // 2% of screen height
             // Employee Name

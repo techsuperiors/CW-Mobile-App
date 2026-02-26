@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 /// Ticket model
 class TicketModel {
-  final String id;
+  final int ticketId; // Integer ID for API calls
+  final String id; // String ID for display (ticketID)
   final String title;
   final String fullTitle;
   final String category;
@@ -15,6 +16,7 @@ class TicketModel {
   final List<String>? attachments;
 
   TicketModel({
+    required this.ticketId,
     required this.id,
     required this.title,
     required this.fullTitle,

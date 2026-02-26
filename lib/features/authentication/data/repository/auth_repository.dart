@@ -8,6 +8,9 @@ import '../../../../core/utils/data_encoder.dart';
 import '../../../../core/utils/token_storage.dart';
 import '../models/login_response.dart';
 import '../models/user_model.dart';
+import '../models/forgot_password_response.dart';
+import '../models/validate_otp_response.dart';
+import '../models/reset_password_response.dart';
 import '../../domain/entities/user.dart';
 
 class AuthRepository {
@@ -93,16 +96,175 @@ class AuthRepository {
     }
   }
 
-  /// Logout
-  Future<void> logout() async {
+  /// Logout - calls logout API, clears data only on API success
+  /// Returns true if logout succeeded (API success + data cleared), false otherwise
+  Future<bool> logout() async {
     try {
-      // Clear token from storage
-      await TokenStorage.clearToken();
-      debugPrint('Token cleared on logout');
-      // You can implement logout API call here if needed
+      // Call logout API first so backend can invalidate the token
+      final success = await _apiService.callLogoutApi();
+      // Clear data only after successful API response
+      if (success) {
+        await TokenStorage.clearAll();
+        debugPrint('Logout complete - token and all data cleared');
+        return true;
+      }
+      debugPrint('Logout API failed - local data not cleared');
+      return false;
     } catch (e) {
-      // Log error but don't throw - logout should always succeed locally
       debugPrint('Logout error: $e');
+      return false;
+    }
+  }
+
+  /// Forgot password - sends OTP to email
+  Future<void> forgotPassword(String email) async {
+    try {
+      final payload = {'email': email};
+      final encodedData = encodeData(payload);
+
+      final response = await _apiService.postNew<ForgotPasswordResponse>(
+        AppUrls.forgotPassword,
+        data: {'payload': encodedData},
+        fromJson: (json) => ForgotPasswordResponse.fromJson(
+          json as Map<String, dynamic>,
+        ),
+      );
+
+      if (response.isSuccess && response.data != null) {
+        if (!response.data!.success) {
+          throw ServerException(
+            response.data!.data?.email != null
+                ? 'Failed to send OTP'
+                : AppStrings.serverError,
+          );
+        }
+      } else {
+        if (response.error != null) {
+          throw ServerException(response.error!.message);
+        }
+        throw ServerException(AppStrings.serverError);
+      }
+    } on ServerException {
+      rethrow;
+    } on NetworkException {
+      rethrow;
+    } catch (e) {
+      throw ServerException('Forgot password failed: ${e.toString()}');
+    }
+  }
+
+  /// Validate OTP - verifies OTP and returns token for reset password
+  Future<void> validatePasswordResetOtp(String email, String otp) async {
+    try {
+      final payload = {'email': email, 'otp': otp};
+      final encodedData = encodeData(payload);
+
+      final response = await _apiService.postNew<ValidateOtpResponse>(
+        AppUrls.validatePasswordResetOtp,
+        data: {'payload': encodedData},
+        fromJson: (json) => ValidateOtpResponse.fromJson(
+          json as Map<String, dynamic>,
+        ),
+      );
+
+      if (response.isSuccess && response.data != null) {
+        final validateResponse = response.data!;
+        if (!validateResponse.success) {
+          throw ServerException('Invalid or expired OTP');
+        }
+        if (validateResponse.token == null ||
+            validateResponse.token!.isEmpty) {
+          throw ServerException('Token not received from server');
+        }
+        // Save token for reset password API
+        await TokenStorage.saveToken(validateResponse.token!);
+      } else {
+        if (response.error != null) {
+          throw ServerException(response.error!.message);
+        }
+        throw ServerException('Invalid or expired OTP');
+      }
+    } on ServerException {
+      rethrow;
+    } on NetworkException {
+      rethrow;
+    } catch (e) {
+      throw ServerException('OTP validation failed: ${e.toString()}');
+    }
+  }
+
+  /// Reset password - requires token from validate OTP
+  Future<void> resetPassword(String password) async {
+    try {
+      final payload = {'password': password};
+      final encodedData = encodeData(payload);
+
+      final response = await _apiService.postNew<ResetPasswordResponse>(
+        AppUrls.resetPassword,
+        data: {'payload': encodedData},
+        fromJson: (json) => ResetPasswordResponse.fromJson(
+          json as Map<String, dynamic>,
+        ),
+      );
+
+      if (response.isSuccess && response.data != null) {
+        if (!response.data!.success) {
+          throw ServerException(
+            response.data!.message ?? 'Failed to reset password',
+          );
+        }
+        // Clear the temporary token after successful reset
+        await TokenStorage.clearToken();
+      } else {
+        if (response.error != null) {
+          throw ServerException(response.error!.message);
+        }
+        throw ServerException(AppStrings.serverError);
+      }
+    } on ServerException {
+      rethrow;
+    } on NetworkException {
+      rethrow;
+    } catch (e) {
+      throw ServerException('Reset password failed: ${e.toString()}');
+    }
+  }
+
+  /// Change password - for logged-in users (requires token)
+  Future<void> changePassword(String oldPassword, String newPassword) async {
+    try {
+      final payload = {
+        'old_password': oldPassword,
+        'new_password': newPassword,
+      };
+      final encodedData = encodeData(payload);
+
+      final response = await _apiService.postNew<ResetPasswordResponse>(
+        AppUrls.changePassword,
+        data: {'payload': encodedData},
+        fromJson: (json) => ResetPasswordResponse.fromJson(
+          json as Map<String, dynamic>,
+        ),
+      );
+
+      if (response.isSuccess && response.data != null) {
+        if (!response.data!.success) {
+          throw ServerException(
+            response.data!.message ?? 'Failed to change password',
+          );
+        }
+      } else {
+        if (response.error != null) {
+          throw ServerException(response.error!.message);
+        }
+        throw ServerException(AppStrings.serverError);
+      }
+    } on ServerException {
+      rethrow;
+    } on NetworkException {
+      rethrow;
+    } catch (e) {
+      throw ServerException('Change password failed: ${e.toString()}');
     }
   }
 }

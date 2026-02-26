@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/common/app_text_field.dart';
 import '../../../../core/widgets/common/app_button.dart';
+import '../bloc/forgot_password/forgot_password_bloc.dart';
+import '../bloc/forgot_password/forgot_password_event.dart';
+import '../bloc/forgot_password/forgot_password_state.dart';
 import 'password_changed_success_page.dart';
 
 /// Reset password page matching CollectivWork design
@@ -21,7 +25,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -32,25 +35,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   void _handleSave() {
     if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      // Simulate API call delay
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-          // Navigate to password changed success page
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const PasswordChangedSuccessPage(),
-            ),
+      context.read<ForgotPasswordBloc>().add(
+            ForgotPasswordResetRequested(_passwordController.text),
           );
-        }
-      });
     }
   }
 
@@ -70,10 +57,28 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       return baseSpacing;
     }
     
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      resizeToAvoidBottomInset: true,
-      body: LayoutBuilder(
+    return BlocListener<ForgotPasswordBloc, ForgotPasswordState>(
+      listener: (context, state) {
+        if (state is ForgotPasswordResetSuccess) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const PasswordChangedSuccessPage(),
+            ),
+          );
+        } else if (state is ForgotPasswordError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.failure.message),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        resizeToAvoidBottomInset: true,
+        body: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -172,13 +177,17 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                               _buildConfirmPasswordField(),
                               SizedBox(height: responsiveSpacing(32)),
                               // Save button
-                              AppButton(
-                                label: AppStrings.save,
-                                onPressed: _handleSave,
-                                isPrimary: true,
-                                isLoading: _isLoading,
-                                width: double.infinity,
-                                backgroundColor: AppColors.loginHeaderTeal,
+                              BlocBuilder<ForgotPasswordBloc, ForgotPasswordState>(
+                                builder: (context, state) {
+                                  return AppButton(
+                                    label: AppStrings.save,
+                                    onPressed: _handleSave,
+                                    isPrimary: true,
+                                    isLoading: state is ForgotPasswordLoading,
+                                    width: double.infinity,
+                                    backgroundColor: AppColors.loginHeaderTeal,
+                                  );
+                                },
                               ),
                               SizedBox(height: responsiveSpacing(32)),
                             ],
@@ -192,6 +201,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
             ),
           );
         },
+      ),
       ),
     );
   }

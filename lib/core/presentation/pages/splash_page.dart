@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../constants/app_assets.dart';
-import '../../../features/authentication/presentation/bloc/auth_bloc.dart';
-import '../../../features/authentication/presentation/bloc/auth_event.dart';
-import '../../../features/authentication/presentation/bloc/auth_state.dart';
+import '../../../features/authentication/presentation/bloc/auth_bloc/auth_bloc.dart';
+import '../../../features/authentication/presentation/bloc/auth_bloc/auth_event.dart';
+import '../../../features/authentication/presentation/bloc/auth_bloc/auth_state.dart';
 import '../../../features/authentication/presentation/pages/login_page.dart';
 import '../../../features/home/presentation/pages/home_page.dart';
 

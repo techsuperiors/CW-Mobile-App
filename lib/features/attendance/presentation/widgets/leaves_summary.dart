@@ -1,90 +1,40 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:dio/dio.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/network/network_info.dart';
-import '../../../leaves/data/datasources/leave_types_remote_datasource.dart';
-import '../../../leaves/data/repositories/leave_types_repository_impl.dart';
-import '../../../leaves/domain/usecases/get_leave_types_usecase.dart';
+import '../../../leaves/domain/entities/leave_type.dart';
 
 /// Leaves summary with donut chart and legend
-class LeavesSummary extends StatefulWidget {
-  const LeavesSummary({super.key});
+class LeavesSummary extends StatelessWidget {
+  final LeaveTypes? leaveTypes;
+  final bool isLoading;
+  final String? errorMessage;
 
-  @override
-  State<LeavesSummary> createState() => _LeavesSummaryState();
-}
+  const LeavesSummary({
+    super.key,
+    this.leaveTypes,
+    required this.isLoading,
+    this.errorMessage,
+  });
 
-class _LeavesSummaryState extends State<LeavesSummary> {
-  List<Map<String, dynamic>> _leaveTypes = [];
-  int _totalLeaves = 0;
-  bool _isLoading = true;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadLeaveTypes();
+  /// Get mapped leave types with colors
+  List<Map<String, dynamic>> _getMappedLeaveTypes() {
+    if (leaveTypes == null) return [];
+    
+    return leaveTypes!.leaveTypes.map((type) {
+      return {
+        'label': type.leaveType,
+        'count': type.count,
+        'color': _getColorForLeaveType(type.leaveType),
+      };
+    }).toList();
   }
 
-  Future<void> _loadLeaveTypes() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Initialize API client and dependencies
-      final networkInfo = NetworkInfoImpl(Connectivity());
-      final dio = Dio();
-      final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
-      final remoteDataSource = LeaveTypesRemoteDataSourceImpl(apiClient);
-      final repository = LeaveTypesRepositoryImpl(
-        remoteDataSource: remoteDataSource,
-        networkInfo: networkInfo,
-      );
-      final getLeaveTypesUseCase = GetLeaveTypesUseCase(repository);
-
-      // Fetch leave types from API
-      final result = await getLeaveTypesUseCase();
-
-      result.fold(
-        (failure) {
-          setState(() {
-            _errorMessage = failure.message;
-            _isLoading = false;
-          });
-        },
-        (leaveTypes) {
-          // Map leave types to widget format with colors
-          final mappedTypes = leaveTypes.leaveTypes.map((type) {
-            return {
-              'label': type.leaveType,
-              'count': type.count,
-              'color': _getColorForLeaveType(type.leaveType),
-            };
-          }).toList();
-
-          final total = mappedTypes.fold<int>(0, (sum, type) => sum + (type['count'] as int));
-
-          setState(() {
-            _leaveTypes = mappedTypes;
-            _totalLeaves = total;
-            _isLoading = false;
-          });
-        },
-      );
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Error loading leave types: ${e.toString()}';
-        _isLoading = false;
-      });
-    }
+  int _getTotalLeaves() {
+    final mappedTypes = _getMappedLeaveTypes();
+    return mappedTypes.fold<int>(0, (sum, type) => sum + (type['count'] as int));
   }
 
   Color _getColorForLeaveType(String leaveType) {
@@ -151,36 +101,31 @@ class _LeavesSummaryState extends State<LeavesSummary> {
               height: MediaQuery.of(context).size.height * 0.02, // 2% of screen height
             ),
             // Content: Loading, Error, or Data
-            if (_isLoading)
+            if (isLoading)
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(16.0),
                   child: CircularProgressIndicator(),
                 ),
               )
-            else if (_errorMessage != null)
+            else if (errorMessage != null)
               Center(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     children: [
                       Text(
-                        _errorMessage!,
+                        errorMessage!,
                         style: AppTextStyles.bodyMedium(context).copyWith(
                           color: AppColors.error,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: _loadLeaveTypes,
-                        child: const Text('Retry'),
-                      ),
                     ],
                   ),
                 ),
               )
-            else if (_leaveTypes.isEmpty)
+            else if (_getMappedLeaveTypes().isEmpty)
               Center(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -202,7 +147,7 @@ class _LeavesSummaryState extends State<LeavesSummary> {
                     flex: 3,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: _leaveTypes.map((type) {
+                      children: _getMappedLeaveTypes().map((type) {
                       return Padding(
                         padding: EdgeInsets.only(bottom: screenHeight * 0.015), // 1.5% of screen height
                         child: Row(
@@ -240,7 +185,7 @@ class _LeavesSummaryState extends State<LeavesSummary> {
                         height: MediaQuery.of(context).size.width * 0.40, // 40% of screen width
                         width: MediaQuery.of(context).size.width * 0.40,
                         child: CustomPaint(
-                          painter: DonutChartPainter(leaveTypes: _leaveTypes),
+                          painter: DonutChartPainter(leaveTypes: _getMappedLeaveTypes()),
                         ),
                       ),
                       SizedBox(height: screenHeight * 0.01), // 1% of screen height
@@ -253,7 +198,7 @@ class _LeavesSummaryState extends State<LeavesSummary> {
                         children: [
                           Flexible(
                             child: Text(
-                              _totalLeaves.toString(),
+                              _getTotalLeaves().toString(),
                               style: AppTextStyles.heading3(context).copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.grey[800],

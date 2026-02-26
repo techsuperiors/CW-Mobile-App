@@ -101,6 +101,7 @@ class LeaveTypeCard extends StatelessWidget {
   }
 
   Widget _buildLOPTable(context) {
+    final currentMonthLop = totalLeaves; // Use totalLeaves for current month LOP
     return Table(
       border: TableBorder(
         top: const BorderSide(color: AppColors.border, width: 1),
@@ -110,7 +111,7 @@ class LeaveTypeCard extends StatelessWidget {
         horizontalInside: const BorderSide(color: AppColors.border, width: 1),
       ),
       children: [
-        _buildTableRow(context, 'LOP This Month', '02 Days'),
+        _buildTableRow(context, 'LOP This Month', '$currentMonthLop Days'),
         _buildTableRow(context, 'Total LOP Days', '$allocatedQuota Days'),
       ],
     );

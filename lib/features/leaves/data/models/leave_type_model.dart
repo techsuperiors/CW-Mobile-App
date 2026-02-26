@@ -1,3 +1,11 @@
+/// Safely converts dynamic (int or double from JSON) to int?
+int? _toInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  return null;
+}
+
 /// Leave Type Configuration Model
 class LeaveTypeConfigModel {
   final String? leaveType;
@@ -47,10 +55,10 @@ class LeaveTypeConfigModel {
   factory LeaveTypeConfigModel.fromJson(Map<String, dynamic> json) {
     return LeaveTypeConfigModel(
       leaveType: json['leave_type'] as String?,
-      annualQuota: json['annual_quota'] as int?,
-      assignedQuota: json['assigned_quota'] as int?,
-      remainingLeaves: json['remaining_leaves'] as int?,
-      allocatedLeave: json['allocated_leave'] as int?,
+      annualQuota: _toInt(json['annual_quota']),
+      assignedQuota: _toInt(json['assigned_quota']),
+      remainingLeaves: _toInt(json['remaining_leaves']),
+      allocatedLeave: _toInt(json['allocated_leave']),
       leaveCode: json['leave_code'] as String?,
       distributeType: json['distributeType'] as String?,
       leaveTypeCategory: json['leaveType'] as String?,
@@ -60,7 +68,7 @@ class LeaveTypeConfigModel {
       maritalStatus: json['marital_status'] != null
           ? (json['marital_status'] as List).map((e) => e.toString()).toList()
           : null,
-      consumedLeaves: json['consumed_leaves'] as int?,
+      consumedLeaves: _toInt(json['consumed_leaves']),
       distributionType: json['distribution_type'] as String?,
       leaveCategory: json['leave_category'] as String?,
       reasonList: json['reason_list'] as List<dynamic>?,
@@ -68,8 +76,8 @@ class LeaveTypeConfigModel {
       mandatoryRaiseDays: json['mandatory_raise_days'] as String?,
       status: json['status'] as String?,
       rules: json['rules'] as Map<String, dynamic>?,
-      totalLeaves: json['total_leaves'] as int?,
-      currentMonthLop: json['current_month_lop'] as int?,
+      totalLeaves: _toInt(json['total_leaves']),
+      currentMonthLop: _toInt(json['current_month_lop']),
     );
   }
 
@@ -115,9 +123,9 @@ class LeaveTypesResponseModel {
     }
 
     return LeaveTypesResponseModel(
-      id: json['id'] as int?,
-      userId: json['user_id'] as int?,
-      leavePolicyId: json['leave_policy_id'] as int?,
+      id: _toInt(json['id']),
+      userId: _toInt(json['user_id']),
+      leavePolicyId: _toInt(json['leave_policy_id']),
       leavePolicyName: json['leave_policy_name'] as String?,
       leaveConfig: leaveConfig,
       lossOffPay: json['lossOffPay'] as bool? ?? false,

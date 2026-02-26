@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'dart:async';
 import 'dart:math' as math;
+import 'package:intl/intl.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -8,11 +9,15 @@ import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/location_service.dart';
+import '../../../../core/utils/time_utils.dart';
+import '../../../../core/widgets/attendance_timer_circle.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/network_info.dart';
 import '../../data/datasources/attendance_remote_datasource.dart';
 import '../../data/repositories/attendance_repository_impl.dart';
 import '../../domain/usecases/punch_in_usecase.dart';
+import '../../domain/usecases/punch_out_usecase.dart';
+import '../../domain/entities/attendance_details.dart';
 
 // Helper function to get gradient alignment for CSS angle (111.14°)
 // CSS: 0° = right, clockwise. The gradient line goes in this direction
@@ -47,21 +52,135 @@ List<Alignment> _getGradientAlignment(double angleDegrees) {
 
 /// Large attendance card with date, time, progress, and punch in/out button
 class AttendanceCard extends StatefulWidget {
-  const AttendanceCard({super.key});
+  final AttendanceDetails? attendanceDetails;
+  final bool isLoading;
+  final VoidCallback onRefresh;
+
+  const AttendanceCard({
+    super.key,
+    this.attendanceDetails,
+    required this.isLoading,
+    required this.onRefresh,
+  });
 
   @override
   State<AttendanceCard> createState() => _AttendanceCardState();
 }
 
 class _AttendanceCardState extends State<AttendanceCard> {
-  bool _isPunchedIn = false; // Track punch-in status
-  bool _isLoading = false; // Track loading state
+  bool _isPunchingIn = false;
+  bool _isPunchingOut = false;
+  Timer? _updateTimer;
+  double _workedHours = 0.0;
+  double _shiftHours = 8.0; // Default shift hours
 
-  Future<void> _handlePunchIn() async {
-    if (_isLoading) return;
+  /// Check if user is already punched in
+  /// Uses punchIn as primary indicator (has punch-in time, no punch-out)
+  /// punchInIp is optional - API may not always return it
+  bool get _isPunchedIn {
+    final hasPunchOut = widget.attendanceDetails?.punchOut != null &&
+        widget.attendanceDetails!.punchOut!.isNotEmpty &&
+        widget.attendanceDetails!.punchOut != '-';
+    if (hasPunchOut) return false;
+
+    final hasPunchInIp = widget.attendanceDetails?.punchInIp != null &&
+        widget.attendanceDetails!.punchInIp!.isNotEmpty &&
+        widget.attendanceDetails!.punchInIp != '-';
+    final hasPunchIn = widget.attendanceDetails?.punchIn != null &&
+        widget.attendanceDetails!.punchIn!.isNotEmpty &&
+        widget.attendanceDetails!.punchIn != '-';
+    return hasPunchInIp || hasPunchIn;
+  }
+
+  /// Check if status is Holiday
+  bool get _isHoliday {
+    return widget.attendanceDetails?.status?.toLowerCase() == 'holiday';
+  }
+
+  /// Check if it's a week off day (Sunday)
+  bool get _isWeekOff {
+    if (widget.attendanceDetails?.date == null) return false;
+    try {
+      final utcDate = DateTime.parse(widget.attendanceDetails!.date!);
+      final localDate = utcDate.toLocal();
+      // Sunday is 7 in DateTime.weekday (Monday=1, Sunday=7)
+      return localDate.weekday == 7;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Check if punch-in button should be disabled (punch out is always enabled when punched in)
+  bool get _isPunchInDisabled {
+    return _isHoliday || _isWeekOff || _isPunchedIn;
+  }
+
+  /// Check if the main button should be disabled
+  bool get _isButtonDisabled {
+    if (widget.isLoading || _isPunchingIn || _isPunchingOut) return true;
+    // When punched in, show punch out - button is enabled
+    if (_isPunchedIn) return false;
+    // When not punched in, disable if holiday or week off
+    return _isHoliday || _isWeekOff;
+  }
+
+  /// Get formatted date from UTC date string
+  String _getFormattedDate() {
+    if (widget.attendanceDetails?.date == null) {
+      return DateFormat('dd MMM, yyyy').format(DateTime.now());
+    }
+    try {
+      final utcDate = DateTime.parse(widget.attendanceDetails!.date!);
+      final localDate = utcDate.toLocal();
+      return DateFormat('dd MMM, yyyy').format(localDate);
+    } catch (e) {
+      return DateFormat('dd MMM, yyyy').format(DateTime.now());
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Update timer every second to refresh worked hours when punched in
+    _updateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _updateWorkedHours();
+    });
+    _updateWorkedHours();
+  }
+
+  @override
+  void didUpdateWidget(AttendanceCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update worked hours when attendance details change
+    if (oldWidget.attendanceDetails != widget.attendanceDetails) {
+      _updateWorkedHours();
+    }
+  }
+
+  @override
+  void dispose() {
+    _updateTimer?.cancel();
+    super.dispose();
+  }
+
+  void _updateWorkedHours() {
+    if (!mounted) return;
 
     setState(() {
-      _isLoading = true;
+      _workedHours = TimeUtils.getWorkedHours(
+        totalTime: widget.attendanceDetails?.totalTime,
+        punchIn: widget.attendanceDetails?.punchIn,
+        punchOut: widget.attendanceDetails?.punchOut,
+        punchInIp: widget.attendanceDetails?.punchInIp,
+      );
+    });
+  }
+
+  Future<void> _handlePunchIn() async {
+    if (_isPunchingIn || _isPunchedIn || _isPunchInDisabled) return;
+
+    setState(() {
+      _isPunchingIn = true;
     });
 
     try {
@@ -102,9 +221,8 @@ class _AttendanceCardState extends State<AttendanceCard> {
         },
         (success) {
           // Handle success
-          setState(() {
-            _isPunchedIn = true;
-          });
+          // Reload attendance details to get updated punch in time
+          widget.onRefresh();
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -128,7 +246,80 @@ class _AttendanceCardState extends State<AttendanceCard> {
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isPunchingIn = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handlePunchOut() async {
+    if (_isPunchingOut || !_isPunchedIn) return;
+
+    setState(() {
+      _isPunchingOut = true;
+    });
+
+    try {
+      // Get current location
+      final locationService = LocationService();
+      final locationData = await locationService.getCurrentLocation();
+
+      // Initialize dependencies (same pattern as punch in)
+      final networkInfo = NetworkInfoImpl(Connectivity());
+      final dio = Dio();
+      final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+      final remoteDataSource = AttendanceRemoteDataSourceImpl(apiClient);
+      final repository = AttendanceRepositoryImpl(
+        remoteDataSource: remoteDataSource,
+        networkInfo: networkInfo,
+      );
+      final punchOutUseCase = PunchOutUseCase(repository);
+
+      // Call punch-out API
+      final result = await punchOutUseCase(
+        punchOutLocation: locationData.address,
+        latitude: locationData.latitude,
+        longitude: locationData.longitude,
+      );
+
+      result.fold(
+        (failure) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(failure.message),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+        },
+        (success) {
+          // Reload attendance details to get updated punch out time
+          widget.onRefresh();
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(success.message),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          }
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPunchingOut = false;
         });
       }
     }
@@ -136,13 +327,10 @@ class _AttendanceCardState extends State<AttendanceCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Get formatted date from API (UTC to local) or use current date
+    final dateStr = _getFormattedDate();
     final now = DateTime.now();
-    final dateStr = DateFormat('dd MMM, yyyy').format(now);
     final dayTimeStr = DateFormat('EEEE, hh:mm a').format(now);
-    
-    // Calculate progress - nearly complete with small blue segment at top
-    // Based on screenshot: mostly green (about 90-95%), small blue segment
-    const double progress = 0.60; // 92% green, 8% blue
     
     return Transform.translate(
       offset: const Offset(0, -12), // Overlap header slightly
@@ -204,30 +392,76 @@ class _AttendanceCardState extends State<AttendanceCard> {
                       height: 1.2,
                     ),
                   ),
+                  // Show Holiday status badge at the end
+                  if (_isHoliday) ...[
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.008),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: MediaQuery.of(context).size.width * 0.025,
+                        vertical: MediaQuery.of(context).size.height * 0.006,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppColors.error.withOpacity(0.4),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.event,
+                            size: 12,
+                            color: AppColors.error,
+                          ),
+                          SizedBox(width: MediaQuery.of(context).size.width * 0.01),
+                          Text(
+                            'Holiday',
+                            style: AppTextStyles.bodySmall(context).copyWith(
+                              color: AppColors.error,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   SizedBox(height: MediaQuery.of(context).size.height * 0.02), // 2% of screen height
                   // Punch In/Out button
                   ElevatedButton(
-                    onPressed: _isPunchedIn ? () {
-                      // TODO: Implement punch-out functionality when API is available
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Punch-out functionality coming soon'),
-                        ),
-                      );
-                    } : _isLoading ? null : _handlePunchIn,
+                    onPressed: _isButtonDisabled
+                        ? null
+                        : _isPunchedIn
+                            ? _handlePunchOut
+                            : _handlePunchIn,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _isPunchedIn ? AppColors.background : AppColors.attendanceTeal,
-                      foregroundColor: _isPunchedIn ? AppColors.textPrimary : AppColors.textWhite,
+                      backgroundColor: _isButtonDisabled
+                          ? AppColors.textSecondary.withOpacity(0.2)
+                          : AppColors.background,
+                      foregroundColor: _isButtonDisabled
+                          ? AppColors.textSecondary.withOpacity(0.7)
+                          : AppColors.textPrimary,
                       padding: EdgeInsets.symmetric(
                         horizontal: MediaQuery.of(context).size.width * 0.053, // ~5.3% of screen width
                         vertical: MediaQuery.of(context).size.height * 0.0175, // 1.75% of screen height
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20), // More rounded/oval
+                        side: BorderSide(
+                          color: _isButtonDisabled
+                              ? AppColors.textSecondary.withOpacity(0.3)
+                              : Colors.transparent,
+                          width: 1,
+                        ),
                       ),
                       elevation: 0,
+                      disabledBackgroundColor: AppColors.textSecondary.withOpacity(0.2),
+                      disabledForegroundColor: AppColors.textSecondary.withOpacity(0.7),
                     ),
-                    child: _isLoading
+                    child: (widget.isLoading || _isPunchingIn || _isPunchingOut)
                         ? SizedBox(
                             width: MediaQuery.of(context).size.width * 0.037,
                             height: MediaQuery.of(context).size.width * 0.037,
@@ -243,12 +477,12 @@ class _AttendanceCardState extends State<AttendanceCard> {
                                 width: MediaQuery.of(context).size.width * 0.064, // ~6.4% of screen width
                                 height: MediaQuery.of(context).size.width * 0.064,
                                 decoration: BoxDecoration(
-                                  color: _isPunchedIn ? AppColors.success : AppColors.textWhite,
+                                  color:  AppColors.success,
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
                                   _isPunchedIn ? Icons.arrow_back : Icons.arrow_forward,
-                                  color: _isPunchedIn ? AppColors.textWhite : AppColors.attendanceTeal,
+                                  color: AppColors.textWhite,
                                   size: MediaQuery.of(context).size.width * 0.037, // ~3.7% of screen width
                                 ),
                               ),
@@ -257,7 +491,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
                                 _isPunchedIn ? AppStrings.punchOut : AppStrings.punchIn,
                                 style: AppTextStyles.bodyMedium(context).copyWith(
                                   fontWeight: FontWeight.w600,
-                                  color: _isPunchedIn ? AppColors.textPrimary : AppColors.textWhite,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                             ],
@@ -267,277 +501,16 @@ class _AttendanceCardState extends State<AttendanceCard> {
               ),
             ),
             SizedBox(width: MediaQuery.of(context).size.width * 0.042), // ~4.2% of screen width
-            // Right side - Circular progress
-            SizedBox(
-              width: 90,
-              height: 90,
-              child: Stack(
-                children: [
-                  // Inner circle with gradient border, inset shadows, and background gradient
-                  Stack(
-                    children: [
-                      // Outer circle with gradient border (0.86px)
-                      Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            // 44.27deg gradient for border
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppColors.attendanceAlmostWhite,
-                              AppColors.attendanceLightBlueGrey,
-                            ],
-                            stops: const [0.273, 0.8825],
-                          ),
-                        ),
-                      ),
-                      // Inner circle with background gradient and inset shadows
-                      Center(
-                        child: Container(
-                          width: 90 - (0.86 * 2), // Subtract border width
-                          height: 90 - (0.86 * 2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                              colors: [
-                                AppColors.attendanceGreyBlue,
-                                AppColors.attendanceVeryLightGreyBlue,
-                              ],
-                            ),
-                            boxShadow: [
-                              // First inset shadow
-                              BoxShadow(
-                                color: AppColors.attendanceLightBlueGrey.withOpacity(0.71),
-                                blurRadius: 25.76,
-                                spreadRadius: -0.86,
-                                offset: const Offset(8.59, 9.45),
-                              ),
-                              // Second inset shadow
-                              BoxShadow(
-                                color: AppColors.attendanceLightBlueGrey.withOpacity(0.52),
-                                blurRadius: 6.87,
-                                spreadRadius: 0,
-                                offset: const Offset(6.01, 6.01),
-                              ),
-                              // Third inset shadow (negative offset for inset effect)
-                              BoxShadow(
-                                color: AppColors.background.withOpacity(0.2),
-                                blurRadius: 25.76,
-                                spreadRadius: 0,
-                                offset: const Offset(-10.31, -10.31),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Progress ring
-                  CustomPaint(
-                    size: const Size(90, 90),
-                    painter: CircularProgressPainter(
-                      progress: progress,
-                      progressColor: AppColors.success,
-                      remainingColor: AppColors.background,
-                      strokeWidth: 10,
-                    ),
-                  ),
-                  // Time text
-                  Center(
-                    child: Text(
-                      '07:35',
-                      style: AppTextStyles.heading5(context).copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.attendanceTeal,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            // Right side - Dynamic Circular progress timer
+            AttendanceTimerCircle(
+              workedHours: _workedHours,
+              shiftHours: _shiftHours,
+              size: 90,
             ),
           ],
         ),
       ),
     );
-  }
-}
-
-/// Custom painter for circular progress indicator with two colors
-class CircularProgressPainter extends CustomPainter {
-  final double progress;
-  final Color progressColor;
-  final Color remainingColor;
-  final double strokeWidth;
-
-  CircularProgressPainter({
-    required this.progress,
-    required this.progressColor,
-    required this.remainingColor,
-    required this.strokeWidth,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - strokeWidth) / 2;
-
-    final startAngle = -math.pi / 2; // Start from top (12 o'clock)
-    final progressSweepAngle = 2 * math.pi * progress;
-
-    // Create SweepGradient with smooth color blending
-    // Since SweepGradient goes full circle, we use many intermediate colors
-    // to ensure smooth blending across the progress arc portion
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    
-    final progressGradient = SweepGradient(
-      center: Alignment.center,
-      startAngle: startAngle, // Align with arc start
-      colors: [
-        AppColors.successDark,
-        AppColors.success,
-        AppColors.success,
-        AppColors.success,
-        AppColors.success,
-        AppColors.success,
-        AppColors.success,
-        AppColors.success,
-        AppColors.success,
-        AppColors.accent,
-        AppColors.accent,
-        AppColors.accent,
-        AppColors.accent,
-        AppColors.accent,
-        AppColors.accentLight,
-      ],
-      stops: const [
-        0.0, 0.07, 0.14, 0.21, 0.29, 0.36, 0.43, 0.5, 0.57, 0.64, 0.71, 0.79, 0.86, 0.93, 1.0
-      ],
-    );
-
-    // Draw progress arc with gradient
-    final progressPaint = Paint()
-      ..shader = progressGradient.createShader(rect)
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..isAntiAlias = true;
-
-    canvas.drawArc(
-      rect,
-      startAngle,
-      progressSweepAngle,
-      false,
-      progressPaint,
-    );
-
-    // Draw remaining arc with gradient, border, and shadow
-    final remainingSweepAngle = 2 * math.pi * (1 - progress);
-    
-    if (remainingSweepAngle > 0) {
-      // Calculate the angle for the remaining arc
-      final remainingStartAngle = startAngle + progressSweepAngle;
-      
-      // Create gradient for remaining arc (white with subtle gradient for depth)
-      // Using LinearGradient along the arc direction for better visual effect
-      final remainingGradient = SweepGradient(
-        center: Alignment.center,
-        startAngle: remainingStartAngle,
-        colors: [
-          AppColors.background,
-          AppColors.attendanceVeryLightGrey,
-          AppColors.attendanceGreyDepth,
-          AppColors.attendanceVeryLightGrey,
-          AppColors.background,
-        ],
-        stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
-      );
-
-      // Draw shadow layer for remaining arc (creates depth effect)
-      final shadowPaint = Paint()
-        ..color = AppColors.textPrimary.withOpacity(0.1)
-        ..strokeWidth = strokeWidth
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0)
-        ..isAntiAlias = true;
-
-      // Draw shadow with slight offset to create depth
-      canvas.save();
-      canvas.translate(2.0, 2.0);
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        remainingStartAngle,
-        remainingSweepAngle,
-        false,
-        shadowPaint,
-      );
-      canvas.restore();
-
-      // Draw light border as base layer (creates visible edge definition)
-      // Draw a slightly larger stroke first to create border effect
-      final borderBasePaint = Paint()
-        ..color = AppColors.attendanceLightGreyBorder
-        ..strokeWidth = strokeWidth + 2.0 // Slightly larger for visible border
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..isAntiAlias = true;
-
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        remainingStartAngle,
-        remainingSweepAngle,
-        false,
-        borderBasePaint,
-      );
-
-      // Draw remaining arc with internal gradient (main fill) on top of border
-      final remainingPaint = Paint()
-        ..shader = remainingGradient.createShader(
-          Rect.fromCircle(center: center, radius: radius),
-        )
-        ..strokeWidth = strokeWidth
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..isAntiAlias = true;
-
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        remainingStartAngle,
-        remainingSweepAngle,
-        false,
-        remainingPaint,
-      );
-
-      // Draw inner highlight for premium 3D effect
-      final innerHighlightRadius = radius - (strokeWidth / 2) + 0.5;
-      final innerHighlightPaint = Paint()
-        ..color = AppColors.background.withOpacity(0.5)
-        ..strokeWidth = 1.0
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..isAntiAlias = true;
-
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: innerHighlightRadius),
-        remainingStartAngle,
-        remainingSweepAngle,
-        false,
-        innerHighlightPaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(CircularProgressPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.progressColor != progressColor ||
-        oldDelegate.remainingColor != remainingColor ||
-        oldDelegate.strokeWidth != strokeWidth;
   }
 }
 

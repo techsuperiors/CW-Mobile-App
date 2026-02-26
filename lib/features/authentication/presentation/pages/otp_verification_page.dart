@@ -2,12 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/common/app_button.dart';
-import 'forgot_password_page.dart';
+import '../bloc/forgot_password/forgot_password_bloc.dart';
+import '../bloc/forgot_password/forgot_password_event.dart';
+import '../bloc/forgot_password/forgot_password_state.dart';
 import 'reset_password_page.dart';
 
 /// OTP Verification page matching CollectivWork design
@@ -70,8 +73,11 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         _remainingSeconds = 80;
         _canResend = false;
       });
+      _timer?.cancel();
       _startTimer();
-      // TODO: Call API to resend OTP
+      context.read<ForgotPasswordBloc>().add(
+            ForgotPasswordResendRequested(widget.email),
+          );
     }
   }
 
@@ -107,30 +113,18 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
 
   void _handleSubmit() {
     final otp = _otpControllers.map((c) => c.text).join();
-    if (otp.length == 6) {
-      // TODO: Verify OTP with backend
-      // For now, just show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(AppStrings.otpVerifiedSuccessfully),
-          backgroundColor: AppColors.success,
-        ),
-      );
-      // Navigate to reset password page
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const ResetPasswordPage(),
-        ),
-      );
-    } else {
+    if (otp.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(AppStrings.pleaseEnterCompleteOtp),
           backgroundColor: AppColors.error,
         ),
       );
+      return;
     }
+    context.read<ForgotPasswordBloc>().add(
+          ForgotPasswordOtpValidated(email: widget.email, otp: otp),
+        );
   }
 
   @override
@@ -149,10 +143,45 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
       return baseSpacing;
     }
     
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      resizeToAvoidBottomInset: true,
-      body: LayoutBuilder(
+    return BlocListener<ForgotPasswordBloc, ForgotPasswordState>(
+      listener: (context, state) {
+        if (state is ForgotPasswordOtpValidatedSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(AppStrings.otpVerifiedSuccessfully),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BlocProvider.value(
+                value: context.read<ForgotPasswordBloc>(),
+                child: const ResetPasswordPage(),
+              ),
+            ),
+          );
+        } else if (state is ForgotPasswordResendSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(AppStrings.verificationCodeSent),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          context.read<ForgotPasswordBloc>().add(const ForgotPasswordReset());
+        } else if (state is ForgotPasswordError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.failure.message),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        resizeToAvoidBottomInset: true,
+        body: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -266,13 +295,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                                       ),
                                       recognizer: TapGestureRecognizer()
                                         ..onTap = () {
-                                          // Navigate back to forgot password page
-                                          Navigator.pushReplacement(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => const ForgotPasswordPage(),
-                                            ),
-                                          );
+                                          // Pop back to forgot password page (bloc preserved)
+                                          Navigator.pop(context);
                                         },
                                     ),
                                   ],
@@ -284,12 +308,17 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                             _buildOtpFields(context),
                             SizedBox(height: responsiveSpacing(32)),
                             // Verify and Proceed button
-                            AppButton(
-                              label: AppStrings.verifyAndProceed,
-                              onPressed: _handleSubmit,
-                              isPrimary: true,
-                              width: double.infinity,
-                              backgroundColor: AppColors.loginHeaderTeal,
+                            BlocBuilder<ForgotPasswordBloc, ForgotPasswordState>(
+                              builder: (context, state) {
+                                return AppButton(
+                                  label: AppStrings.verifyAndProceed,
+                                  onPressed: _handleSubmit,
+                                  isPrimary: true,
+                                  isLoading: state is ForgotPasswordLoading,
+                                  width: double.infinity,
+                                  backgroundColor: AppColors.loginHeaderTeal,
+                                );
+                              },
                             ),
                             SizedBox(height: responsiveSpacing(24)),
                             // Resend Code and Timer
@@ -337,6 +366,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
               ),
           );
         },
+      ),
       ),
     );
   }

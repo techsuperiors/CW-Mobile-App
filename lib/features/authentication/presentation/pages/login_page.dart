@@ -9,10 +9,11 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/common/app_text_field.dart';
 import '../../../../core/widgets/common/app_button.dart';
 import '../../../home/presentation/pages/home_page.dart';
-import '../bloc/auth_bloc.dart';
-import '../bloc/auth_event.dart';
-import '../bloc/auth_state.dart';
-import 'otp_verification_page.dart';
+import '../bloc/auth_bloc/auth_bloc.dart';
+import '../bloc/auth_bloc/auth_event.dart';
+import '../bloc/auth_bloc/auth_state.dart';
+import '../../data/repository/auth_repository.dart';
+import '../bloc/forgot_password/forgot_password_bloc.dart';
 import 'forgot_password_page.dart';
 
 /// Login page matching CollectivWork design
@@ -122,11 +123,6 @@ class _LoginPageState extends State<LoginPage> {
                 duration: const Duration(seconds: 3),
               ),
             );
-            // Navigator.pushAndRemoveUntil(
-            //   context,
-            //   MaterialPageRoute(builder: (_) => const HomePage()),
-            //       (route) => false,
-            // );
           }
         },
         child: LayoutBuilder(
@@ -270,7 +266,12 @@ class _LoginPageState extends State<LoginPage> {
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (_) => const ForgotPasswordPage(),
+                                              builder: (_) => BlocProvider(
+                                                create: (_) => ForgotPasswordBloc(
+                                                  authRepository: context.read<AuthRepository>(),
+                                                ),
+                                                child: const ForgotPasswordPage(),
+                                              ),
                                             ),
                                           );
                                         },

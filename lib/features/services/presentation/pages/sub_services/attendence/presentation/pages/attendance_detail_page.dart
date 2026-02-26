@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
+import '../../../../../../../../core/network/api_client.dart';
+import '../../../../../../../../core/network/network_info.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
+import '../../../../../../../attendance/data/datasources/attendance_details_remote_datasource.dart';
+import '../../../../../../../attendance/data/repositories/attendance_details_repository_impl.dart';
+import '../../../../../../../attendance/domain/entities/attendance_details.dart';
+import '../../../../../../../attendance/domain/usecases/get_attendance_details_usecase.dart';
 import '../widgets/time_utilization_card.dart';
 import '../widgets/attendance_detail_calendar.dart';
 import '../widgets/day_details_card.dart';
@@ -18,6 +27,58 @@ class AttendanceDetailPage extends StatefulWidget {
 
 class _AttendanceDetailPageState extends State<AttendanceDetailPage> {
   DateTime _selectedDate = DateTime(2025, 12, 30);
+  AttendanceDetails? _attendanceDetails;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAttendanceDetails();
+  }
+
+  Future<void> _loadAttendanceDetails() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final networkInfo = NetworkInfoImpl(Connectivity());
+      final dio = Dio();
+      final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+      final remoteDataSource =
+          AttendanceDetailsRemoteDataSourceImpl(apiClient);
+      final repository = AttendanceDetailsRepositoryImpl(
+        remoteDataSource: remoteDataSource,
+        networkInfo: networkInfo,
+      );
+      final getAttendanceDetailsUseCase =
+          GetAttendanceDetailsUseCase(repository);
+
+      final result = await getAttendanceDetailsUseCase();
+
+      result.fold(
+        (failure) {
+          setState(() {
+            _errorMessage = failure.message;
+            _isLoading = false;
+          });
+        },
+        (attendanceDetails) {
+          setState(() {
+            _attendanceDetails = attendanceDetails;
+            _isLoading = false;
+          });
+        },
+      );
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading attendance details: ${e.toString()}';
+        _isLoading = false;
+      });
+    }
+  }
 
   void _onDateSelected(DateTime date) {
     setState(() {
@@ -70,9 +131,7 @@ class _AttendanceDetailPageState extends State<AttendanceDetailPage> {
       ),
       bottomNavigationBar: BottomNavBar(
         currentIndex: 0, // Services is active
-        onTap: (index) {
-          // Handle navigation if needed
-        },
+        onTap: NavigationHelper.getBottomNavHandler(context),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -81,7 +140,11 @@ class _AttendanceDetailPageState extends State<AttendanceDetailPage> {
           children: [
             SizedBox(height: screenHeight * 0.02),
             // Today's Time Utilization
-            const TimeUtilizationCard(),
+            TimeUtilizationCard(
+              attendanceDetails: _attendanceDetails,
+              isLoading: _isLoading,
+              onRefresh: _loadAttendanceDetails,
+            ),
             SizedBox(height: screenHeight * 0.02),
             // Calendar
             AttendanceDetailCalendar(
@@ -90,7 +153,12 @@ class _AttendanceDetailPageState extends State<AttendanceDetailPage> {
             ),
             SizedBox(height: screenHeight * 0.02),
             // Day Details
-            DayDetailsCard(selectedDate: _selectedDate),
+            DayDetailsCard(
+              selectedDate: _selectedDate,
+              attendanceDetails: _attendanceDetails,
+              isLoading: _isLoading,
+              errorMessage: _errorMessage,
+            ),
             SizedBox(height: screenHeight * 0.02),
           ],
         ),

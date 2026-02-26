@@ -1,83 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:dio/dio.dart';
 import 'dart:math' as math;
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/network/network_info.dart';
-import '../../data/datasources/attendance_details_remote_datasource.dart';
-import '../../data/repositories/attendance_details_repository_impl.dart';
-import '../../domain/usecases/get_attendance_details_usecase.dart';
 import '../../domain/entities/attendance_details.dart';
 
 /// Punch details widget with 2x2 grid layout
-class PunchDetails extends StatefulWidget {
-  const PunchDetails({super.key});
+class PunchDetails extends StatelessWidget {
+  final AttendanceDetails? attendanceDetails;
+  final bool isLoading;
+  final String? errorMessage;
+  final VoidCallback onRefresh;
 
-  @override
-  State<PunchDetails> createState() => _PunchDetailsState();
-}
-
-class _PunchDetailsState extends State<PunchDetails> {
-  AttendanceDetails? _attendanceDetails;
-  bool _isLoading = true;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAttendanceDetails();
-  }
-
-  Future<void> _loadAttendanceDetails() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Initialize API client and dependencies
-      final networkInfo = NetworkInfoImpl(Connectivity());
-      final dio = Dio();
-      final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
-      final remoteDataSource =
-          AttendanceDetailsRemoteDataSourceImpl(apiClient);
-      final repository = AttendanceDetailsRepositoryImpl(
-        remoteDataSource: remoteDataSource,
-        networkInfo: networkInfo,
-      );
-      final getAttendanceDetailsUseCase =
-          GetAttendanceDetailsUseCase(repository);
-
-      // Fetch attendance details from API
-      final result = await getAttendanceDetailsUseCase();
-
-      result.fold(
-        (failure) {
-          setState(() {
-            _errorMessage = failure.message;
-            _isLoading = false;
-          });
-        },
-        (attendanceDetails) {
-          setState(() {
-            _attendanceDetails = attendanceDetails;
-            _isLoading = false;
-          });
-        },
-      );
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Error loading attendance details: ${e.toString()}';
-        _isLoading = false;
-      });
-    }
-  }
+  const PunchDetails({
+    super.key,
+    this.attendanceDetails,
+    required this.isLoading,
+    this.errorMessage,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -87,14 +31,14 @@ class _PunchDetailsState extends State<PunchDetails> {
     return Padding(
       padding: EdgeInsets.symmetric(
           horizontal: screenWidth * 0.042), // ~4.2% of screen width
-      child: _isLoading
+      child: isLoading
           ? SizedBox(
               height: screenHeight * 0.15,
               child: const Center(
                 child: CircularProgressIndicator(),
               ),
             )
-          : _errorMessage != null
+          : errorMessage != null
               ? SizedBox(
                   height: screenHeight * 0.15,
                   child: Center(
@@ -102,15 +46,15 @@ class _PunchDetailsState extends State<PunchDetails> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          _errorMessage!,
-                          style: AppTextStyles.bodyMedium(context).copyWith(
+                          errorMessage!,
+                          style: AppTextStyles.bodyMediumHeading(context).copyWith(
                             color: AppColors.error,
                           ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
                         TextButton(
-                          onPressed: _loadAttendanceDetails,
+                          onPressed: onRefresh,
                           child: const Text('Retry'),
                         ),
                       ],
@@ -129,7 +73,7 @@ class _PunchDetailsState extends State<PunchDetails> {
                   children: [
                     _buildPunchCard(
                       context,
-                      time: _attendanceDetails?.formattedPunchIn ?? '-',
+                      time: attendanceDetails?.formattedPunchIn ?? '-',
                       label: AppStrings.punchIn,
                       icon: AppAssets.iconPunchIn,
                       iconColor: AppColors.primary,
@@ -138,7 +82,7 @@ class _PunchDetailsState extends State<PunchDetails> {
                     ),
                     _buildPunchCard(
                       context,
-                      time: _attendanceDetails?.formattedPunchOut ?? '-',
+                      time: attendanceDetails?.formattedPunchOut ?? '-',
                       label: AppStrings.punchOut,
                       icon: AppAssets.iconPunchOut,
                       iconColor: AppColors.success,
@@ -147,7 +91,7 @@ class _PunchDetailsState extends State<PunchDetails> {
                     ),
                     _buildPunchCard(
                       context,
-                      time: _attendanceDetails?.formattedBreakTime ?? '-',
+                      time: attendanceDetails?.formattedBreakTime ?? '-',
                       label: AppStrings.breakTime,
                       icon: AppAssets.iconBreak,
                       iconColor: AppColors.warning,
@@ -156,7 +100,7 @@ class _PunchDetailsState extends State<PunchDetails> {
                     ),
                     _buildPunchCard(
                       context,
-                      time: _attendanceDetails?.formattedOverTime ?? '-',
+                      time: attendanceDetails?.formattedOverTime ?? '-',
                       label: AppStrings.overtime,
                       icon: AppAssets.iconOvertime,
                       iconColor: AppColors.error,

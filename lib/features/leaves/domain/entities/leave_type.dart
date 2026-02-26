@@ -5,6 +5,10 @@ class LeaveType {
   final String leaveCode;
   final int? consumedLeaves;
   final int? totalLeaves;
+  final int? annualQuota;
+  final int? allocatedQuota;
+  final int? remainingLeaves;
+  final int? currentMonthLop;
 
   LeaveType({
     required this.leaveType,
@@ -12,6 +16,10 @@ class LeaveType {
     required this.leaveCode,
     this.consumedLeaves,
     this.totalLeaves,
+    this.annualQuota,
+    this.allocatedQuota,
+    this.remainingLeaves,
+    this.currentMonthLop,
   });
 }
 

@@ -7,9 +7,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_test_code/collectivWork.dart';
+import 'package:collectivWork/collectivWork.dart';
 
-import 'package:my_test_code/main.dart';
+import 'package:collectivWork/main.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {

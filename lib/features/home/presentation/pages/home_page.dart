@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/widgets/app_drawer.dart';
 import '../../../attendance/presentation/pages/attendance_page.dart';
 import '../../../dashboard/data/datasources/dashboard_remote_datasource.dart';
 import '../../../dashboard/data/repositories/dashboard_repository_impl.dart';
@@ -11,48 +12,76 @@ import '../../../dashboard/domain/usecases/get_dashboard_stats.dart';
 import '../../../dashboard/presentation/bloc/dashboard_bloc.dart';
 import '../../../services/presentation/pages/services_page.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../../../request/presentation/pages/request_bottom_sheet.dart';
 
 /// Home page with bottom navigation
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final int? initialTabIndex;
+  
+  const HomePage({super.key, this.initialTabIndex});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentIndex = 2; // Services is the default active page
+  late int _currentIndex;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  late final DashboardBloc _dashboardBloc;
 
-  final List<Widget> _pages = [
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialTabIndex ?? 2; // Default to Attendance/Home tab
+
+    final networkInfo = NetworkInfoImpl(Connectivity());
+
+    _dashboardBloc = DashboardBloc(
+      getDashboardStats: GetDashboardStats(
+        DashboardRepositoryImpl(
+          remoteDataSource: DashboardRemoteDataSourceImpl(),
+          networkInfo: networkInfo,
+        ),
+      ),
+    );
+  }
+
+  void _openDrawer() {
+    _scaffoldKey.currentState?.openDrawer();
+  }
+
+  List<Widget> _buildPages() => [
     const ServicesPage(), // Services (index 0)
     const PlaceholderPage(title: AppStrings.posts), // Posts (index 1)
-    const AttendancePage(), // Home (index 2)
+    AttendancePage(onOpenDrawer: _openDrawer), // Home (index 2)
     const PlaceholderPage(title: AppStrings.request), // Request (index 3)
     const PlaceholderPage(title: AppStrings.approval), // Approval (index 4)
   ];
 
   @override
   Widget build(BuildContext context) {
-    // Create DashboardBloc only when HomePage is accessed (lazy initialization)
-    return BlocProvider(
-      create: (_) {
-        final networkInfo = NetworkInfoImpl(Connectivity());
-        final dashboardRemoteDataSource = DashboardRemoteDataSourceImpl();
-        final dashboardRepository = DashboardRepositoryImpl(
-          remoteDataSource: dashboardRemoteDataSource,
-          networkInfo: networkInfo,
-        );
-        final getDashboardStats = GetDashboardStats(dashboardRepository);
-        return DashboardBloc(getDashboardStats: getDashboardStats);
-      },
+    return BlocProvider.value(
+      value: _dashboardBloc,
       child: Scaffold(
-        body: _pages[_currentIndex],
+        key: _scaffoldKey,
+        drawer: const AppDrawer(),
+        body: _buildPages()[_currentIndex],
         bottomNavigationBar: BottomNavBar(
           currentIndex: _currentIndex,
           onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
+            // Show bottom sheet for Request button (index 3)
+            if (index == 3) {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => const RequestBottomSheet(),
+              );
+            } else {
+              setState(() {
+                _currentIndex = index;
+              });
+            }
           },
         ),
       ),

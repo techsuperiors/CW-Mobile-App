@@ -29,6 +29,7 @@ class AppColors {
   static const Color textSecondary = Color(0xFF757575);
   static const Color textTertiary = Color(0xFF9E9E9E);
   static const Color textWhite = Color(0xFFFFFFFF);
+  static const Color textHeading = Color(0xFF121212);
 
   // Background Colors
   static const Color background = Color(0xFFFFFFFF);
@@ -70,6 +71,7 @@ class AppColors {
   static const Color serviceTeal = Color(0xFF28A992);
   static const Color servicePink = Color(0xFFEE46BC);
   static const Color servicePinkDark = Color(0xFFF63D68);
+  static const Color serviceYellow = Color(0xFFFFC107);
 
   // Service Colors - Background Colors
   static const Color servicePurpleBg = Color(0xFFEEF4FF);
@@ -81,6 +83,7 @@ class AppColors {
   static const Color serviceTealBg = Color(0xFFDDFFF9);
   static const Color servicePinkBg = Color(0xFFFDF2FA);
   static const Color servicePinkDarkBg = Color(0xFFFFF1F3);
+  static const Color serviceYellowBg = Color(0xFFFFF9C4);
 
   // Attendance Colors
   static const Color attendanceTeal = Color(0xFF0B7F7F);

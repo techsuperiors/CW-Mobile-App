@@ -33,6 +33,12 @@ class TokenStorage {
     return await _prefs!.remove(AppConstants.tokenKey);
   }
 
+  /// Clear all app data (SharedPreferences) - used on logout
+  static Future<bool> clearAll() async {
+    await init();
+    return await _prefs!.clear();
+  }
+
   /// Check if token exists
   static bool hasToken() {
     final token = getToken();

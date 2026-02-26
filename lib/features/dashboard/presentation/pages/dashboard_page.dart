@@ -10,6 +10,7 @@ import '../bloc/dashboard_event.dart';
 import '../bloc/dashboard_state.dart';
 import '../widgets/dashboard_stats_grid.dart';
 import '../widgets/dashboard_chart_section.dart';
+import '../widgets/dashboard_attendance_timer.dart';
 import '../../../attendance/presentation/widgets/leaves_summary.dart';
 
 /// Dashboard page with responsive layout
@@ -51,8 +52,11 @@ class _DashboardPageState extends State<DashboardPage> {
                       // Stats Grid
                       DashboardStatsGrid(stats: state.stats),
                       SizedBox(height: MediaQuery.of(context).size.height * 0.03), // 3% of screen height
+                      // Attendance Timer
+                      const DashboardAttendanceTimer(),
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.03), // 3% of screen height
                       // Leave Summary
-                      const LeavesSummary(),
+                      // const LeavesSummary(),
                       SizedBox(height: MediaQuery.of(context).size.height * 0.03), // 3% of screen height
                       // Charts Section
                       DashboardChartSection(stats: state.stats),

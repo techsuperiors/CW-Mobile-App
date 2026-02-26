@@ -10,5 +10,11 @@ abstract class AttendanceRepository {
     required double longitude,
     required String punchType,
   });
+
+  Future<Either<Failure, PunchInResult>> punchOut({
+    required String punchOutLocation,
+    required double latitude,
+    required double longitude,
+  });
 }
 

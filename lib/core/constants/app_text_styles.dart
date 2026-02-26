@@ -145,6 +145,20 @@ class AppTextStyles {
     );
   }
 
+  static TextStyle bodyMediumHeading(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final screenWidth = mediaQuery.size.width;
+    final screenHeight = mediaQuery.size.height;
+    final smallerDimension = screenWidth < screenHeight ? screenWidth : screenHeight;
+    final fontSize = (14.0 / 360.0) * smallerDimension * mediaQuery.textScaleFactor.clamp(0.9, 1.2);
+
+    return TextStyle(
+      fontSize: fontSize,
+      fontWeight: FontWeight.normal,
+      color: AppColors.textPrimary,
+    );
+  }
+
   static TextStyle bodySmall(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;

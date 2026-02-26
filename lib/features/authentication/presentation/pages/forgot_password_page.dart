@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/common/app_text_field.dart';
 import '../../../../core/widgets/common/app_button.dart';
+import '../bloc/forgot_password/forgot_password_bloc.dart';
+import '../bloc/forgot_password/forgot_password_event.dart';
+import '../bloc/forgot_password/forgot_password_state.dart';
 import 'otp_verification_page.dart';
 
 /// Forgot password page
@@ -18,7 +22,6 @@ class ForgotPasswordPage extends StatefulWidget {
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -28,27 +31,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
   void _handleSubmit() {
     if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      // Simulate API call delay
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-          // Navigate to OTP verification page with the email
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OtpVerificationPage(
-                email: _emailController.text.trim(),
-              ),
-            ),
+      context.read<ForgotPasswordBloc>().add(
+            ForgotPasswordRequested(_emailController.text.trim()),
           );
-        }
-      });
     }
   }
 
@@ -77,12 +62,33 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       return baseSpacing;
     }
     
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      resizeToAvoidBottomInset: true,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
+    return BlocListener<ForgotPasswordBloc, ForgotPasswordState>(
+      listener: (context, state) {
+        if (state is ForgotPasswordForgotSuccess) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BlocProvider.value(
+                value: context.read<ForgotPasswordBloc>(),
+                child: OtpVerificationPage(email: state.email),
+              ),
+            ),
+          );
+        } else if (state is ForgotPasswordError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.failure.message),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        resizeToAvoidBottomInset: true,
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: ConstrainedBox(
               constraints: BoxConstraints(
@@ -199,13 +205,17 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                 _buildEmailField(),
                                 SizedBox(height: responsiveSpacing(32)),
                                 // Send button
-                                AppButton(
-                                  label: AppStrings.send,
-                                  onPressed: _handleSubmit,
-                                  isPrimary: true,
-                                  isLoading: _isLoading,
-                                  width: double.infinity,
-                                  backgroundColor: AppColors.loginHeaderTeal,
+                                BlocBuilder<ForgotPasswordBloc, ForgotPasswordState>(
+                                  builder: (context, state) {
+                                    return AppButton(
+                                      label: AppStrings.send,
+                                      onPressed: _handleSubmit,
+                                      isPrimary: true,
+                                      isLoading: state is ForgotPasswordLoading,
+                                      width: double.infinity,
+                                      backgroundColor: AppColors.loginHeaderTeal,
+                                    );
+                                  },
                                 ),
                                 SizedBox(height: responsiveSpacing(32)),
                               ],
@@ -219,6 +229,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             ),
           );
         },
+      ),
       ),
     );
   }

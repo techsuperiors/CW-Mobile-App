@@ -6,15 +6,18 @@ import '../constants/app_strings.dart';
 import '../error/exceptions.dart';
 import '../utils/token_storage.dart';
 import 'network_info.dart';
+import 'dart:developer' as developer;
 
 /// API client for making HTTP requests
 class ApiClient {
   final Dio _dio;
   final NetworkInfo _networkInfo;
+  VoidCallback? onTokenExpired;
 
   ApiClient({
     required Dio dio,
     required NetworkInfo networkInfo,
+    this.onTokenExpired,
   })  : _dio = dio,
         _networkInfo = networkInfo {
     _setupInterceptors();
@@ -42,21 +45,21 @@ class ApiClient {
           // Debug: Log request details
           if (kDebugMode) {
             final fullUrl = options.uri.toString();
-            debugPrint('═══════════════════════════════════════════════════════');
-            debugPrint('API Request: ${options.method} $fullUrl');
+            developer.log('═══════════════════════════════════════════════════════');
+            developer.log('API Request: ${options.method} $fullUrl');
             if (options.queryParameters.isNotEmpty) {
-              debugPrint('Query Parameters: ${options.queryParameters}');
+              developer.log('Query Parameters: ${options.queryParameters}');
             }
-            debugPrint('Headers: ${options.headers}');
+            developer.log('Headers: ${options.headers}');
             if (options.data != null) {
-              debugPrint('Request Data: ${options.data}');
+              developer.log('Request Data: ${options.data}');
             }
             if (token != null && token.isNotEmpty) {
-              debugPrint('Authorization: Token present (${token.length} chars)');
+              developer.log('Authorization: Token present (${token.length} chars)');
             } else {
-              debugPrint('Warning: No authorization token available');
+              developer.log('Warning: No authorization token available');
             }
-            debugPrint('═══════════════════════════════════════════════════════');
+            developer.log('═══════════════════════════════════════════════════════');
           }
           
           return handler.next(options);
@@ -64,27 +67,33 @@ class ApiClient {
         onResponse: (response, handler) {
           if (kDebugMode) {
             final fullUrl = response.requestOptions.uri.toString();
-            debugPrint('═══════════════════════════════════════════════════════');
-            debugPrint('API Response: ${response.requestOptions.method} $fullUrl');
-            debugPrint('Status Code: ${response.statusCode}');
-            debugPrint('Response Data: ${response.data}');
-            debugPrint('═══════════════════════════════════════════════════════');
+            developer.log('═══════════════════════════════════════════════════════');
+            developer.log('API Response: ${response.requestOptions.method} $fullUrl');
+            developer.log('Status Code: ${response.statusCode}');
+            developer.log('Response Data: ${response.data}');
+            developer.log('═══════════════════════════════════════════════════════');
           }
           return handler.next(response);
         },
-        onError: (error, handler) {
+        onError: (error, handler) async {
           if (kDebugMode) {
             final fullUrl = error.requestOptions.uri.toString();
-            debugPrint('═══════════════════════════════════════════════════════');
-            debugPrint('API Error: ${error.requestOptions.method} $fullUrl');
-            debugPrint('Error Type: ${error.type}');
-            debugPrint('Error Message: ${error.message}');
+            developer.log('═══════════════════════════════════════════════════════');
+            developer.log('API Error: ${error.requestOptions.method} $fullUrl');
+            developer.log('Error Type: ${error.type}');
+            developer.log('Error Message: ${error.message}');
             if (error.response != null) {
-              debugPrint('Error Status Code: ${error.response?.statusCode}');
-              debugPrint('Error Response Data: ${error.response?.data}');
+              developer.log('Error Status Code: ${error.response?.statusCode}');
+              developer.log('Error Response Data: ${error.response?.data}');
             }
-            debugPrint('═══════════════════════════════════════════════════════');
+            developer.log('═══════════════════════════════════════════════════════');
           }
+          
+          // Handle 401 Unauthorized - token expired
+          if (error.response?.statusCode == 401) {
+            await _handleTokenExpiration();
+          }
+          
           return handler.next(error);
         },
       ),
@@ -181,6 +190,17 @@ class ApiClient {
     }
   }
 
+  /// Handle token expiration or missing token
+  Future<void> _handleTokenExpiration() async {
+    developer.log("Token expired or missing - clearing token and navigating to login");
+    await TokenStorage.clearToken();
+    
+    // Trigger callback to navigate to login
+    if (onTokenExpired != null) {
+      onTokenExpired!();
+    }
+  }
+
   /// Handle Dio errors
   AppException _handleDioError(DioException error) {
     switch (error.type) {
@@ -191,6 +211,7 @@ class ApiClient {
       case DioExceptionType.badResponse:
         final statusCode = error.response?.statusCode;
         if (statusCode == 401) {
+          // Token expiration is handled in interceptor
           return const AuthException(AppStrings.unauthorized);
         } else if (statusCode == 404) {
           return const ServerException(AppStrings.resourceNotFound);

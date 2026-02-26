@@ -25,6 +25,9 @@ class AppStrings {
   static const String login = 'Login';
   static const String logIn = 'Log In';
   static const String logout = 'Logout';
+  static const String logoutConfirmation = 'Are you sure you want to logout ?';
+  static const String yes = 'Yes';
+  static const String no = 'No';
   static const String email = 'Email';
   static const String password = 'Password';
   static const String username = 'Username';
@@ -62,6 +65,7 @@ class AppStrings {
   static const String weveSentVerificationCode = 'We\'ve sent a verification code to email address';
   static const String wrongEmail = 'Wrong Email?';
   static const String resendCode = 'Resend Code';
+  static const String verificationCodeSent = 'Verification code sent successfully';
   static const String submit = 'Submit';
   static const String verifyAndProceed = 'Verify and Proceed';
 
@@ -77,6 +81,10 @@ class AppStrings {
   static const String passwordChanged = 'Password Changed';
   static const String congratulation = 'Congratulation';
   static const String passwordChangeSuccessMessage = 'You have successfully change password. Please use the new password when Sign in.';
+  static const String changePassword = 'Change Password';
+  static const String currentPassword = 'Current Password';
+  static const String enterCurrentPassword = 'Enter current password';
+  static const String pleaseEnterCurrentPassword = 'Please enter your current password';
   static const String done = 'Done';
 
   // Navigation

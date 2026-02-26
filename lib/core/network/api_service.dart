@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import '../constants/app_strings.dart';
+import '../constants/app_urls.dart';
 import '../error/exceptions.dart';
 import '../utils/token_storage.dart';
 import 'network_info.dart';
@@ -34,6 +35,21 @@ class ApiService {
       );
     }
 
+    // Check if token is available for authenticated endpoints
+    if (!_isPublicEndpoint(endpoint)) {
+      final token = TokenStorage.getToken();
+      if (token == null || token.isEmpty) {
+        log("Token not available - navigating to login");
+        await _handleTokenExpiration();
+        return ApiResponse(
+          error: ApiException(
+            401,
+            AppStrings.unauthorized,
+          ),
+        );
+      }
+    }
+
     try {
       final fullUrl = endpoint.startsWith('http')
           ? endpoint
@@ -51,11 +67,7 @@ class ApiService {
       }
       log("GET Request: $fullUrl");
 
-      final response = await http
-          .get(
-            Uri.parse(fullUrl),
-            headers: headers,
-          )
+      final response = await http.get(Uri.parse(fullUrl), headers: headers,)
           .timeout(
             Duration(milliseconds: AppConstants.connectionTimeout),
             onTimeout: () {
@@ -112,6 +124,21 @@ class ApiService {
           AppStrings.noInternetConnection,
         ),
       );
+    }
+
+    // Check if token is available for authenticated endpoints
+    if (!_isPublicEndpoint(endpoint)) {
+      final token = TokenStorage.getToken();
+      if (token == null || token.isEmpty) {
+        log("Token not available - navigating to login");
+        await _handleTokenExpiration();
+        return ApiResponse(
+          error: ApiException(
+            401,
+            AppStrings.unauthorized,
+          ),
+        );
+      }
     }
 
     try {
@@ -268,15 +295,74 @@ class ApiService {
     return headers;
   }
 
-  /// Handle token expiration
+  /// Handle token expiration or missing token
   Future<void> _handleTokenExpiration() async {
-    log("Token expired - clearing token and navigating to login");
-    await TokenStorage.clearToken();
-    
+    log("Token expired or missing - calling logout API and clearing all data");
+    // Call logout API first (with token if available) so backend can invalidate
+    await _callLogoutApi();
+    // Always clear on token expiry - token is invalid, must clear local state
+    await TokenStorage.clearAll();
+
     // Trigger callback to navigate to login
     if (onTokenExpired != null) {
       onTokenExpired!();
     }
+  }
+
+  /// Call logout API to invalidate token on backend
+  /// Returns true if API call succeeded (2xx), false otherwise
+  Future<bool> _callLogoutApi() async {
+    try {
+      await TokenStorage.init();
+      final token = TokenStorage.getToken();
+      if (token == null || token.isEmpty) {
+        log("Logout API skipped - no token available");
+        return false;
+      }
+
+      final fullUrl = '${AppConfig.baseUrl}${AppUrls.logout}';
+      log("Calling logout API: $fullUrl");
+      final headers = _getHeaders();
+      final response = await http
+          .post(
+            Uri.parse(fullUrl),
+            headers: headers,
+            body: jsonEncode({}),
+          )
+          .timeout(
+            Duration(milliseconds: AppConstants.connectionTimeout),
+            onTimeout: () => throw Exception('Timeout'),
+          );
+
+      final success = response.statusCode >= 200 && response.statusCode < 300;
+      if (!success) {
+        log("Logout API failed with status: ${response.statusCode}");
+      }
+      return success;
+    } catch (e) {
+      log("Logout API call failed: $e");
+      return false;
+    }
+  }
+
+  /// Call logout API - public method for AuthRepository to use
+  /// Returns true if API succeeded, false otherwise
+  Future<bool> callLogoutApi() => _callLogoutApi();
+
+  /// Check if endpoint is public (doesn't require authentication)
+  bool _isPublicEndpoint(String endpoint) {
+    // List of public endpoints that don't require authentication
+    final publicEndpoints = [
+      '/api/mobile/app/users/login',
+      '/api/mobile/app/users/register',
+      '/api/mobile/app/users/forgot/password',
+      '/api/mobile/app/users/validate/password/reset/otp',
+    ];
+    
+    return publicEndpoints.any((publicEndpoint) => 
+      endpoint.contains(publicEndpoint) || 
+      endpoint.endsWith(publicEndpoint)
+    );
   }
 
   /// Extract error message from response
