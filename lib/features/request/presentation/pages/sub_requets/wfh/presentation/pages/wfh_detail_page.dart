@@ -1,22 +1,51 @@
+import 'package:collectivWork/core/constants/app_assets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/constants/app_urls.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
+import '../../../../../../../approval/presentation/widgets/approval_action_bar.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../models/wfh_request_model.dart';
-import '../../../leaves/presentation/widgets/activity_section.dart';
 import '../../../leaves/presentation/widgets/approvers_section.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import '../../../../../../../../core/network/api_service.dart';
+import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../authentication/presentation/pages/login_page.dart';
+import '../../../../../bloc/approvers/approvers_bloc.dart';
+import '../../../../../../../../core/utils/app_navigator.dart';
+import '../../../leaves/data/datasources/approvers_remote_datasource.dart';
+import '../../../leaves/data/repositories/approvers_repository_impl.dart';
+import '../../../leaves/domain/usecases/get_approvers.dart';
+import 'package:dio/dio.dart';
+import '../../../../../../../../core/network/api_client.dart';
+import '../../../../../../../../core/utils/data_encoder.dart';
+import '../../../../../../../../core/utils/token_storage.dart';
+import '../../../../../../../attendance/data/models/attendance_request_comment_model.dart';
+import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
+import '../../data/datasources/wfh_remote_datasource.dart';
+import '../../data/repositories/wfh_repository_impl.dart';
+import '../../domain/usecases/update_wfh_status.dart';
+import '../../bloc/action/wfh_action_bloc.dart';
+import '../../bloc/action/wfh_action_event.dart';
+import '../../bloc/action/wfh_action_state.dart';
+import '../../../../../../../user/presentation/bloc/user_profile_bloc.dart';
+import '../../../../../../../user/presentation/bloc/user_profile_state.dart';
 import 'apply_wfh_page.dart';
 
 /// WFH detail page showing full information about a WFH request
 class WfhDetailPage extends StatefulWidget {
   final WfhRequestModel wfhRequest;
+  final bool isApprovalMode;
 
   const WfhDetailPage({
     super.key,
     required this.wfhRequest,
+    this.isApprovalMode = false,
   });
 
   @override
@@ -25,6 +54,17 @@ class WfhDetailPage extends StatefulWidget {
 
 class _WfhDetailPageState extends State<WfhDetailPage> {
   final _commentController = TextEditingController();
+  List<AttendanceRequestComment> _comments = const [];
+  List<WfhApproverSnapshot> _approvers = const [];
+  bool _commentsLoading = true;
+  bool _submittingComment = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadApprovers();
+    _loadComments();
+  }
 
   @override
   void dispose() {
@@ -37,112 +77,118 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    return ResponsiveScaffold(
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        leading: GestureDetector(
-          onTap: () => Navigator.of(context).pop(),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.arrow_back_ios,
-                color: Theme.of(context).colorScheme.primary,
-                size: screenWidth * 0.048,
+    return BlocProvider(
+      create: (context) {
+        final networkInfo = NetworkInfoImpl(Connectivity());
+        final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+        final remoteDataSource = WfhRemoteDataSourceImpl(apiClient: apiClient);
+        final repository = WfhRepositoryImpl(
+          remoteDataSource: remoteDataSource,
+        );
+        final useCase = UpdateWfhStatusUseCase(repository);
+        return WfhActionBloc(updateWfhStatusUseCase: useCase);
+      },
+      child: BlocListener<WfhActionBloc, WfhActionState>(
+        listener: (context, state) {
+          if (state is WfhActionInProgress) {
+            // Show loading dialog
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder:
+                  (context) => const Center(child: CircularProgressIndicator()),
+            );
+          } else if (state is WfhActionSuccess) {
+            // Pop loading dialog
+            Navigator.of(context).pop();
+            // Show success
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppColors.success,
               ),
-              Flexible(
-                child: Text(
-                  'Back',
-                  style: AppTextStyles.bodyLarge(context).copyWith(
-                    fontWeight: FontWeight.w500,
+            );
+            Navigator.of(context).pop(true);
+          } else if (state is WfhActionFailure) {
+            // Pop loading dialog
+            Navigator.of(context).pop();
+            // Show error
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.errorMessage),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+        },
+        child: ResponsiveScaffold(
+          backgroundColor: AppColors.backgroundMedium,
+          appBar: AppBar(
+            elevation: 0,
+            forceMaterialTransparency: true,
+            leadingWidth: 110,
+            backgroundColor: AppColors.background,
+            foregroundColor: AppColors.textPrimary,
+            leading: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.arrow_back_ios,
                     color: Theme.of(context).colorScheme.primary,
+                    size: screenWidth * 0.048,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-        leadingWidth: 110,
-        title: Text(
-          'WFH',
-          style: AppTextStyles.heading4(context).copyWith(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          PopupMenuButton<String>(
-            icon: Icon(
-              Icons.more_vert,
-              color: AppColors.textPrimary,
-            ),
-            onSelected: (value) {
-              if (value == 'Edit') {
-                // Navigate to apply WFH page with pre-filled data
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ApplyWfhPage(
-                      wfhRequest: widget.wfhRequest,
+                  Flexible(
+                    child: Text(
+                      'Back',
+                      style: AppTextStyles.bodyMedium(context).copyWith(
+                        fontWeight: FontWeight.w400,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                );
-              } else if (value == 'Withdraw') {
-                // Handle withdraw
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'Edit',
-                child: Text('Edit'),
+                ],
               ),
-              const PopupMenuItem(
-                value: 'Withdraw',
-                child: Text('Withdraw'),
+            ),
+            title: Text(
+              widget.isApprovalMode ? 'WFH Approval' : 'WFH',
+              style: AppTextStyles.heading4(context).copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
               ),
-            ],
+            ),
+            centerTitle: true,
           ),
-        ],
+          bottomNavigationBar:
+              widget.isApprovalMode
+                  ? null
+                  : BottomNavBar(
+                    currentIndex: 3,
+                    onTap: NavigationHelper.getBottomNavHandler(context),
+                  ),
+          body: _buildDetailsContent(context, screenWidth, screenHeight),
+        ),
       ),
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: 3, // Request is active
-        onTap: NavigationHelper.getBottomNavHandler(context),
-      ),
-      body: _buildDetailsContent(context, screenWidth, screenHeight),
     );
   }
 
-  Widget _buildDetailsContent(BuildContext context, double screenWidth, double screenHeight) {
+  Widget _buildDetailsContent(
+    BuildContext context,
+    double screenWidth,
+    double screenHeight,
+  ) {
     final statusColor = _getStatusColor(widget.wfhRequest.status);
     final dateFormat = DateFormat('dd-MMM-yyyy');
     final dateTimeFormat = DateFormat('dd-MMM-yyyy HH:mm');
 
     return SingleChildScrollView(
-      padding: EdgeInsets.all(screenWidth * 0.022),
+      padding: EdgeInsets.all(screenWidth * 0.002),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title and Menu
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  widget.wfhRequest.reason,
-                  style: AppTextStyles.heading4(context).copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.success, // Green color for title
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: screenHeight * 0.02),
           // WFH Details Card
           _buildDetailsCard(
             context,
@@ -152,10 +198,8 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
             dateFormat,
             dateTimeFormat,
           ),
-          SizedBox(height: screenHeight * 0.02),
           // Description Section
-          _buildDescriptionSection(context, screenWidth, screenHeight),
-          SizedBox(height: screenHeight * 0.02),
+          SizedBox(height: screenHeight * 0.01),
           // Comments Section
           _buildCommentsSection(context, screenWidth, screenHeight),
         ],
@@ -175,31 +219,155 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-            spreadRadius: 0,
-          ),
-        ],
       ),
       padding: EdgeInsets.all(screenWidth * 0.042),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDetailRow(
-            context,
-            'Leave Type:',
-            widget.wfhRequest.reason,
-            screenWidth,
-            screenHeight,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  widget.wfhRequest.subject ?? widget.wfhRequest.reason,
+                  style: AppTextStyles.heading4(context).copyWith(
+                    fontWeight: FontWeight.w700,
+                    color:
+                        Theme.of(
+                          context,
+                        ).colorScheme.primary, // Green color for title
+                  ),
+                ),
+              ),
+              Builder(
+                builder:
+                    (menuContext) => PopupMenuButton<String>(
+                      icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
+                      onSelected: (value) {
+                        if (value == 'Edit') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => ApplyWfhPage(
+                                    wfhRequest: widget.wfhRequest,
+                                  ),
+                            ),
+                          ).then((result) {
+                        if (result == true && context.mounted) {
+                          Navigator.of(
+                            context,
+                          ).pop(true); // Cascade refresh
+                        }
+                      });
+                        } else if (value == 'Withdraw') {
+                          // Dispatch withdraw event using the inner context with BlocProvider
+                          final requestIdString =
+                              widget.wfhRequest.attendanceRequestId ??
+                              widget.wfhRequest.id;
+                          final requestId = int.tryParse(requestIdString) ?? 0;
+                          if (requestId > 0) {
+                            menuContext.read<WfhActionBloc>().add(
+                              UpdateWfhStatus(
+                                requestId: requestId,
+                                status: 'Withdrawn',
+                              ),
+                            );
+                          }
+                        } else if (value == 'Activity') {
+                          _showActivityBottomSheet(context);
+                        }
+                      },
+                      itemBuilder: (context) {
+                        final isPending =
+                            widget.wfhRequest.status == WfhStatus.pending;
+                        return [
+                          if (isPending && !widget.isApprovalMode)
+                            PopupMenuItem(
+                              value: 'Edit',
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                    width: screenWidth * 0.05,
+
+                                    height: screenHeight * 0.05,
+                                    child: SvgPicture.asset(
+                                      AppAssets.editIconwfh,
+                                    ),
+                                  ),
+                                  SizedBox(width: screenWidth * 0.02),
+                                  Text(
+                                    'Edit',
+                                    style: AppTextStyles.heading5(
+                                      context,
+                                    ).copyWith(
+                                      fontWeight: FontWeight.w400,
+                                      color: AppColors.textHeading,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (isPending && !widget.isApprovalMode)
+                            PopupMenuItem(
+                              value: 'Withdraw',
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: screenWidth * 0.05,
+
+                                    height: screenHeight * 0.05,
+                                    child: SvgPicture.asset(
+                                      AppAssets.withdrawIcon,
+                                    ),
+                                  ),
+                                  SizedBox(width: screenWidth * 0.02),
+                                  Text(
+                                    'Withdraw',
+                                    style: AppTextStyles.heading5(
+                                      context,
+                                    ).copyWith(
+                                      fontWeight: FontWeight.w400,
+                                      color: AppColors.textHeading,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          PopupMenuItem(
+                            value: 'Activity',
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: screenWidth * 0.05,
+
+                                  height: screenHeight * 0.05,
+                                  child: SvgPicture.asset(
+                                    AppAssets.activityIcon,
+                                  ),
+                                ),
+                                SizedBox(width: screenWidth * 0.02),
+                                Text(
+                                  'Activity',
+                                  style: AppTextStyles.heading5(
+                                    context,
+                                  ).copyWith(
+                                    fontWeight: FontWeight.w400,
+                                    color: AppColors.textHeading,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ];
+                      },
+                    ),
+              ),
+            ],
           ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
+          SizedBox(height: screenHeight * 0.02),
+
           _buildDetailRow(
             context,
             'Request Type:',
@@ -208,10 +376,11 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
             screenHeight,
           ),
           Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRowWithAvatar(
+          _buildDetailRow(
             context,
-            'Request To:',
-            'Riya Rawat',
+            'WFH Type:',
+            widget.wfhRequest.requestType ??
+                (widget.wfhRequest.toDate == null ? 'single' : 'multiple'),
             screenWidth,
             screenHeight,
           ),
@@ -241,26 +410,23 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
             screenWidth,
             screenHeight,
           ),
+          // Show reject remark if rejected
+          if (widget.wfhRequest.status == WfhStatus.rejected &&
+              widget.wfhRequest.rejectRemark != null) ...[
+            Divider(height: screenHeight * 0.03, color: AppColors.border),
+            _buildDetailRow(
+              context,
+              'Reject Remark:',
+              widget.wfhRequest.rejectRemark!,
+              screenWidth,
+              screenHeight,
+            ),
+          ],
           Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRow(
-            context,
-            'Last Updated At:',
-            dateTimeFormat.format(DateTime.now()),
-            screenWidth,
-            screenHeight,
-          ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRowWithAvatar(
-            context,
-            'Last Updated By:',
-            'Priya Rawat',
-            screenWidth,
-            screenHeight,
-          ),
+          _buildApproversRow(context, screenWidth, screenHeight),
           Divider(height: screenHeight * 0.03, color: AppColors.border),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
                 width: screenWidth * 0.3,
@@ -272,10 +438,11 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
                   ),
                 ),
               ),
+              const Spacer(),
               Container(
                 padding: EdgeInsets.symmetric(
                   horizontal: screenWidth * 0.032,
-                  vertical: screenHeight * 0.008,
+                  vertical: screenHeight * 0.004,
                 ),
                 decoration: BoxDecoration(
                   color: statusColor,
@@ -283,18 +450,74 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
                 ),
                 child: Text(
                   widget.wfhRequest.status.displayName,
-                  style: AppTextStyles.bodySmall(context).copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white,
-                  ),
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w500, color: Colors.white),
                 ),
               ),
             ],
           ),
+          Divider(height: screenHeight * 0.03, color: AppColors.border),
+
+          _buildDescriptionSection(context, screenWidth, screenHeight),
         ],
       ),
     );
   }
+
+  Widget _buildApproversRow(
+    BuildContext context,
+    double screenWidth,
+    double screenHeight,
+  ) {
+    final approvers =
+        _approvers.isNotEmpty ? _approvers : widget.wfhRequest.approvers;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: screenWidth * 0.3,
+          child: Text(
+            'Approvers:',
+            style: AppTextStyles.bodyMediumHeading(context).copyWith(
+              fontWeight: FontWeight.w500,
+              color: AppColors.textHeading,
+            ),
+          ),
+        ),
+        const Spacer(),
+        if (approvers.isNotEmpty)
+          GestureDetector(
+            onTap: () => _showApproversBottomSheet(context),
+            child: Row(
+              children: [
+                _WfhApproverAvatarStack(
+                  approvers: approvers,
+                  avatarSize: screenWidth * 0.07,
+                ),
+                SizedBox(width: screenWidth * 0.02),
+                Text(
+                  approvers.length == 1
+                      ? approvers.first.fullName
+                      : '${approvers.length} approvers',
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Text('—', style: AppTextStyles.bodySmall(context)),
+      ],
+    );
+  }
+
+
 
   Widget _buildDetailRow(
     BuildContext context,
@@ -331,76 +554,13 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
     );
   }
 
-  Widget _buildDetailRowWithAvatar(
+  Widget _buildDescriptionSection(
     BuildContext context,
-    String label,
-    String value,
     double screenWidth,
     double screenHeight,
   ) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        SizedBox(
-          width: screenWidth * 0.3,
-          child: Text(
-            label,
-            style: AppTextStyles.bodyMediumHeading(context).copyWith(
-              fontWeight: FontWeight.w500,
-              color: AppColors.textHeading,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              CircleAvatar(
-                radius: screenWidth * 0.032,
-                backgroundColor: AppColors.primary,
-                child: Text(
-                  value.split(' ').map((n) => n[0]).take(2).join(),
-                  style: AppTextStyles.bodySmall(context).copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              SizedBox(width: screenWidth * 0.021),
-              Text(
-                value,
-                style: AppTextStyles.bodySmall(context).copyWith(
-                  fontWeight: FontWeight.w400,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDescriptionSection(BuildContext context, double screenWidth, double screenHeight) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      padding: EdgeInsets.all(screenWidth * 0.042),
+      decoration: BoxDecoration(color: Colors.white),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -413,26 +573,68 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
           ),
           SizedBox(height: screenHeight * 0.012),
           Text(
-            'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.',
-            style: AppTextStyles.bodySmall(context).copyWith(
-              color: AppColors.textSecondary,
-              height: 1.5,
-            ),
+            widget.wfhRequest.reason.isNotEmpty
+                ? widget.wfhRequest.reason
+                : (widget.wfhRequest.subject ?? 'No description provided'),
+            style: AppTextStyles.bodySmall(
+              context,
+            ).copyWith(color: AppColors.textSecondary, height: 1.5),
           ),
+          if (widget.isApprovalMode &&
+              widget.wfhRequest.status == WfhStatus.pending &&
+              widget.wfhRequest.isEligibleToApprove) ...[
+            SizedBox(height: screenHeight * 0.02),
+            BlocBuilder<WfhActionBloc, WfhActionState>(
+              builder: (context, state) {
+                final requestIdString =
+                    widget.wfhRequest.attendanceRequestId ??
+                    widget.wfhRequest.id;
+                final requestId = int.tryParse(requestIdString) ?? 0;
+
+                return ApprovalActionBar(
+                  embedded: true,
+                  isLoading: state is WfhActionInProgress,
+                  onApprove:
+                      requestId <= 0
+                          ? null
+                          : () {
+                            context.read<WfhActionBloc>().add(
+                              UpdateWfhStatus(
+                                requestId: requestId,
+                                status: 'Approved',
+                              ),
+                            );
+                          },
+                  onReject:
+                      requestId <= 0
+                          ? null
+                          : () {
+                            context.read<WfhActionBloc>().add(
+                              UpdateWfhStatus(
+                                requestId: requestId,
+                                status: 'Rejected',
+                              ),
+                            );
+                          },
+                );
+              },
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildCommentsSection(BuildContext context, double screenWidth, double screenHeight) {
+  Widget _buildCommentsSection(
+    BuildContext context,
+    double screenWidth,
+    double screenHeight,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-          width: 1,
-        ),
+        border: Border.all(color: AppColors.border, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -446,82 +648,125 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Text(
+                'Comments',
+                style: AppTextStyles.heading5(context).copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: screenWidth * 0.025,
+                  vertical: screenHeight * 0.005,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.serviceBlueBg,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '${_comments.length}',
+                  style: AppTextStyles.labelSmall(context).copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: screenHeight * 0.008),
           Text(
-            'Comments',
-            style: AppTextStyles.heading5(context).copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
+            'Keep updates and discussion in one place.',
+            style: AppTextStyles.bodySmall(
+              context,
+            ).copyWith(color: AppColors.textSecondary),
           ),
-          SizedBox(height: screenHeight * 0.015),
-          TextField(
-            controller: _commentController,
-            decoration: InputDecoration(
-              hintText: 'Add a comment...',
-              hintStyle: AppTextStyles.bodyMedium(context).copyWith(
-                color: AppColors.textTertiary,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: AppColors.border,
-                  width: 1,
+          SizedBox(height: screenHeight * 0.018),
+          if (_commentsLoading)
+            const Center(child: CircularProgressIndicator())
+          else if (_comments.isNotEmpty) ...[
+            ..._comments.map(
+              (comment) => Padding(
+                padding: EdgeInsets.only(bottom: screenHeight * 0.012),
+                child: _buildCommentTile(
+                  context,
+                  screenWidth,
+                  screenHeight,
+                  comment,
                 ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: AppColors.border,
-                  width: 1,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: AppColors.primary,
-                  width: 1,
-                ),
-              ),
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: screenWidth * 0.032,
-                vertical: screenHeight * 0.015,
               ),
             ),
-            maxLines: 3,
-            style: AppTextStyles.bodyMedium(context),
-          ),
-          SizedBox(height: screenHeight * 0.02),
-          // Submit Button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                if (_commentController.text.isNotEmpty) {
-                  // Handle submit comment
-                  _commentController.clear();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Comment submitted'),
-                      backgroundColor: AppColors.success,
+
+            SizedBox(height: screenHeight * 0.018),
+          ],
+          Container(
+            padding: EdgeInsets.all(screenWidth * 0.02),
+            decoration: BoxDecoration(
+              color: AppColors.backgroundLight,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.borderLight),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commentController,
+                    minLines: 1,
+                    maxLines: 4,
+                    style: AppTextStyles.bodyMedium(context),
+                    decoration: InputDecoration(
+                      hintText: 'Write a comment...',
+                      hintStyle: AppTextStyles.bodyMedium(
+                        context,
+                      ).copyWith(color: AppColors.textTertiary),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: screenWidth * 0.02,
+                        vertical: screenHeight * 0.012,
+                      ),
                     ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.textWhite,
-                padding: EdgeInsets.symmetric(vertical: screenHeight * 0.018),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                elevation: 0,
-              ),
-              child: Text(
-                'Submit',
-                style: AppTextStyles.buttonLarge(context).copyWith(
-                  color: AppColors.textWhite,
+                SizedBox(width: screenWidth * 0.02),
+                SizedBox(
+                  height: screenWidth * 0.12,
+                  width: screenWidth * 0.12,
+                  child: ElevatedButton(
+                    onPressed:
+                        _submittingComment
+                            ? null
+                            : () => _submitComment(context),
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.textWhite,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    child:
+                        _submittingComment
+                            ? SizedBox(
+                              width: screenWidth * 0.05,
+                              height: screenWidth * 0.05,
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                            : Icon(
+                              Icons.arrow_upward_rounded,
+                              size: screenWidth * 0.05,
+                            ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -529,27 +774,375 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
     );
   }
 
+  Widget _buildCommentTile(
+    BuildContext context,
+    double screenWidth,
+    double screenHeight,
+    AttendanceRequestComment comment,
+  )
+  {
+    final userName =
+        comment.user?.fullName.isNotEmpty == true
+            ? comment.user!.fullName
+            : 'User';
+    final initials =
+        userName
+            .split(' ')
+            .where((part) => part.isNotEmpty)
+            .take(2)
+            .map((part) => part[0].toUpperCase())
+            .join();
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(screenWidth * 0.032),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: screenWidth * 0.09,
+                height: screenWidth * 0.09,
+                decoration: BoxDecoration(
+                  color: AppColors.serviceBlueBg,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  initials.isEmpty ? 'U' : initials,
+                  style: AppTextStyles.bodySmall(context).copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              SizedBox(width: screenWidth * 0.03),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      userName,
+                      style: AppTextStyles.bodyMediumHeading(
+                        context,
+                      ).copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    SizedBox(height: screenHeight * 0.002),
+                    Text(
+                      comment.createdAt != null
+                          ? DateFormat(
+                            'dd MMM yyyy, hh:mm a',
+                          ).format(comment.createdAt!)
+                          : 'Just now',
+                      style: AppTextStyles.bodySmall(
+                        context,
+                      ).copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: screenHeight * 0.012),
+          Text(
+            comment.comment,
+            style: AppTextStyles.bodyMedium(
+              context,
+            ).copyWith(color: AppColors.textPrimary, height: 1.45),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showActivityBottomSheet(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.5, // Start at half screen
-        minChildSize: 0.3, // Minimum 30% of screen
-        maxChildSize: 0.9, // Maximum 90% of screen (can be dragged up)
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
+      builder:
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.5, // Start at half screen
+            minChildSize: 0.3, // Minimum 30% of screen
+            maxChildSize: 0.9, // Maximum 90% of screen (can be dragged up)
+            builder:
+                (context, scrollController) => Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: FutureBuilder<List<_WfhActivityItem>>(
+                    future: _fetchActivityItems(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  color: AppColors.error,
+                                  size: sw * 0.1,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Failed to load activity',
+                                  style: AppTextStyles.bodyMedium(context),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      final activities = snapshot.data ?? const [];
+                      return ListView(
+                        controller: scrollController,
+                        padding: EdgeInsets.all(sw * 0.04),
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 40,
+                              height: 4,
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: AppColors.border,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                          Text(
+                            'Activity',
+                            style: AppTextStyles.heading4(
+                              context,
+                            ).copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 16),
+                          if (activities.isEmpty)
+                            Text(
+                              'No activity available',
+                              style: AppTextStyles.bodyMedium(
+                                context,
+                              ).copyWith(color: AppColors.textSecondary),
+                            )
+                          else
+                            ...activities.map(
+                              (activity) =>
+                                  _WfhActivityTile(activity: activity, sw: sw),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
           ),
-          child: ActivitySection(scrollController: scrollController),
-        ),
-      ),
     );
+  }
+
+  Future<List<_WfhActivityItem>> _fetchActivityItems() async {
+    final networkInfo = NetworkInfoImpl(Connectivity());
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final requestIdString =
+        widget.wfhRequest.attendanceRequestId ?? widget.wfhRequest.id;
+    final requestId = int.tryParse(requestIdString) ?? 0;
+
+    final payload = encodeData({'request_id': requestId});
+    final response = await apiClient.get(
+      // '/api/attendance/wfh/request/details?payload=$payload',
+      '${AppUrls.wfhRequestDetails}?payload=$payload',
+
+      options: Options(headers: {'Content-Type': 'application/json'}),
+    );
+
+    final responseData = response.data;
+    if (responseData is! Map<String, dynamic>) {
+      return const [];
+    }
+
+    if (responseData['success'] != true) {
+      throw Exception(
+        responseData['message'] as String? ?? 'Failed to load activity',
+      );
+    }
+
+    final data = responseData['data'];
+    if (data is! Map<String, dynamic>) {
+      return const [];
+    }
+
+    final rawActivity = data['activity'];
+    if (rawActivity is! List) {
+      return const [];
+    }
+
+    return rawActivity
+        .whereType<Map>()
+        .map(
+          (item) => _WfhActivityItem.fromJson(Map<String, dynamic>.from(item)),
+        )
+        .toList();
+  }
+
+  Future<void> _loadApprovers() async {
+    try {
+      final networkInfo = NetworkInfoImpl(Connectivity());
+      final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+      final payload = encodeData({'request_id': _requestId});
+      final response = await apiClient.get(
+        '${AppUrls.wfhRequestDetails}?payload=$payload',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      final responseData = response.data;
+      if (responseData is! Map<String, dynamic>) {
+        return;
+      }
+
+      if (responseData['success'] != true) {
+        return;
+      }
+
+      final data = responseData['data'];
+      if (data is! Map<String, dynamic>) {
+        return;
+      }
+
+      final approvers =
+          (data['approvers'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .expand(
+                (level) => (level['users'] as List<dynamic>? ?? const [])
+                    .whereType<Map<String, dynamic>>()
+                    .map(WfhApproverSnapshot.fromJson),
+              )
+              .toList();
+
+      if (!mounted) return;
+      setState(() => _approvers = approvers);
+    } catch (_) {
+      // Keep the row on list-level data fallback if detail approvers fail to load.
+    }
+  }
+
+  Future<void> _loadComments() async {
+    setState(() => _commentsLoading = true);
+    try {
+      final networkInfo = NetworkInfoImpl(Connectivity());
+      final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+      final payload = encodeData({
+        'client_id': _resolveClientId(),
+        'attendance_request_id': _requestId,
+        'type': 'WorkFromHome',
+      });
+      final response = await apiClient.get(
+        '/api/attendance/request/comments/list?payload=$payload',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+      final responseData = response.data;
+      if (responseData is Map<String, dynamic> &&
+          responseData['success'] == true) {
+        _comments = parseAttendanceRequestComments(responseData);
+      } else {
+        _comments = const [];
+      }
+    } catch (_) {
+      _comments = const [];
+    } finally {
+      if (mounted) {
+        setState(() => _commentsLoading = false);
+      }
+    }
+  }
+
+  Future<void> _submitComment(BuildContext context) async {
+    final trimmedComment = _commentController.text.trim();
+    if (trimmedComment.isEmpty) return;
+
+    setState(() => _submittingComment = true);
+    try {
+      final networkInfo = NetworkInfoImpl(Connectivity());
+      final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+      final payload = encodeData({
+        'request_id': _requestId,
+        'comment': trimmedComment,
+        'type': 'WorkFromHome',
+      });
+      final response = await apiClient.post(
+        '/api/attendance/request/comments',
+        data: {'payload': payload},
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      final responseData = response.data;
+      final success =
+          responseData is Map<String, dynamic> &&
+          responseData['success'] == true;
+      final message =
+          responseData is Map<String, dynamic>
+              ? responseData['message'] as String? ?? 'Failed to add comment'
+              : 'Failed to add comment';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: success ? AppColors.success : AppColors.error,
+        ),
+      );
+
+      if (success) {
+        _commentController.clear();
+        await _loadComments();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to add comment'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _submittingComment = false);
+      }
+    }
+  }
+
+  int get _requestId {
+    final requestIdString =
+        widget.wfhRequest.attendanceRequestId ?? widget.wfhRequest.id;
+    return int.tryParse(requestIdString) ?? 0;
+  }
+
+  int _resolveClientId() {
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is UserProfileLoaded) {
+      return profileState.profile.clientId;
+    }
+    final token = TokenStorage.getToken();
+    if (token == null || token.isEmpty) return 0;
+    final decoded = decodeData<Map<String, dynamic>>(token);
+    final clientId = decoded?['client_id'];
+    if (clientId is int) return clientId;
+    if (clientId is String) return int.tryParse(clientId) ?? 0;
+    return 0;
   }
 
   void _showApproversBottomSheet(BuildContext context) {
@@ -557,21 +1150,49 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.5, // Start at half screen
-        minChildSize: 0.3, // Minimum 30% of screen
-        maxChildSize: 0.9, // Maximum 90% of screen (can be dragged up)
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
+      builder:
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.5, // Start at half screen
+            minChildSize: 0.3, // Minimum 30% of screen
+            maxChildSize: 0.9, // Maximum 90% of screen (can be dragged up)
+            builder:
+                (context, scrollController) => Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: BlocProvider(
+                    create: (context) {
+                      final apiService = ApiService(
+                        networkInfo: NetworkInfoImpl(Connectivity()),
+                        onTokenExpired:
+                            () => AppNavigator.pushAndRemoveAll(
+                              MaterialPageRoute(
+                                builder: (_) => const LoginPage(),
+                              ),
+                            ),
+                      );
+                      final remoteDataSource = ApproversRemoteDataSourceImpl(
+                        apiService: apiService,
+                      );
+                      final repository = ApproversRepositoryImpl(
+                        remoteDataSource: remoteDataSource,
+                      );
+                      final getApprovers = GetApprovers(repository);
+
+                      return ApproversBloc(getApprovers: getApprovers);
+                    },
+                    child: ApproversSection(
+                      scrollController: scrollController,
+                      endpoint: AppUrls.wfhRequestDetails,
+                      payload: {'request_id': _requestId},
+                    ),
+                  ),
+                ),
           ),
-          child: ApproversSection(scrollController: scrollController),
-        ),
-      ),
     );
   }
 
@@ -583,6 +1204,195 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
         return const Color(0xFF4CAF50); // Green
       case WfhStatus.rejected:
         return const Color(0xFFE53935); // Red
+      case WfhStatus.withdrawn:
+        return const Color(0xFF9E9E9E); // Grey
     }
+  }
+}
+
+class _WfhActivityItem {
+  final String action;
+  final String actionType;
+  final String firstName;
+  final String lastName;
+  final DateTime? createdAt;
+
+  const _WfhActivityItem({
+    required this.action,
+    required this.actionType,
+    required this.firstName,
+    required this.lastName,
+    required this.createdAt,
+  });
+
+  String get cleanAction => action.replaceAll(RegExp(r'<[^>]*>'), '');
+
+  String get actorName => '$firstName $lastName'.trim();
+
+  factory _WfhActivityItem.fromJson(Map<String, dynamic> json) {
+    return _WfhActivityItem(
+      action: json['action'] as String? ?? '',
+      actionType: json['action_type'] as String? ?? '',
+      firstName: json['first_name'] as String? ?? '',
+      lastName: json['last_name'] as String? ?? '',
+      createdAt:
+          DateTime.tryParse(json['created_at'] as String? ?? '')?.toLocal(),
+    );
+  }
+}
+
+class _WfhActivityTile extends StatelessWidget {
+  final _WfhActivityItem activity;
+  final double sw;
+
+  const _WfhActivityTile({required this.activity, required this.sw});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.all(sw * 0.035),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              activity.actorName.isNotEmpty
+                  ? activity.actorName[0].toUpperCase()
+                  : 'A',
+              style: AppTextStyles.bodyMedium(context).copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  activity.cleanAction,
+                  style: AppTextStyles.bodyMedium(
+                    context,
+                  ).copyWith(color: AppColors.textPrimary, height: 1.4),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  activity.createdAt != null
+                      ? DateFormat(
+                        'dd MMM yyyy, hh:mm a',
+                      ).format(activity.createdAt!)
+                      : activity.actionType,
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WfhApproverAvatar extends StatelessWidget {
+  final WfhApproverSnapshot approver;
+  final double size;
+
+  const _WfhApproverAvatar({required this.approver, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    Color bgColor = AppColors.primary;
+    if (approver.profileColor != null && approver.profileColor!.startsWith('#')) {
+      try {
+        bgColor = Color(
+          int.parse(
+            approver.profileColor!.replaceFirst('#', 'FF'),
+            radix: 16,
+          ),
+        );
+      } catch (_) {}
+    }
+
+    return CircleAvatar(
+      radius: size / 2,
+      backgroundColor: bgColor,
+      backgroundImage:
+          approver.imageUrl != null && approver.imageUrl!.isNotEmpty
+              ? NetworkImage(approver.imageUrl!)
+              : null,
+      child:
+          approver.imageUrl == null || approver.imageUrl!.isEmpty
+              ? Text(
+                  approver.firstName.isNotEmpty
+                      ? approver.firstName[0].toUpperCase()
+                      : '?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: size * 0.45,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              : null,
+    );
+  }
+}
+
+class _WfhApproverAvatarStack extends StatelessWidget {
+  final List<WfhApproverSnapshot> approvers;
+  final double avatarSize;
+
+  const _WfhApproverAvatarStack({
+    required this.approvers,
+    required this.avatarSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleApprovers = approvers.take(3).toList();
+    final overlap = avatarSize * 0.35;
+    final width =
+        visibleApprovers.length == 1
+            ? avatarSize
+            : avatarSize +
+                ((visibleApprovers.length - 1) * (avatarSize - overlap));
+
+    return SizedBox(
+      width: width,
+      height: avatarSize,
+      child: Stack(
+        children: [
+          for (var i = 0; i < visibleApprovers.length; i++)
+            Positioned(
+              left: i * (avatarSize - overlap),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: _WfhApproverAvatar(
+                  approver: visibleApprovers[i],
+                  size: avatarSize,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

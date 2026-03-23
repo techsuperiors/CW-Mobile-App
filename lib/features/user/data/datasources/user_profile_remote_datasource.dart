@@ -65,7 +65,8 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
       }
 
       return profileResponse.data!;
-    } on ServerException {
+    } on ServerException
+    {
       rethrow;
     } catch (e) {
       if (e is ServerException) {

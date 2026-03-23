@@ -13,4 +13,3 @@ class GetAttendanceDetailsUseCase {
     return await repository.getAttendanceDetails();
   }
 }
-

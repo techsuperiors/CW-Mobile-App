@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -7,6 +6,8 @@ import '../../../../core/widgets/common/app_section_header.dart';
 import '../../../request/presentation/pages/sub_requets/leaves/presentation/pages/apply_leave_page.dart';
 import '../../../request/presentation/pages/sub_requets/wfh/presentation/pages/apply_wfh_page.dart';
 import '../../../request/presentation/pages/sub_requets/regularize/presentation/pages/apply_regularize_page.dart';
+import '../../../../core/widgets/permission_guard.dart';
+import '../../../../core/utils/permission_checker.dart';
 
 /// Quick links widget
 class QuickLinks extends StatelessWidget {
@@ -20,46 +21,84 @@ class QuickLinks extends StatelessWidget {
         'label': AppStrings.applyLeaveRequest,
         'color': AppColors.error,
         'backgroundColor': AppColors.attendanceLightRedBg,
+        'anyOf': ['Leave Management:My Leaves:Write'],
       },
       {
         'icon': Icons.business_center,
         'label': AppStrings.workFromHomeRequest,
         'color': AppColors.primary,
         'backgroundColor': AppColors.attendanceLightBlueBg,
+        'requiredPermission': 'Attendance:WFH Request:Write',
       },
       {
         'icon': Icons.edit,
         'label': AppStrings.raiseRegularizeRequest,
         'color': AppColors.success,
         'backgroundColor': AppColors.attendanceLightGreenBg,
+        'requiredPermission': 'Attendance:Regularize:Write',
       },
     ];
 
+    // Filter links based on permissions first to know if the section should render at all
+    final visibleLinks =
+        quickLinks.where((link) {
+          if (link['requiredPermission'] == null && link['anyOf'] == null) {
+            return true;
+          }
+          return PermissionChecker.hasPermission(
+            context,
+            requiredPermission: link['requiredPermission'] as String?,
+            anyOf: link['anyOf'] as List<String>?,
+          );
+        }).toList();
+
+    // Hide entire Quick Links section if no permissions match
+    if (visibleLinks.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.042), // ~4.2% of screen width
+      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.042),
+      // ~4.2% of screen width
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.01),
           AppSectionHeader(title: AppStrings.quickLinks),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+
           SizedBox(
-            height: MediaQuery.of(context).size.width * 0.25, // 25% of screen width
+            height:
+                MediaQuery.of(context).size.width * 0.25, // 25% of screen width
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemCount: quickLinks.length,
-              separatorBuilder: (context, index) => SizedBox(
-                width: MediaQuery.of(context).size.width * 0.025, // 2.5% of screen width
-              ),
+              itemCount: visibleLinks.length,
+              separatorBuilder:
+                  (context, index) => SizedBox(
+                    width:
+                        MediaQuery.of(context).size.width *
+                        0.040, // 2.5% of screen width
+                  ),
               itemBuilder: (context, index) {
-                final link = quickLinks[index];
-                return _buildQuickLinkCard(
-                  context,
-                  icon: link['icon'] as IconData,
-                  label: link['label'] as String,
-                  iconColor: link['color'] as Color,
-                  backgroundColor: link['backgroundColor'] as Color,
-                  onTap: () => _handleQuickLinkTap(context, link['label'] as String),
+                final link = visibleLinks[index];
+
+                return PermissionGuard(
+                  requiredPermission: link['requiredPermission'] as String?,
+                  anyOf: link['anyOf'] as List<String>?,
+                  child: _buildQuickLinkCard(
+                    context,
+                    icon: link['icon'] as IconData,
+                    label: link['label'] as String,
+                    iconColor: link['color'] as Color,
+                    backgroundColor: link['backgroundColor'] as Color,
+                    onTap:
+                        () => _handleQuickLinkTap(
+                          context,
+                          link['label'] as String,
+                        ),
+                  ),
                 );
               },
             ),
@@ -73,23 +112,17 @@ class QuickLinks extends StatelessWidget {
     if (label == AppStrings.applyLeaveRequest) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => const ApplyLeavePage(),
-        ),
+        MaterialPageRoute(builder: (context) => const ApplyLeavePage()),
       );
     } else if (label == AppStrings.workFromHomeRequest) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => const ApplyWfhPage(),
-        ),
+        MaterialPageRoute(builder: (context) => const ApplyWfhPage()),
       );
     } else if (label == AppStrings.raiseRegularizeRequest) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => const ApplyRegularizePage(),
-        ),
+        MaterialPageRoute(builder: (context) => const ApplyRegularizePage()),
       );
     }
   }
@@ -105,8 +138,9 @@ class QuickLinks extends StatelessWidget {
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;
     final screenHeight = mediaQuery.size.height;
-    final smallerDimension = screenWidth < screenHeight ? screenWidth : screenHeight;
-    
+    final smallerDimension =
+        screenWidth < screenHeight ? screenWidth : screenHeight;
+
     // Calculate card dimensions based on screen size
     // Card width: 30% of screen width, clamped between 100 and 140
     final cardWidth = (screenWidth * 0.30).clamp(100.0, 140.0);
@@ -123,10 +157,7 @@ class QuickLinks extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.background,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: iconColor,
-              width: 1.5,
-            ),
+            border: Border.all(color: iconColor, width: 1.5),
           ),
           padding: EdgeInsets.all(
             smallerDimension * 0.027, // ~2.7% of smaller dimension
@@ -140,26 +171,31 @@ class QuickLinks extends StatelessWidget {
                 children: [
                   Icon(
                     icon,
-                    size: smallerDimension * 0.067, // ~6.7% of smaller dimension
+                    size: smallerDimension * 0.057,
+                    // ~6.7% of smaller dimension
                     color: iconColor,
                   ),
                   // Action icon in top-right
                   Container(
-                    width: smallerDimension * 0.067, // ~6.7% of smaller dimension
-                    height: smallerDimension * 0.067,
+                    width: smallerDimension * 0.057,
+                    // ~6.7% of smaller dimension
+                    height: smallerDimension * 0.057,
                     decoration: BoxDecoration(
                       color: backgroundColor,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.arrow_outward,
-                      size: smallerDimension * 0.039, // ~3.9% of smaller dimension
+                      size: smallerDimension * 0.039,
+                      // ~3.9% of smaller dimension
                       color: iconColor,
                     ),
-                  )
+                  ),
                 ],
               ),
-              SizedBox(height: MediaQuery.of(context).size.height * 0.01), // 1% of screen height
+              SizedBox(
+                height: MediaQuery.of(context).size.height * 0.016,
+              ), // 1% of screen height
               // Text centered vertically and horizontally
               Flexible(
                 child: Text(
@@ -167,7 +203,7 @@ class QuickLinks extends StatelessWidget {
                   textAlign: TextAlign.start,
                   style: AppTextStyles.bodySmall(context).copyWith(
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
+                    color: AppColors.textSecondary,
                     height: 1.3,
                   ),
                   maxLines: 3,
@@ -181,4 +217,3 @@ class QuickLinks extends StatelessWidget {
     );
   }
 }
-

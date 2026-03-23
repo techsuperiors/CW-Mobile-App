@@ -28,13 +28,18 @@ class AttendanceTimerCircle extends StatelessWidget {
     final double progress = workedHours / shiftHours;
     return progress.clamp(0.0, 1.0);
   }
-
-  /// Format worked hours to HH:MM string
+  /// Format worked hours to HH:MM:SS string
   String get _formattedTime {
-    final hours = workedHours.floor();
-    final minutes = ((workedHours - hours) * 60).round();
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+    final totalSeconds = (workedHours * 3600).round();
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+
+    return '${hours.toString().padLeft(2, '0')}:'
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}';
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -114,15 +119,15 @@ class AttendanceTimerCircle extends StatelessWidget {
               progress: _progress,
               progressColor: AppColors.success,
               remainingColor: AppColors.background,
-              strokeWidth: 10,
+              strokeWidth: 6,
             ),
           ),
           // Time text
           Center(
             child: Text(
               _formattedTime,
-              style: AppTextStyles.heading5(context).copyWith(
-                fontWeight: FontWeight.w700,
+              style: AppTextStyles.bodySmall(context).copyWith(
+                fontWeight: FontWeight.w500,
                 color: AppColors.attendanceTeal,
               ),
             ),

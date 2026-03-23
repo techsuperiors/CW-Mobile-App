@@ -11,6 +11,7 @@ class EmployeeAgreementModel {
   final String status;
   final String? content; // Agreement content text
   final String? signatureUrl; // Signature image URL
+  final String? documentUrl; // Signature pdf URL
 
   const EmployeeAgreementModel({
     required this.id,
@@ -24,6 +25,7 @@ class EmployeeAgreementModel {
     required this.status,
     this.content,
     this.signatureUrl,
+    this.documentUrl,
   });
 }
 

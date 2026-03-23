@@ -11,6 +11,9 @@ class UpcomingEventModel {
   final String? eventDate;
   final Map<String, dynamic>? user;
   final Map<String, dynamic>? employee;
+  final String? imageUrl;       // add
+  final String? profileColor;   // add
+
 
   UpcomingEventModel({
     this.id,
@@ -24,6 +27,8 @@ class UpcomingEventModel {
     this.eventDate,
     this.user,
     this.employee,
+    this.imageUrl,              // add
+    this.profileColor,          // add
   });
 
   factory UpcomingEventModel.fromJson(Map<String, dynamic> json) {
@@ -102,6 +107,8 @@ class UpcomingEventModel {
       eventDate: dateStr,
       user: json['user'] as Map<String, dynamic>?,
       employee: json['employee'] as Map<String, dynamic>?,
+      imageUrl: json['image_url'] as String?,        // yeh add karo
+      profileColor: json['profile_color'] as String?, // yeh add karo
     );
   }
 

@@ -25,10 +25,7 @@ class TicketLoaded extends TicketState {
   final TicketList ticketList;
   final String requestType;
 
-  const TicketLoaded({
-    required this.ticketList,
-    required this.requestType,
-  });
+  const TicketLoaded({required this.ticketList, required this.requestType});
 
   @override
   List<Object> get props => [ticketList, requestType];
@@ -117,12 +114,12 @@ class TicketFileUploading extends TicketState {
 
 /// Ticket file upload success state
 class TicketFileUploaded extends TicketState {
-  final TicketStats stats;
+  final List<UploadedFile> uploadedFiles;
 
-  const TicketFileUploaded({required this.stats});
+  const TicketFileUploaded({required this.uploadedFiles});
 
   @override
-  List<Object> get props => [stats];
+  List<Object> get props => [uploadedFiles];
 }
 
 /// Ticket file upload error state

@@ -49,6 +49,8 @@ class UpcomingEventsRepositoryImpl implements UpcomingEventsRepository {
       date: model.date ?? model.eventDate ?? model.startDate ?? '',
       formattedDate: model.formattedDate,
       iconName: iconName,
+      imageUrl: model.imageUrl,           // add
+      profileColor: model.profileColor,   // add
     );
   }
 }

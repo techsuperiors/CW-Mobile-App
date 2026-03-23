@@ -1,12 +1,61 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../bloc/approvers/approvers_bloc.dart';
+import '../../../../../bloc/approvers/approvers_event.dart';
+import '../../../../../bloc/approvers/approvers_state.dart';
 
 /// Approvers section widget showing approval levels and approvers
-class ApproversSection extends StatelessWidget {
+class ApproversSection extends StatefulWidget {
   final ScrollController? scrollController;
-  
-  const ApproversSection({super.key, this.scrollController});
+  final String endpoint;
+  final Map<String, dynamic> payload;
+
+  const ApproversSection({
+    super.key,
+    this.scrollController,
+    required this.endpoint,
+    required this.payload,
+  });
+
+  @override
+  State<ApproversSection> createState() => _ApproversSectionState();
+}
+
+class _ApproversSectionState extends State<ApproversSection> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<ApproversBloc>().add(
+      FetchApprovers(endpoint: widget.endpoint, payload: widget.payload),
+    );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return const Color(0xFF2196F3); // Blue
+      case 'approved':
+        return const Color(0xFF4CAF50); // Green
+      case 'rejected':
+        return const Color(0xFFE53935); // Red
+      default:
+        return AppColors.warning;
+    }
+  }
+
+  Color _parseColor(String hexColor) {
+    hexColor = hexColor.replaceAll('#', '');
+    if (hexColor.length == 6) {
+      hexColor = 'FF$hexColor';
+    }
+    try {
+      return Color(int.parse(hexColor, radix: 16));
+    } catch (_) {
+      return AppColors.primary;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,10 +97,7 @@ class ApproversSection extends StatelessWidget {
                 ],
               ),
               IconButton(
-                icon: Icon(
-                  Icons.close,
-                  color: AppColors.textSecondary,
-                ),
+                icon: Icon(Icons.close, color: AppColors.textSecondary),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
@@ -59,16 +105,13 @@ class ApproversSection extends StatelessWidget {
         ),
         Expanded(
           child: SingleChildScrollView(
-            controller: scrollController,
+            controller: widget.scrollController,
             padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.042),
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.border,
-                  width: 1,
-                ),
+                border: Border.all(color: AppColors.border, width: 1),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.05),
@@ -83,107 +126,98 @@ class ApproversSection extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Description
-                  Text(
-                    'Lorem Ipsum is simply dummy text of the printing and typesetting industry.',
-                    style: AppTextStyles.bodySmall(context).copyWith(
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                    ),
+                  SizedBox(height: screenHeight * 0.01),
+                  BlocBuilder<ApproversBloc, ApproversState>(
+                    builder: (context, state) {
+                      if (state is ApproversLoading) {
+                        return Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: screenHeight * 0.05,
+                            ),
+                            child: CircularProgressIndicator(
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        );
+                      } else if (state is ApproversError) {
+                        return Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: screenHeight * 0.05,
+                            ),
+                            child: Text(
+                              state.message,
+                              style: AppTextStyles.bodyMedium(
+                                context,
+                              ).copyWith(color: AppColors.error),
+                            ),
+                          ),
+                        );
+                      } else if (state is ApproversLoaded) {
+                        if (state.approvers.isEmpty) {
+                          return Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                vertical: screenHeight * 0.05,
+                              ),
+                              child: Text(
+                                'No approvers found.',
+                                style: AppTextStyles.bodyMedium(
+                                  context,
+                                ).copyWith(color: AppColors.textSecondary),
+                              ),
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children:
+                              state.approvers.map((level) {
+                                return Padding(
+                                  padding: EdgeInsets.only(
+                                    bottom: screenHeight * 0.025,
+                                  ),
+                                  child: _buildApprovalLevel(
+                                    context,
+                                    level.level.toLowerCase().contains('super')
+                                        ? level.level
+                                        : 'Level ${level.level}',
+                                    level.allApproversRequired == true
+                                        ? '(All Approvers Must Approve)'
+                                        : '(Anyone can approve)',
+                                    level.users.map((u) {
+                                      return _ApproverInfo(
+                                        name: '${u.firstName} ${u.lastName}',
+                                        status: u.approvalStatus,
+                                        statusColor: _getStatusColor(
+                                          u.approvalStatus,
+                                        ),
+                                        hasAvatar:
+                                            u.imageUrl != null ||
+                                            u.profileColor != null,
+                                        imageUrl: u.imageUrl,
+                                        initials:
+                                            u.firstName.isNotEmpty
+                                                ? u.firstName[0]
+                                                : null,
+                                        customColor:
+                                            u.profileColor != null
+                                                ? _parseColor(u.profileColor!)
+                                                : null,
+                                      );
+                                    }).toList(),
+                                    screenWidth,
+                                    screenHeight,
+                                  ),
+                                );
+                              }).toList(),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
                   ),
-                  SizedBox(height: screenHeight * 0.025),
-            // Level 1
-            _buildApprovalLevel(
-              context,
-              'Level 1',
-              '(All Approvers Must Approve)',
-              [
-                _ApproverInfo(
-                  name: 'Priya Rawat',
-                  status: 'Pending',
-                  statusColor: AppColors.warning,
-                  hasAvatar: true,
-                  initials: 'PR',
-                ),
-                _ApproverInfo(
-                  name: 'Riya Sharma',
-                  status: 'Approved',
-                  statusColor: AppColors.success,
-                  hasAvatar: true,
-                  initials: 'RS',
-                ),
-              ],
-              screenWidth,
-              screenHeight,
-            ),
-            SizedBox(height: screenHeight * 0.025),
-            // Level 2
-            _buildApprovalLevel(
-              context,
-              'Level 2',
-              null,
-              [
-                _ApproverInfo(
-                  name: 'Support User',
-                  status: 'Pending',
-                  statusColor: AppColors.warning,
-                  hasAvatar: false,
-                  initials: 'PR',
-                ),
-              ],
-              screenWidth,
-              screenHeight,
-            ),
-            SizedBox(height: screenHeight * 0.025),
-            // Level 3
-            _buildApprovalLevel(
-              context,
-              'Level 3',
-              '(Anyone can approve)',
-              [
-                _ApproverInfo(
-                  name: 'Kapil Rawat',
-                  status: 'Pending',
-                  statusColor: AppColors.warning,
-                  hasAvatar: false,
-                  initials: 'KR',
-                ),
-                _ApproverInfo(
-                  name: 'Aman Sharma',
-                  status: 'Approved',
-                  statusColor: AppColors.success,
-                  hasAvatar: false,
-                  initials: 'AS',
-                ),
-              ],
-              screenWidth,
-              screenHeight,
-            ),
-            SizedBox(height: screenHeight * 0.025),
-            // Super Approver
-            _buildApprovalLevel(
-              context,
-              'Super Approver',
-              '(Can approve on behalf of all levels)',
-              [
-                _ApproverInfo(
-                  name: 'Kapil Rawat',
-                  status: 'Pending',
-                  statusColor: AppColors.warning,
-                  hasAvatar: false,
-                  initials: 'KR',
-                ),
-                _ApproverInfo(
-                  name: 'Aman Sharma',
-                  status: 'Approved',
-                  statusColor: AppColors.success,
-                  hasAvatar: false,
-                  initials: 'AS',
-                ),
-              ],
-              screenWidth,
-              screenHeight,
-            ),
                 ],
               ),
             ),
@@ -218,24 +252,26 @@ class ApproversSection extends StatelessWidget {
               Flexible(
                 child: Text(
                   subtitle,
-                  style: AppTextStyles.bodySmall(context).copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(color: AppColors.textSecondary),
                 ),
               ),
             ],
           ],
         ),
         SizedBox(height: screenHeight * 0.015),
-        ...approvers.map((approver) => Padding(
-              padding: EdgeInsets.only(bottom: screenHeight * 0.012),
-              child: _buildApproverRow(
-                context,
-                approver,
-                screenWidth,
-                screenHeight,
-              ),
-            )),
+        ...approvers.map(
+          (approver) => Padding(
+            padding: EdgeInsets.only(bottom: screenHeight * 0.012),
+            child: _buildApproverRow(
+              context,
+              approver,
+              screenWidth,
+              screenHeight,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -246,21 +282,14 @@ class ApproversSection extends StatelessWidget {
     double screenWidth,
     double screenHeight,
   ) {
-    // Determine avatar color based on name (matching design)
     Color avatarColor;
     Color textColor;
-    if (approver.hasAvatar) {
-      // Different colors for different approvers
-      if (approver.name.contains('Priya')) {
-        avatarColor = const Color(0xFF2196F3); // Blue
-        textColor = Colors.white;
-      } else if (approver.name.contains('Riya')) {
-        avatarColor = const Color(0xFF9C27B0); // Purple
-        textColor = Colors.white;
-      } else {
-        avatarColor = AppColors.primary;
-        textColor = Colors.white;
-      }
+    if (approver.customColor != null) {
+      avatarColor = approver.customColor!;
+      textColor = Colors.white;
+    } else if (approver.hasAvatar) {
+      avatarColor = AppColors.primary;
+      textColor = Colors.white;
     } else {
       avatarColor = const Color(0xFFE3F2FD); // Light blue
       textColor = AppColors.textPrimary;
@@ -271,10 +300,7 @@ class ApproversSection extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppColors.border,
-          width: 1,
-        ),
+        border: Border.all(color: AppColors.border, width: 1),
       ),
       child: Row(
         children: [
@@ -282,13 +308,27 @@ class ApproversSection extends StatelessWidget {
           CircleAvatar(
             radius: screenWidth * 0.032,
             backgroundColor: avatarColor,
-            child: Text(
-              approver.initials ?? approver.name.split(' ').map((n) => n[0]).take(2).join(),
-              style: AppTextStyles.bodySmall(context).copyWith(
-                color: textColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            backgroundImage:
+                approver.imageUrl != null && approver.imageUrl!.isNotEmpty
+                    ? NetworkImage(approver.imageUrl!)
+                    : null,
+            child:
+                approver.imageUrl != null && approver.imageUrl!.isNotEmpty
+                    ? null
+                    : Text(
+                      approver.initials ??
+                          approver.name
+                              .split(' ')
+                              .map((n) => n.isNotEmpty ? n[0] : '')
+                              .take(2)
+                              .join(),
+                      style: AppTextStyles.bodySmall(
+                        context,
+                      ).copyWith(
+                        color: textColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
           ),
           SizedBox(width: screenWidth * 0.021),
           // Name
@@ -310,10 +350,7 @@ class ApproversSection extends StatelessWidget {
             decoration: BoxDecoration(
               color: approver.statusColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: approver.statusColor,
-                width: 1,
-              ),
+              border: Border.all(color: approver.statusColor, width: 1),
             ),
             child: Text(
               approver.status,
@@ -334,13 +371,17 @@ class _ApproverInfo {
   final String status;
   final Color statusColor;
   final bool hasAvatar;
+  final String? imageUrl;
   final String? initials;
+  final Color? customColor;
 
   _ApproverInfo({
     required this.name,
     required this.status,
     required this.statusColor,
     required this.hasAvatar,
+    this.imageUrl,
     this.initials,
+    this.customColor,
   });
 }

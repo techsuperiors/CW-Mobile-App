@@ -1,210 +1,317 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
+import 'package:native_screenshot_widget/native_screenshot_widget.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../domain/models/payslip_model.dart';
 
-/// PDF viewer page for payslip with download option
+/// Payslip preview page with HTML rendering and PDF download support.
 class PayslipPdfViewerPage extends StatefulWidget {
   final PayslipModel payslip;
 
-  const PayslipPdfViewerPage({
-    super.key,
-    required this.payslip,
-  });
+  const PayslipPdfViewerPage({super.key, required this.payslip});
 
   @override
   State<PayslipPdfViewerPage> createState() => _PayslipPdfViewerPageState();
 }
 
 class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
-  final GlobalKey<SfPdfViewerState> _pdfViewerKey = GlobalKey();
   bool _isDownloading = false;
-  String? _localPdfPath;
+  late final WebViewController _webViewController;
+  bool _isPageLoading = true;
+  late final String _htmlDocument;
+  final NativeScreenshotController _screenshotController =
+      NativeScreenshotController();
+  Uint8List? _pdfBytes;
+
+  String get _htmlContent => widget.payslip.template.trim();
 
   @override
   void initState() {
     super.initState();
-    _loadPdf();
-  }
+    _htmlDocument = _buildHtmlDocument(_htmlContent);
+    _webViewController =
+        WebViewController()
+          ..setJavaScriptMode(JavaScriptMode.unrestricted)
+          ..setBackgroundColor(Colors.white)
+          ..setNavigationDelegate(
+            NavigationDelegate(
+              onPageFinished: (_) {
+                if (mounted) {
+                  setState(() {
+                    _isPageLoading = false;
+                  });
+                }
+              },
+            ),
+          );
 
-  Future<void> _loadPdf() async {
-    try {
-      // Try to load from cache first
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/payslip_${widget.payslip.id}.pdf');
-      
-      if (await file.exists()) {
-        setState(() {
-          _localPdfPath = file.path;
-        });
-      }
-    } catch (e) {
-      // If local file doesn't exist, will load from URL
+    if (_htmlContent.isNotEmpty) {
+      _webViewController.loadRequest(
+        Uri.dataFromString(
+          _htmlDocument,
+          mimeType: 'text/html',
+          encoding: utf8,
+        ),
+      );
+    } else {
+      _isPageLoading = false;
     }
   }
 
+  Future<Uint8List> _generatePdfBytes() async {
+    if (_pdfBytes != null) {
+      return _pdfBytes!;
+    }
+
+    final screenshotBytes = await _screenshotController.takeScreenshot();
+    if (screenshotBytes == null || screenshotBytes.isEmpty) {
+      throw Exception('Could not capture payslip preview.');
+    }
+
+    final document = pw.Document();
+    final screenshotImage = pw.MemoryImage(screenshotBytes);
+
+    document.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(12),
+        build:
+            (context) => pw.Center(
+              child: pw.Image(screenshotImage, fit: pw.BoxFit.contain),
+            ),
+      ),
+    );
+
+    final pdfBytes = await document.save();
+
+    return pdfBytes;
+  }
+
   Future<void> _downloadPdf() async {
+    if (_htmlContent.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payslip template is not available yet.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isDownloading = true;
     });
 
     try {
-      // Download PDF
-      final response = await http.get(Uri.parse(widget.payslip.pdfUrl));
-      
-      if (response.statusCode == 200) {
-        // Get application documents directory
-        final directory = await getApplicationDocumentsDirectory();
-        final file = File('${directory.path}/payslip_${widget.payslip.id}.pdf');
-        
-        // Write PDF to file
-        await file.writeAsBytes(response.bodyBytes);
-        
+      final pdfBytes = await _generatePdfBytes();
+
+      if (_pdfBytes == null && mounted) {
         setState(() {
-          _localPdfPath = file.path;
+          _pdfBytes = pdfBytes;
+        });
+      }
+
+      final fileName =
+          'Payslip_${widget.payslip.displayName.replaceAll(' ', '_')}.pdf';
+
+      await Printing.layoutPdf(name: fileName, onLayout: (_) async => pdfBytes);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Choose "Save as PDF" to download the payslip.'),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error downloading PDF: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
           _isDownloading = false;
         });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Payslip downloaded successfully'),
-              backgroundColor: AppColors.success,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      } else {
-        throw Exception('Failed to download PDF: ${response.statusCode}');
-      }
-    } catch (e) {
-      setState(() {
-        _isDownloading = false;
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error downloading PDF: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
       }
     }
+  }
+
+  String _buildHtmlDocument(String rawHtml) {
+    final normalized =
+        rawHtml.contains('<!DOCTYPE html>')
+            ? rawHtml
+            : '''
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body>$rawHtml</body>
+</html>
+''';
+
+    final withHeadStyle = normalized.replaceFirst('</head>', '''
+  <base href="https://app.collectivwork.com/">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff !important;
+      color: #111111;
+      min-height: 100%;
+      width: 100%;
+      overflow-x: hidden;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .container {
+      background: #ffffff !important;
+      min-height: 100vh;
+      margin: 0 auto;
+    }
+  </style>
+</head>''');
+
+    return withHeadStyle.replaceFirst(
+      '<body>',
+      '<body style="background:#ffffff !important; margin:0; padding:0;">',
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    
-    // Dark grey header color matching the design
-    const headerColor = Color(0xFF424242);
-
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          // Custom dark grey header
-          Container(
-            height: screenHeight * 0.08, // ~8% of screen height
-            width: double.infinity,
-            color: headerColor,
-            padding: EdgeInsets.symmetric(
-              horizontal: screenWidth * 0.04,
-              vertical: screenHeight * 0.01,
-            ),
-            child: Row(
-              children: [
-                // Back button
-                IconButton(
-                  icon: Icon(
-                    Icons.arrow_back_ios,
-                    color: AppColors.textWhite,
-                    size: screenWidth * 0.05,
+      appBar: AppBar(
+        elevation: 0,
+        leadingWidth: 150,
+
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
+        leading: GestureDetector(
+          onTap: () {
+            Navigator.of(context).pop();
+          },
+          child: Row(
+            children: [
+              Icon(
+                Icons.arrow_back_ios,
+                color: Theme.of(context).colorScheme.primary,
+                size: screenWidth * 0.048,
+              ),
+              Flexible(
+                child: Text(
+                  'Back',
+                  style: AppTextStyles.bodyMedium(context).copyWith(
+                    fontWeight: FontWeight.w400,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
-                  onPressed: () => Navigator.of(context).pop(),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(width: screenWidth * 0.03),
-                // Month and Year with purple dotted border
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: screenWidth * 0.04,
-                    vertical: screenHeight * 0.008,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: const Color(0xFF9C27B0), // Purple color
-                      width: 1.5,
-                      style: BorderStyle.solid,
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    widget.payslip.displayName,
-                    style: AppTextStyles.bodyMedium(context).copyWith(
-                      color: AppColors.textWhite,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                // Download button with purple dotted border
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: const Color(0xFF9C27B0), // Purple color
-                      width: 1.5,
-                      style: BorderStyle.solid,
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: IconButton(
-                    icon: _isDownloading
-                        ? SizedBox(
-                            width: screenWidth * 0.05,
-                            height: screenWidth * 0.05,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.textWhite,
-                              ),
-                            ),
-                          )
-                        : Icon(
-                            Icons.download,
-                            color: AppColors.textWhite,
-                            size: screenWidth * 0.05,
-                          ),
-                    onPressed: _isDownloading ? null : _downloadPdf,
-                    padding: EdgeInsets.all(screenWidth * 0.02),
-                    constraints: const BoxConstraints(),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          // PDF Viewer
-          Expanded(
-            child: _localPdfPath != null
-                ? SfPdfViewer.file(
-                    File(_localPdfPath!),
-                    key: _pdfViewerKey,
-                  )
-                : SfPdfViewer.network(
-                    widget.payslip.pdfUrl,
-                    key: _pdfViewerKey,
-                  ),
+        ),
+
+        title: Text(
+          widget.payslip.displayName,
+          style: AppTextStyles.bodyLarge(
+            context,
+          ).copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+          overflow: TextOverflow.ellipsis,
+        ),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon:
+                _isDownloading
+                    ? SizedBox(
+                      width: screenWidth * 0.05,
+                      height: screenWidth * 0.05,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.textPrimary,
+                        ),
+                      ),
+                    )
+                    : Icon(
+                      Icons.download_rounded,
+                      color: AppColors.textPrimary,
+                      size: screenWidth * 0.058,
+                    ),
+            onPressed: _isDownloading ? null : _downloadPdf,
           ),
         ],
       ),
+      body:
+          _htmlContent.isEmpty
+              ? Center(
+                child: Text(
+                  'Payslip template is not available yet.',
+                  style: AppTextStyles.bodyLarge(
+                    context,
+                  ).copyWith(color: AppColors.textPrimary),
+                ),
+              )
+              : Stack(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.all(screenWidth * 0.03),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: NativeScreenshot(
+                        controller: _screenshotController,
+                        child: Container(
+                          color: Colors.white,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: WebViewWidget(
+                              controller: _webViewController,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_isPageLoading)
+                    const Center(child: CircularProgressIndicator()),
+                ],
+              ),
     );
   }
 }
-

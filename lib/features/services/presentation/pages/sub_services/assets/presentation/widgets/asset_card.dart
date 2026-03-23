@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../domain/entities/asset_entity.dart';
 import '../../domain/models/asset_model.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 
 /// Card widget for displaying assigned asset information
 class AssetCard extends StatelessWidget {
-  final AssetModel asset;
+  final AssetEntity asset;
 
-  const AssetCard({
-    super.key,
-    required this.asset,
-  });
+  const AssetCard({super.key, required this.asset});
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +24,7 @@ class AssetCard extends StatelessWidget {
           ),
         ],
       ),
-      padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.042), // ~4.2% of screen width
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.042),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -36,55 +34,85 @@ class AssetCard extends StatelessWidget {
             children: [
               // Asset Icon
               Container(
-                padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.027), // ~2.7% of screen width
+                padding: EdgeInsets.all(
+                  MediaQuery.of(context).size.width * 0.027,
+                ),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
-                  _getAssetIcon(asset.assetType),
+                  _getAssetIcon(asset.subCategoryName),
                   color: Theme.of(context).colorScheme.primary,
-                  size: MediaQuery.of(context).size.width * 0.064, // ~6.4% of screen width
+                  size: MediaQuery.of(context).size.width * 0.064,
                 ),
               ),
-              SizedBox(width: MediaQuery.of(context).size.width * 0.032), // ~3.2% of screen width
-              // Asset Name
+              SizedBox(width: MediaQuery.of(context).size.width * 0.032),
+              // Asset Name + Status
               Expanded(
-                child: Text(
-                  asset.name,
-                  style: AppTextStyles.heading4(context).copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      asset.assetName,
+                      style: AppTextStyles.heading4(context).copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Status badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(
+                          asset.allocationStatus,
+                        ).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        asset.allocationStatus,
+                        style: AppTextStyles.bodySmall(context).copyWith(
+                          color: _getStatusColor(asset.allocationStatus),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.02), // 2% of screen height
+          SizedBox(height: MediaQuery.of(context).size.height * 0.02),
           // Details Section
-          _buildDetailRow(context, 'Employee Name', asset.employeeName, asset.employeeAvatar),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.0125), // 1.25% of screen height
-          _buildDetailRow(context, 'Asset ID', asset.assetId, null),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.0125), // 1.25% of screen height
-          _buildDetailRow(context, 'Department', asset.department, null),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.0125), // 1.25% of screen height
-          _buildDetailRow(context, 'Office Location', asset.officeLocation, null),
+          if (asset.assignedBy != null)
+            _buildDetailRow(context, 'Assigned By', asset.assignedBy!.fullName),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.0125),
+          _buildDetailRow(context, 'Asset ID', asset.assetId),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.0125),
+          _buildDetailRow(context, 'Category', asset.categoryName),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.0125),
+          _buildDetailRow(context, 'Condition', asset.condition),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.0125),
+          _buildDetailRow(context, 'Type', asset.assetType),
         ],
       ),
     );
   }
 
-  Widget _buildDetailRow(BuildContext context, String label, String value, String? avatarPath) {
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final smallerDimension = screenWidth < screenHeight ? screenWidth : screenHeight;
-    
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         // Label column
         SizedBox(
-          width: screenWidth * 0.267, // ~26.7% of screen width
+          width: screenWidth * 0.267,
           child: Text(
             label,
             style: AppTextStyles.bodySmall(context).copyWith(
@@ -93,41 +121,50 @@ class AssetCard extends StatelessWidget {
             ),
           ),
         ),
-        SizedBox(width: screenWidth * 0.042), // ~4.2% of screen width
-        // Value column with optional avatar
+        SizedBox(width: screenWidth * 0.042),
+        // Value column
         Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              if (avatarPath != null) ...[
-                SizedBox(width: screenWidth * 0.021), // ~2.1% of screen width
-                CircleAvatar(
-                  radius: smallerDimension * 0.033, // ~3.3% of smaller dimension
-                  backgroundImage: AssetImage(avatarPath),
-                ),
-              ],
-              SizedBox(width: screenWidth * 0.021), // ~2.1% of screen width
-              Text(
-                value,
-                style: AppTextStyles.bodySmall(context).copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.right,
-              ),
-            ],
+          child: Text(
+            value,
+            style: AppTextStyles.bodySmall(context).copyWith(
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+            ),
+            textAlign: TextAlign.right,
           ),
         ),
       ],
     );
   }
 
-  IconData _getAssetIcon(String assetType) {
-    switch (assetType.toLowerCase()) {
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'assigned':
+        return Colors.green;
+      case 'returned':
+        return Colors.orange;
+      case 'damaged':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getAssetIcon(String subCategory) {
+    switch (subCategory.toLowerCase()) {
       case 'laptop':
         return Icons.laptop;
       case 'headphone':
         return Icons.headphones;
+      case 'monitor':
+        return Icons.monitor;
+      case 'mouse':
+        return Icons.mouse;
+      case 'keyboard':
+        return Icons.keyboard;
+      case 'mobile':
+      case 'phone':
+        return Icons.phone_android;
       default:
         return Icons.devices;
     }

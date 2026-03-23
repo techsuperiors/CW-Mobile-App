@@ -4,11 +4,11 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   // Base URLs
   static const String devBaseUrl = 'https://dev.collectivwork.com';
-  static const String productionBaseUrl = 'https://collectivwork.com';
+  static const String productionBaseUrl = 'https://app.collectivwork.com';
 
   static const String environment = String.fromEnvironment(
     'ENV',
-    defaultValue: 'development',
+    defaultValue: 'production',
   );
 
   static bool get isDevelopment => environment == 'development';

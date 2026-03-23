@@ -20,6 +20,7 @@ class AppStrings {
   static const String noData = 'No data available';
   static const String retry = 'Retry';
   static const String comingSoon = 'Coming Soon';
+  static const String back = 'Back';
 
   // Authentication
   static const String login = 'Login';
@@ -36,55 +37,67 @@ class AppStrings {
   static const String enterEmailOrMobile = 'Enter email or mobile number';
   static const String enterPassword = 'Enter password';
   static const String pleaseEnterUsername = 'Please enter your username';
-  static const String pleaseEnterEmailOrMobile = 'Please enter email or mobile number';
+  static const String pleaseEnterEmailOrMobile =
+      'Please enter email or mobile number';
   static const String pleaseEnterPassword = 'Please enter your password';
   static const String forgotPassword = 'Forgot Password?';
   static const String forgetPassword = 'Forget password';
   static const String forgotPasswordTitle = 'Forgot Password?';
-  static const String enterEmailToReset = 'Enter your email address and we\'ll send you a verification code to reset your password.';
-  static const String pleaseResetPassword = 'Please reset your password to restore access to your account.';
+  static const String enterEmailToReset =
+      'Enter your email address and we\'ll send you a verification code to reset your password.';
+  static const String pleaseResetPassword =
+      'Please reset your password to restore access to your account.';
   static const String enterEmail = 'Enter email';
   static const String enterYourEmail = 'enter your email';
   static const String pleaseEnterEmail = 'Please enter your email';
   static const String pleaseEnterValidEmail = 'Please enter a valid email';
-  static const String pleaseEnterValidMobile = 'Please enter a valid 10-digit mobile number';
+  static const String pleaseEnterValidMobile =
+      'Please enter a valid 10-digit mobile number';
   static const String sendVerificationCode = 'Send Verification Code';
   static const String send = 'Send';
   static const String rememberMe = 'Remember Me';
   static const String welcomeBack = 'Welcome Back !';
-  static const String pleaseLoginToAccess = 'Please login to access your account.';
+  static const String pleaseLoginToAccess =
+      'Please login to access your account.';
   static const String dontHaveAccount = 'Don\'t have an account? ';
   static const String signUp = 'Sign Up';
   static const String loginFailed = 'Login failed';
-  
+
   // OTP Verification
   static const String otp = 'OTP';
   static const String otpVerification = 'OTP Verification';
   static const String getYourCode = 'Get Your Code';
-  static const String otpSentToEmail = 'We\'ve sent a verification code to email address';
-  static const String weveSentVerificationCode = 'We\'ve sent a verification code to email address';
+  static const String otpSentToEmail =
+      'We\'ve sent a verification code to email address';
+  static const String weveSentVerificationCode =
+      'We\'ve sent a verification code to email address';
   static const String wrongEmail = 'Wrong Email?';
   static const String resendCode = 'Resend Code';
-  static const String verificationCodeSent = 'Verification code sent successfully';
+  static const String verificationCodeSent =
+      'Verification code sent successfully';
   static const String submit = 'Submit';
   static const String verifyAndProceed = 'Verify and Proceed';
 
   // Reset Password
   static const String setUpPassword = 'Set Up Password';
   static const String enterNewPassword = 'Enter New Password';
-  static const String passwordMustBeDifferent = 'Your new password must be different from previously used password.';
+  static const String passwordMustBeDifferent =
+      'Your new password must be different from previously used password.';
   static const String confirmPassword = 'Confirm Password';
   static const String enterConfirmPassword = 'Enter confirm password';
-  static const String pleaseEnterConfirmPassword = 'Please enter confirm password';
+  static const String pleaseEnterConfirmPassword =
+      'Please enter confirm password';
   static const String passwordsDoNotMatch = 'Passwords do not match';
   static const String passwordResetSuccessfully = 'Password reset successfully';
   static const String passwordChanged = 'Password Changed';
   static const String congratulation = 'Congratulation';
-  static const String passwordChangeSuccessMessage = 'You have successfully change password. Please use the new password when Sign in.';
+  static const String passwordChangeSuccessMessage =
+      'You have successfully change password. Please use the new password when Sign in.';
   static const String changePassword = 'Change Password';
   static const String currentPassword = 'Current Password';
   static const String enterCurrentPassword = 'Enter current password';
-  static const String pleaseEnterCurrentPassword = 'Please enter your current password';
+  static const String pleaseEnterCurrentPassword =
+      'Please enter your current password';
   static const String done = 'Done';
 
   // Navigation
@@ -100,7 +113,8 @@ class AppStrings {
   static const String approval = 'Approval';
 
   // Request
-  static const String requestDescription = 'A unified system designed to efficiently manage all my service requests and organizational tasks.';
+  static const String requestDescription =
+      'A unified system designed to efficiently manage all my service requests and organizational tasks.';
   static const String applyLeave = 'Apply Leave';
   static const String leaveRequest = 'Leave Request';
   static const String wfh = 'WFH';
@@ -108,12 +122,17 @@ class AppStrings {
   static const String onDuty = 'On-Duty';
   static const String compOff = 'Comp-off';
 
+  //Approval
+  static const String approvalDescription =
+      'A unified system designed to efficiently manage all my service approvals and organizational tasks.';
+
   // Services
   static const String attendance = 'Attendance';
   static const String trackAttendanceEasily = 'Track Attendance Easily';
   static const String policies = 'Policies';
   static const String employeeAgreement = 'Employee Agreement';
-  static const String trackAttendanceEasilyDescription = 'Track attendance easily';
+  static const String trackAttendanceEasilyDescription =
+      'Track attendance easily';
   static const String visit = 'Visit';
   static const String visitDescription = 'All your company visits';
   static const String expenses = 'Expenses';
@@ -162,9 +181,9 @@ class AppStrings {
   static const String earned = 'Earned';
   static const String paidHoliday = 'Paid Holiday';
   static const String totalLeaves = 'Total Leaves';
-  static const String workingDays = 'Working Days';
-  static const String wfhDays = 'WFH Days';
-  static const String leaveDays = 'Leave Days';
+  static const String workingDays = 'Working Day(s)';
+  static const String wfhDays = 'WFH Day(s)';
+  static const String leaveDays = 'Leave Day(s)';
   static const String breakTime = 'Break';
   static const String eightDays = '08 Days';
   static const String shiftTimeRange = '9:00 AM - 6:00 PM';
@@ -192,7 +211,8 @@ class AppStrings {
   static const String sat = 'SAT';
 
   // Errors
-  static const String networkError = 'Network error. Please check your connection.';
+  static const String networkError =
+      'Network error. Please check your connection.';
   static const String serverError = 'Server error. Please try again later.';
   static const String storageError = 'Storage error. Please try again.';
   static const String unknownError = 'An unknown error occurred.';
@@ -208,19 +228,26 @@ class AppStrings {
   static const String failedToClearCache = 'Failed to clear cache';
   static const String failedToSaveToken = 'Failed to save token';
   static const String failedToGetToken = 'Failed to get token';
-  
+
   // OTP Messages
   static const String otpVerifiedSuccessfully = 'OTP verified successfully';
   static const String pleaseEnterCompleteOtp = 'Please enter complete OTP';
   static const String sec = ' sec';
-  
+
   // Placeholder
   static const String feature = 'Feature';
-  
+
   // Currency
   static const String currencySymbol = '\$';
-  
+
   // Form Labels
   static const String select = 'Select';
-}
 
+  //Notification
+  static const String notification = 'Notification';
+
+  //Comp-off
+  static const String dayworked = 'Day Worked';
+  static const String lockdurationin = 'Lock duration in';
+
+}

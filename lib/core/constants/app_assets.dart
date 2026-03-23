@@ -8,7 +8,11 @@ class AppAssets {
 
   // Icons
   static const String otpPageIcon = 'assets/icons/otp_page_icon.svg';
-  
+
+  //Avatar
+  static const String profileavatar = 'assets/images/profile_avatar.svg';
+
+
   // Bottom Navigation Icons
   static const String iconServices = 'assets/icons/service_icon.svg';
   static const String iconPosts = 'assets/icons/posts_icons.svg';
@@ -17,7 +21,7 @@ class AppAssets {
   static const String iconApproval = 'assets/icons/approval_icon.svg';
 
   // Placeholder Images
-  static const String placeholderAvatar = 'assets/images/placeholder_avatar.png';
+  static const String placeholderAvatar = 'assets/images/profile_avatar.svg';
   static const String placeholderEvent = 'assets/images/placeholder_event.png';
   static const String indicatorLogo = 'assets/images/Indicator.svg';
 
@@ -31,6 +35,16 @@ class AppAssets {
   static const String iconPunchOut = 'assets/icons/punch_out_icon.svg';
   static const String iconBreak = 'assets/icons/breaktime_icon.svg';
   static const String iconOvertime = 'assets/icons/overtime_icon.svg';
+  static const String iconcalender = 'assets/icons/calender_icon.svg';
+  static const String iconnotification = 'assets/icons/notification_icno.svg';
+  static const String iconattendencehome = 'assets/icons/attendence_cal_icon.svg';
+  static const String iconaLatePunchIn = 'assets/icons/latePunchInIcon.svg';
+
+  //Upcoming Events Icons
+  static const String iconbirthday = 'assets/icons/birthday_icon.svg';
+  static const String iconanniversary = 'assets/icons/anniversary_icon.svg';
+
+
 
   // Service Icons
   static const String iconAttendance = 'assets/icons/attendence.svg';
@@ -44,5 +58,32 @@ class AppAssets {
   static const String iconTickets = 'assets/icons/tickets.svg';
   static const String iconExpenses = 'assets/icons/expenses.svg';
   static const String iconInfo = 'assets/icons/i_icon.svg';
+  static const String iconupload = 'assets/icons/upload_icon.svg';
+
+  //Common Icons
+ static const String addIcon = 'assets/icons/add_icon.svg';
+
+ //Apply Leave Icons
+  static const String editIcon = 'assets/icons/edit_pencil_icon.svg';
+  static const String filterIcon = 'assets/icons/filter_icon.svg';
+  static const String searchIcon = 'assets/icons/search_icon.svg';
+  static const String applyLeaveIcon = 'assets/icons/apply_leave_icon.svg';
+
+
+  //Apply WFH Icons
+  static const String activityIcon = 'assets/icons/activity_icon.svg';
+  static const String withdrawIcon = 'assets/icons/withdraw_icon.svg';
+  static const String editIconwfh = 'assets/icons/edit_icon.svg';
+
+
+  //Approval Icons
+  static const String correctIconapprova="assets/icons/sucess_icon.svg";
+  static const String wrongIcon="assets/icons/wrong_icon.svg";
+
+  //Service Assets Icons
+  static const String laptopIcon="assets/icons/laptop_icon.svg";
+  static const String headphonesIcon="assets/icons/headphone_icon.svg";
+
+
 }
 

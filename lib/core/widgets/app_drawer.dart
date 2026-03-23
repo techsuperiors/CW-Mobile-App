@@ -33,6 +33,7 @@ class AppDrawer extends StatelessWidget {
             builder: (context, profileState) {
               final UserProfile? profile =
                   profileState is UserProfileLoaded ? profileState.profile : null;
+
               return Container(
                 width: double.infinity,
                 padding: EdgeInsets.fromLTRB(
@@ -68,7 +69,7 @@ class AppDrawer extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              profile?.user.fullName ?? 'User',
+                              profile?.user.firstName ?? 'User',
                               style: AppTextStyles.heading3(context).copyWith(
                                 color: AppColors.textWhite,
                                 fontWeight: FontWeight.w600,
@@ -82,7 +83,7 @@ class AppDrawer extends StatelessWidget {
                                   profile?.user.employeeType ??
                                   'Employee',
                               style: AppTextStyles.bodyMedium(context).copyWith(
-                                color: AppColors.textWhite.withOpacity(0.95),
+                                color: AppColors.textWhite.withValues(alpha: 0.95),
                                 fontSize: 14,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -114,6 +115,99 @@ class AppDrawer extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => const ChangePasswordPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  BlocBuilder<UserProfileBloc, UserProfileState>(
+                    builder: (context, profileState) {
+                      final profile =
+                          profileState is UserProfileLoaded
+                              ? profileState.profile
+                              : null;
+
+                      if (profile == null) {
+                        return const SizedBox.shrink();
+                      }
+
+                      final infoItems = <_ProfileInfoItem>[
+                        if ((profile.user.email ?? '').isNotEmpty)
+                          _ProfileInfoItem(
+                            'Email',
+                            profile.user.email!,
+                            Icons.alternate_email_rounded,
+                          ),
+                        if ((profile.userDesignation?.designationName ?? '')
+                            .isNotEmpty)
+                          _ProfileInfoItem(
+                            'Designation',
+                            profile.userDesignation!.designationName!,
+                            Icons.badge_outlined,
+                          ),
+                        if ((profile.user.employeeID ?? '').isNotEmpty)
+                          _ProfileInfoItem(
+                            'Employee Id',
+                            profile.user.employeeID!,
+                            Icons.perm_identity_rounded,
+                          ),
+                        if ((profile.user.phone ?? '').isNotEmpty)
+                          _ProfileInfoItem(
+                            'Phone No',
+                            profile.user.phone!,
+                            Icons.call_outlined,
+                          ),
+                        if ((profile.user.gender ?? '').isNotEmpty)
+                          _ProfileInfoItem(
+                            'Gender',
+                            profile.user.gender!,
+                            Icons.wc_outlined,
+                          ),
+                        if ((profile.user.location ?? '').isNotEmpty)
+                          _ProfileInfoItem(
+                            'Location',
+                            profile.user.location!,
+                            Icons.location_on_outlined,
+                          ),
+                      ];
+
+                      if (infoItems.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return Container(
+                        margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.borderLight),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: infoItems.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final item = entry.value;
+
+                            return Padding(
+                                  padding: EdgeInsets.only(
+                                    bottom:
+                                        index == infoItems.length - 1 ? 0 : 14,
+                                  ),
+                                  child: _buildProfileInfoRow(
+                                    context,
+                                    item.icon,
+                                    item.label,
+                                    item.value,
+                                  ),
+                                );
+                          }).toList(),
                         ),
                       );
                     },
@@ -258,4 +352,67 @@ class AppDrawer extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildProfileInfoRow(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: AppColors.backgroundLight,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: AppColors.attendanceTeal,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: AppTextStyles.labelSmall(context).copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: AppTextStyles.bodyMedium(context).copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w500,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileInfoItem {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _ProfileInfoItem(
+    this.label,
+    this.value,
+    this.icon,
+  );
 }

@@ -7,11 +7,16 @@ import 'package:collectivWork/features/services/presentation/pages/sub_services/
 import 'package:collectivWork/features/services/presentation/pages/sub_services/tickets/presentation/pages/tickets_page.dart';
 import 'package:collectivWork/features/services/presentation/pages/sub_services/payslip/presentation/pages/payslip_page.dart';
 import 'package:collectivWork/features/services/presentation/pages/sub_services/document/presentation/pages/document_page.dart';
+import 'package:collectivWork/features/services/presentation/pages/sub_services/expense/presentation/pages/expense_page.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/responsive_scaffold.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/utils/permission_checker.dart';
 import '../../domain/models/service_model.dart';
+import '../../../user/presentation/bloc/user_profile_bloc.dart';
+import '../../../user/presentation/bloc/user_profile_state.dart';
 import '../widgets/services_grid.dart';
 import '../data/services_data.dart';
 
@@ -29,23 +34,21 @@ class _ServicesPageState extends State<ServicesPage> {
   void _onServiceTap(ServiceModel service) {
     // Convert String ID to integer
     final serviceId = int.tryParse(service.id) ?? 0;
-    
+    debugPrint("Testing: Service tapped - ${service.title}");
+    debugPrint("Testing: Service tapped - ${service.id}");
+
     // Navigate based on service ID using switch case
     switch (serviceId) {
       case 1: // Attendance
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => const AttendanceDetailPage(),
-          ),
+          MaterialPageRoute(builder: (context) => const AttendanceDetailPage()),
         );
         break;
       case 2: // Leave
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => const LeaveRequestPage(),
-          ),
+          MaterialPageRoute(builder: (context) => const LeaveRequestPage()),
         );
         break;
       case 3: // Policies
@@ -72,6 +75,12 @@ class _ServicesPageState extends State<ServicesPage> {
           ),
         );
         break;
+      case 6: // Expenses
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ExpensePage()),
+        );
+        break;
       case 8: // Document
         Navigator.push(
           context,
@@ -91,9 +100,7 @@ class _ServicesPageState extends State<ServicesPage> {
       case 10: // Tickets
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => const TicketsPage(),
-          ),
+          MaterialPageRoute(builder: (context) => const TicketsPage()),
         );
         break;
       // Add more cases for other services as needed
@@ -108,50 +115,67 @@ class _ServicesPageState extends State<ServicesPage> {
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
     final screenWidth = mediaQuery.size.width;
-    
+
     return ResponsiveScaffold(
+      backgroundColor: AppColors.backgroundMedium,
       appBar: AppBar(
         elevation: 0,
+        forceMaterialTransparency: true,
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.textPrimary,
         automaticallyImplyLeading: false,
-        toolbarHeight: 0,
+        // toolbarHeight: 0,
+        centerTitle: false,
+        title: Text(
+          AppStrings.ourServices,
+          style: AppTextStyles.heading1(context).copyWith(
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
+            height: 1.2,
+          ),
+        ),
       ),
+
       body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.022), // 4.2% of screen width
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(height: screenHeight * 0.04), // 4% of screen height for top spacing
-            // Large "Services" title
-            Text(
-              AppStrings.services,
-              style: AppTextStyles.heading1(context).copyWith(
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-                height: 1.2,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: screenWidth * 0.022,
+          ), // 4.2% of screen width ,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Filter services based on user permissions dynamically using BlocBuilder
+              SizedBox(height: screenHeight*0.01),
+              BlocBuilder<UserProfileBloc, UserProfileState>(
+                builder: (context, state) {
+                  return ServicesGrid(
+                    services:
+                        _services.where((service) {
+                          // If it has no required permissions, let everyone see it
+                          if (service.requiredPermission == null &&
+                              service.anyOfPermissions == null) {
+                            return true;
+                          }
+                          // Otherwise, check via PermissionChecker
+                          return PermissionChecker.hasPermission(
+                            context,
+                            requiredPermission: service.requiredPermission,
+                            anyOf: service.anyOfPermissions,
+                          );
+                        }).toList(),
+                    onServiceTap: _onServiceTap,
+                  );
+                },
               ),
-            ),
-            SizedBox(height: screenHeight * 0.03), // 3% of screen height
-            // "Our Services" section title
-            Text(
-              AppStrings.ourServices,
-              style: AppTextStyles.heading3(context).copyWith(
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-                height: 1.2,
-              ),
-            ),
-            SizedBox(height: screenHeight * 0.02), // 2% of screen height
-            ServicesGrid(
-              services: _services,
-              onServiceTap: _onServiceTap,
-            ),
-            SizedBox(height: screenHeight * 0.02), // Bottom spacing
-          ],
+              SizedBox(height: screenHeight * 0.02),
+              // Bottom spacing
+            ],
+          ),
         ),
       ),
     );

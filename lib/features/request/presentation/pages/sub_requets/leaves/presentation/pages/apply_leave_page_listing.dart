@@ -1,18 +1,34 @@
+import 'package:collectivWork/core/constants/app_assets.dart';
+import 'package:collectivWork/core/widgets/permission_guard.dart';
+import 'package:collectivWork/features/request/presentation/pages/sub_requets/leaves/presentation/bloc/leave_request_bloc.dart';
+import 'package:collectivWork/features/request/presentation/pages/sub_requets/leaves/presentation/bloc/leave_request_state.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_tab_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
+import '../../../../../../../../core/network/api_client.dart';
+import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../../core/widgets/status_tabbed_section.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
-import 'apply_leave_page.dart';
-import '../../bloc/leave_request_bloc.dart';
-import '../../bloc/leave_request_event.dart';
-import '../../bloc/leave_request_state.dart';
-import '../../models/leave_request_model.dart';
+import '../../../../../widgets/request_listing/request_empty_state.dart';
+import '../../../../../widgets/request_listing/request_grouping_utils.dart';
+import '../../../wfh/models/wfh_request_model.dart';
+import '../../domain/entities/leave_entity.dart';
+import '../../data/datasources/leaves_remote_datasource.dart';
+import '../../data/repositories/leaves_repository_impl.dart';
+import '../../domain/usecases/get_leaves_usecase.dart';
+import '../../domain/usecases/apply_leave_usecase.dart';
+import '../bloc/leave_request_event.dart';
 import '../widgets/leave_request_card.dart';
+import 'apply_leave_page.dart';
 import 'leave_detail_page.dart';
 
 /// Apply Leave listing page showing list of leave requests
@@ -23,19 +39,36 @@ class ApplyLeavePageListing extends StatefulWidget {
   State<ApplyLeavePageListing> createState() => _ApplyLeavePageListingState();
 }
 
-class _ApplyLeavePageListingState extends State<ApplyLeavePageListing> {
+class _ApplyLeavePageListingState extends State<ApplyLeavePageListing>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   LeaveStatus? _selectedStatusFilter;
+  late TabController _tabController;
+  static const List<StatusTabDefinition<LeaveStatus>> _tabs = [
+    StatusTabDefinition(label: 'All', status: null),
+    StatusTabDefinition(label: 'Pending', status: LeaveStatus.pending),
+    StatusTabDefinition(label: 'Approved', status: LeaveStatus.approved),
+    StatusTabDefinition(label: 'Rejected', status: LeaveStatus.rejected),
+    StatusTabDefinition(label: 'Withdrawn', status: LeaveStatus.withdrawn),
+  ];
 
   @override
   void initState() {
     super.initState();
+
+    ///For the tab bar and for controlling the behaviour of it
+    _tabController = TabController(length: _tabs.length, vsync: this);
+    _tabController.addListener(() {
+      setState(() {});
+    });
     // BlocProvider will load leave requests automatically in its create method
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.dispose();
+
     super.dispose();
   }
 
@@ -45,9 +78,27 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing> {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return BlocProvider(
-      create: (_) => LeaveRequestBloc()..add(const LoadLeaveRequests()),
+      create: (_) {
+        final networkInfo = NetworkInfoImpl(Connectivity());
+        final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+        final remoteDataSource = LeavesRemoteDataSourceImpl(
+          apiClient: apiClient,
+        );
+        final repository = LeavesRepositoryImpl(
+          remoteDataSource: remoteDataSource,
+          networkInfo: networkInfo,
+        );
+        final getLeavesUseCase = GetLeavesUseCase(repository);
+        final applyLeaveUseCase = ApplyLeaveUseCase(repository);
+        return LeaveRequestBloc(
+          getLeavesUseCase: getLeavesUseCase,
+          applyLeaveUseCase: applyLeaveUseCase,
+        )..add(const LoadLeaveRequests());
+      },
       child: ResponsiveScaffold(
+        backgroundColor: AppColors.backgroundLight,
         appBar: AppBar(
+          forceMaterialTransparency: true,
           elevation: 0,
           backgroundColor: AppColors.background,
           foregroundColor: AppColors.textPrimary,
@@ -65,8 +116,8 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing> {
                 Flexible(
                   child: Text(
                     'Back',
-                    style: AppTextStyles.bodyLarge(context).copyWith(
-                      fontWeight: FontWeight.w500,
+                    style: AppTextStyles.bodyMedium(context).copyWith(
+                      fontWeight: FontWeight.w400,
                       color: Theme.of(context).colorScheme.primary,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -90,115 +141,113 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing> {
           onTap: NavigationHelper.getBottomNavHandler(context),
         ),
         body: Builder(
-          builder: (blocContext) => Column(
-            children: [
-              // Search and filter section
-              _buildSearchAndFilterSection(blocContext),
-              // Divider
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: screenWidth * 0.012, // 4.2% of screen width
-                vertical: screenHeight * 0.01, // 1% of screen height
-              ),
-              child: CustomPaint(
-                painter: DottedLinePainter(),
-                size: Size(screenWidth * 0.916, 1), // Account for padding
-              ),
-            ),
-            // Leave requests list
-            Expanded(
-              child: BlocBuilder<LeaveRequestBloc, LeaveRequestState>(
-                builder: (context, state) {
-                  if (state is LeaveRequestLoading) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
+          builder:
+              (blocContext) => Column(
+                children: [
+                  // Search and filter section
+                  _buildSearchAndFilterSection(blocContext),
+                  SizedBox(height: screenHeight * 0.015),
+                  // Leave requests list
+                  Expanded(
+                    child: BlocBuilder<LeaveRequestBloc, LeaveRequestState>(
+                      builder: (context, state) {
+                        if (state is LeaveRequestLoading) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
 
-                  if (state is LeaveRequestError) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: screenWidth * 0.15,
-                            color: AppColors.error,
-                          ),
-                          SizedBox(height: screenHeight * 0.02),
-                          Text(
-                            state.message,
-                            style: AppTextStyles.bodyMedium(context),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    );
-                  }
+                        if (state is LeaveRequestError) {
+                          return ApiErrorState(
+                            rawMessage: state.message,
+                            onRetry: () {
+                              final bloc = context.read<LeaveRequestBloc>();
+                              bloc.add(const LoadLeaveRequests());
+                            },
+                          );
+                        }
 
-                  if (state is LeaveRequestLoaded) {
-                    if (state.filteredLeaveRequests.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.inbox_outlined,
-                              size: screenWidth * 0.15,
-                              color: AppColors.textTertiary,
-                            ),
-                            SizedBox(height: screenHeight * 0.02),
-                            Text(
-                              AppStrings.noData,
-                              style: AppTextStyles.bodyMedium(context).copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    return ListView.builder(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: screenWidth * 0.012, // 4.2% of screen width
-                        vertical: screenHeight * 0.015, // 1.5% of screen height
-                      ),
-                      itemCount: state.filteredLeaveRequests.length,
-                      itemBuilder: (context, index) {
-                        return LeaveRequestCard(
-                          leaveRequest: state.filteredLeaveRequests[index],
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => LeaveDetailPage(
-                                  leaveRequest: state.filteredLeaveRequests[index],
+                        if (state is LeaveRequestLoaded) {
+                          return StatusTabbedSection<LeaveStatus, LeaveEntity>(
+                            controller: _tabController,
+                            tabs: _tabs,
+                            items: state.leaveRequests,
+                            searchQuery: state.searchQuery?.toLowerCase() ?? '',
+                            statusSelector: (item) => item.status,
+                            matchesSearch: (item, query) {
+                              if (query.isEmpty) return true;
+                              return (item.subject?.toLowerCase().contains(
+                                        query,
+                                      ) ??
+                                      false) ||
+                                  item.reason.toLowerCase().contains(query);
+                            },
+                            tabColorBuilder: RequestTabTheme.colorForIndex,
+                            emptyBuilder: (context) => RequestEmptyState(),
+                            listBuilder: (context, list) {
+                              final grouped = RequestGroupingUtils.groupByMonth(
+                                items: list,
+                                dateSelector: (item) => item.appliedDate,
+                              );
+                              return ListView.builder(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: screenHeight * 0.012,
                                 ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    );
-                  }
+                                itemCount: grouped.length,
+                                itemBuilder: (context, index) {
+                                  final entry = grouped[index];
+                                  if (entry is String) {
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                        top:
+                                            index == 0
+                                                ? 0
+                                                : screenHeight * 0.014,
+                                        bottom: screenHeight * 0.010,
+                                      ),
+                                      child: Text(
+                                        entry,
+                                        style: AppTextStyles.bodySmall(
+                                          context,
+                                        ).copyWith(
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  final req = entry as LeaveEntity;
 
-                  return const SizedBox.shrink();
-                },
+                                  return LeaveRequestCard(
+                                    leaveRequest: req,
+                                    onTap: () async {
+                                      final result = await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => LeaveDetailPage(
+                                                leaveRequest: req,
+                                              ),
+                                        ),
+                                      );
+                                      if (result == true && context.mounted) {
+                                        context.read<LeaveRequestBloc>().add(
+                                          const LoadLeaveRequests(),
+                                        );
+                                      }
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ],
               ),
-            ),
-              // Divider before bottom nav
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.042,
-                ),
-                child: CustomPaint(
-                  painter: DottedLinePainter(),
-                  size: Size(screenWidth * 0.916, 1), // Account for padding
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -208,124 +257,108 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: screenWidth * 0.012, // 4.2% of screen width
-        vertical: screenHeight * 0.015, // 1.5% of screen height
-      ),
-      child: Row(
-        children: [
-          // Search bar
-          Expanded(
-            child: Container(
-              height: screenHeight * 0.055, // 5.5% of screen height
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.border,
-                  width: 1,
+    return Row(
+      children: [
+        // Search bar
+        Expanded(
+          child: Container(
+            height: screenHeight * 0.050,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F2F2), // light grey background
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: AppStrings.search,
-                  hintStyle: AppTextStyles.bodySmall(context).copyWith(
-                    color: AppColors.textTertiary,
-                  ),
-                  prefixIcon: Padding(
-                    padding: EdgeInsets.all(screenWidth * 0.032),
-                    child: Icon(
-                      Icons.search,
-                      size: screenWidth * 0.048, // 4.8% of screen width
-                      color: AppColors.textSecondary,
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              textAlignVertical: TextAlignVertical.center,
+              style: AppTextStyles.bodyMedium(context),
+              decoration: InputDecoration(
+                hintText: AppStrings.search,
+                hintStyle: AppTextStyles.bodyMedium(
+                  context,
+                ).copyWith(color: AppColors.textTertiary),
+
+                prefixIcon: Padding(
+                  padding: EdgeInsets.all(screenWidth * 0.03),
+                  child: SvgPicture.asset(
+                    AppAssets.searchIcon,
+                    width: screenWidth * 0.045,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.grey,
+                      BlendMode.srcIn,
                     ),
                   ),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: screenWidth * 0.032, // 3.2% of screen width
-                    vertical: screenHeight * 0.012, // 1.2% of screen height
-                  ),
                 ),
-                style: AppTextStyles.bodyMedium(context),
-                onChanged: (value) {
-                  context.read<LeaveRequestBloc>().add(SearchLeaveRequests(value));
-                },
-              ),
-            ),
-          ),
-          SizedBox(width: screenWidth * 0.021), // 2.1% of screen width
-          // Filter icon button (square with rounded corners)
-          Container(
-            width: screenHeight * 0.055, // 5.5% of screen height
-            height: screenHeight * 0.055,
-            decoration: BoxDecoration(
-              color: AppColors.backgroundLight,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppColors.border,
-                width: 1,
-              ),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  _showFilterBottomSheet(context);
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Center(
-                  child: Icon(
-                    Icons.filter_alt, // Funnel/filter icon
-                    size: screenWidth * 0.048, // 4.8% of screen width
-                    color: AppColors.textSecondary,
-                  ),
+
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8), // 👈 curved border
+                  borderSide: BorderSide.none,
+                ),
+
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: screenHeight * 0.010,
                 ),
               ),
+
+              onChanged: (value) {
+                context.read<LeaveRequestBloc>().add(
+                  SearchLeaveRequests(value),
+                );
+              },
             ),
           ),
-          SizedBox(width: screenWidth * 0.021), // 2.1% of screen width
-          // Add button (green circular button with plus) - opens form page
-          Container(
-            width: screenHeight * 0.055, // 5.5% of screen height
-            height: screenHeight * 0.055,
-            decoration: BoxDecoration(
-              color: AppColors.success,
-              shape: BoxShape.circle,
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  // Navigate to apply leave form page
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ApplyLeavePage(),
-                    ),
+        ),
+        SizedBox(width: screenWidth * 0.042), // 4.2% of screen width
+        // SizedBox(width: screenWidth * 0.021), // 2.1% of screen width
+        // Add button (green circular button with plus) - opens form page
+        PermissionGuard(
+          anyOf: ["Leave Management:My Leaves:Write"],
+          child: SizedBox(
+            height: screenHeight * 0.050, // 5.0% of screen height
+
+            child: InkWell(
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ApplyLeavePage(),
+                  ),
+                );
+                if (result == true && context.mounted) {
+                  context.read<LeaveRequestBloc>().add(
+                    const LoadLeaveRequests(),
                   );
-                },
-                customBorder: const CircleBorder(),
-                child: Center(
-                  child: Icon(
-                    Icons.add,
-                    color: Colors.white,
-                    size: screenWidth * 0.053, // 5.3% of screen width
-                  ),
-                ),
-              ),
+                }
+              },
+              customBorder: const CircleBorder(),
+              child: SvgPicture.asset(AppAssets.addIcon),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   void _showFilterBottomSheet(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     // Get current filter state from bloc using the context that has BlocProvider
     final bloc = context.read<LeaveRequestBloc>();
     final currentState = bloc.state;
@@ -339,99 +372,118 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (bottomSheetContext) => StatefulBuilder(
-        builder: (bottomSheetContext, setModalState) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          padding: EdgeInsets.all(screenWidth * 0.042),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Filter by Status',
-                style: AppTextStyles.heading4(bottomSheetContext),
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              // Filter options
-              _buildFilterOption(
-                bottomSheetContext,
-                'All',
-                null,
-                _selectedStatusFilter == null,
-                () {
-                  setModalState(() {
-                    _selectedStatusFilter = null;
-                  });
-                },
-              ),
-              _buildFilterOption(
-                bottomSheetContext,
-                'Pending',
-                LeaveStatus.pending,
-                _selectedStatusFilter == LeaveStatus.pending,
-                () {
-                  setModalState(() {
-                    _selectedStatusFilter = LeaveStatus.pending;
-                  });
-                },
-              ),
-              _buildFilterOption(
-                bottomSheetContext,
-                'Approved',
-                LeaveStatus.approved,
-                _selectedStatusFilter == LeaveStatus.approved,
-                () {
-                  setModalState(() {
-                    _selectedStatusFilter = LeaveStatus.approved;
-                  });
-                },
-              ),
-              _buildFilterOption(
-                bottomSheetContext,
-                'Rejected',
-                LeaveStatus.rejected,
-                _selectedStatusFilter == LeaveStatus.rejected,
-                () {
-                  setModalState(() {
-                    _selectedStatusFilter = LeaveStatus.rejected;
-                  });
-                },
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              // Apply button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(bottomSheetContext);
-                    // Use the bloc instance from the outer context
-                    bloc.add(FilterLeaveRequestsByStatus(_selectedStatusFilter));
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: EdgeInsets.symmetric(
-                      vertical: screenHeight * 0.018,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+      builder:
+          (bottomSheetContext) => StatefulBuilder(
+            builder:
+                (bottomSheetContext, setModalState) => Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
                     ),
                   ),
-                  child: Text(
-                    'Apply Filter',
-                    style: AppTextStyles.buttonMedium(bottomSheetContext),
+                  padding: EdgeInsets.all(screenWidth * 0.042),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Filter by Status',
+                        style: AppTextStyles.heading4(bottomSheetContext),
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      // Filter options
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'All',
+                        null,
+                        _selectedStatusFilter == null,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = null;
+                          });
+                        },
+                      ),
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'Pending',
+                        LeaveStatus.pending,
+                        _selectedStatusFilter == LeaveStatus.pending,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = LeaveStatus.pending;
+                          });
+                        },
+                      ),
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'Approved',
+                        LeaveStatus.approved,
+                        _selectedStatusFilter == LeaveStatus.approved,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = LeaveStatus.approved;
+                          });
+                        },
+                      ),
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'Rejected',
+                        LeaveStatus.rejected,
+                        _selectedStatusFilter == LeaveStatus.rejected,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = LeaveStatus.rejected;
+                          });
+                        },
+                      ),
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'Withdrawn',
+                        LeaveStatus.withdrawn,
+                        _selectedStatusFilter == LeaveStatus.withdrawn,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = LeaveStatus.withdrawn;
+                          });
+                        },
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      // Apply button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(bottomSheetContext);
+                            // Use the bloc instance from the outer context
+                            bloc.add(
+                              FilterLeaveRequestsByStatus(
+                                _selectedStatusFilter,
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: EdgeInsets.symmetric(
+                              vertical: screenHeight * 0.018,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            'Apply Filter',
+                            style: AppTextStyles.buttonMedium(
+                              bottomSheetContext,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
           ),
-        ),
-      ),
     );
   }
 
@@ -447,13 +499,13 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing> {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(
-          vertical: screenHeight * 0.015,
-        ),
+        padding: EdgeInsets.symmetric(vertical: screenHeight * 0.015),
         child: Row(
           children: [
             Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+              isSelected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
             ),
             SizedBox(width: MediaQuery.of(context).size.width * 0.032),
@@ -475,21 +527,18 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing> {
 class DottedLinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.border
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
+    final paint =
+        Paint()
+          ..color = AppColors.border
+          ..strokeWidth = 1
+          ..style = PaintingStyle.stroke;
 
     const dashWidth = 3.0;
     const dashSpace = 3.0;
     double startX = 0;
 
     while (startX < size.width) {
-      canvas.drawLine(
-        Offset(startX, 0),
-        Offset(startX + dashWidth, 0),
-        paint,
-      );
+      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
       startX += dashWidth + dashSpace;
     }
   }

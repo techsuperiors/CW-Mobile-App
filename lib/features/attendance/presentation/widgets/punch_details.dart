@@ -6,6 +6,7 @@ import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/widgets/common/shimmer.dart';
 import '../../domain/entities/attendance_details.dart';
 
 /// Punch details widget with 2x2 grid layout
@@ -27,89 +28,165 @@ class PunchDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-
     return Padding(
       padding: EdgeInsets.symmetric(
-          horizontal: screenWidth * 0.042), // ~4.2% of screen width
-      child: isLoading
-          ? SizedBox(
-              height: screenHeight * 0.15,
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            )
-          : errorMessage != null
+        horizontal: screenWidth * 0.042,
+      ), // ~4.2% of screen width
+      child:
+          isLoading
               ? SizedBox(
-                  height: screenHeight * 0.15,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          errorMessage!,
-                          style: AppTextStyles.bodyMediumHeading(context).copyWith(
-                            color: AppColors.error,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: onRefresh,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
+                // height: screenHeight * 0.15,
+                child:  Center(child: _buildPunchGridSkeleton(context)),
+              )
+              : errorMessage != null
+              ? SizedBox(
+                height: screenHeight * 0.15,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        errorMessage!,
+                        style: AppTextStyles.bodyMediumHeading(
+                          context,
+                        ).copyWith(color: AppColors.error),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: onRefresh,
+                        child: const Text('Retry'),
+                      ),
+                    ],
                   ),
-                )
-              : GridView.count(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: screenWidth * 0.027, // ~2.7% of screen width
-                  mainAxisSpacing:
-                      screenHeight * 0.015, // 1.5% of screen height
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: EdgeInsets.zero,
-                  childAspectRatio: 2.3,
-                  children: [
-                    _buildPunchCard(
-                      context,
-                      time: attendanceDetails?.formattedPunchIn ?? '-',
-                      label: AppStrings.punchIn,
-                      icon: AppAssets.iconPunchIn,
-                      iconColor: AppColors.primary,
-                      backgroundColor: AppColors.attendanceLightBlueBg,
-                      borderColor: AppColors.primary,
-                    ),
-                    _buildPunchCard(
-                      context,
-                      time: attendanceDetails?.formattedPunchOut ?? '-',
-                      label: AppStrings.punchOut,
-                      icon: AppAssets.iconPunchOut,
-                      iconColor: AppColors.success,
-                      backgroundColor: AppColors.attendanceLightGreenBg,
-                      borderColor: AppColors.success,
-                    ),
-                    _buildPunchCard(
-                      context,
-                      time: attendanceDetails?.formattedBreakTime ?? '-',
-                      label: AppStrings.breakTime,
-                      icon: AppAssets.iconBreak,
-                      iconColor: AppColors.warning,
-                      backgroundColor: AppColors.attendanceLightOrangeBg,
-                      borderColor: AppColors.warning,
-                    ),
-                    _buildPunchCard(
-                      context,
-                      time: attendanceDetails?.formattedOverTime ?? '-',
-                      label: AppStrings.overtime,
-                      icon: AppAssets.iconOvertime,
-                      iconColor: AppColors.error,
-                      backgroundColor: AppColors.attendanceLightRedBg,
-                      borderColor: AppColors.error,
-                    ),
-                  ],
                 ),
+              )
+              : GridView.count(
+                crossAxisCount: 2,
+                crossAxisSpacing: screenWidth * 0.027,
+                // ~2.7% of screen width
+                mainAxisSpacing: screenHeight * 0.015,
+                // 1.5% of screen height
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                childAspectRatio: 2.3,
+                children: [
+                  _buildPunchCard(
+                    context,
+                    time:
+                        (attendanceDetails?.formattedPunchIn == null ||
+                                attendanceDetails!.formattedPunchIn.contains(
+                                  '-',
+                                ))
+                            ? 'Not yet'
+                            : attendanceDetails!.formattedPunchIn,
+                    label: AppStrings.punchIn,
+                    icon: AppAssets.iconPunchIn,
+                    iconColor: AppColors.primary,
+                    backgroundColor: AppColors.background,
+                    borderColor: AppColors.primary,
+                  ),
+                  _buildPunchCard(
+                    context,
+
+                    time: _getPunchOutDisplay(),
+                    label: AppStrings.punchOut,
+                    icon: AppAssets.iconPunchOut,
+                    iconColor: AppColors.success,
+                    backgroundColor: AppColors.background,
+                    borderColor: AppColors.success,
+                  ),
+                  _buildPunchCard(
+                    context,
+                    time: _formatBreakTime() ?? '-',
+                    label: AppStrings.breakTime,
+                    icon: AppAssets.iconBreak,
+                    iconColor: AppColors.warning,
+                    backgroundColor: AppColors.background,
+                    borderColor: AppColors.warning,
+                  ),
+                  _buildPunchCard(
+                    context,
+                    time: attendanceDetails?.overTime?.total.toString() ?? '-',
+                    label: AppStrings.overtime,
+                    icon: AppAssets.iconOvertime,
+                    iconColor: AppColors.error,
+                    backgroundColor: AppColors.background,
+                    borderColor: AppColors.error,
+                  ),
+                ],
+              ),
     );
+  }
+
+  Widget _buildPunchGridSkeleton(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      itemCount: 4,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: MediaQuery.of(context).size.width * 0.027,
+        mainAxisSpacing: MediaQuery.of(context).size.height * 0.015,
+        childAspectRatio: 2.3,
+      ),
+      itemBuilder: (context, index) => const AppShimmer.custom(
+        width: double.infinity,
+        height: double.infinity,
+        shapeBorder: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      ),
+    );
+  }
+
+  String _formatBreakTime() {
+    if (attendanceDetails?.breakTime == null) return '--';
+    final breakTimeSeconds =
+        int.tryParse(attendanceDetails!.breakTime ?? '0') ?? 0;
+
+    final hours = breakTimeSeconds ~/ 3600;
+    final minutes = (breakTimeSeconds % 3600) ~/ 60;
+
+    if (hours > 0) {
+      return '${hours}h ${minutes} min'; // e.g. "1h 30m"
+    }
+    return '${minutes} min'; // e.g. "45m"
+  }
+
+  String _getPunchOutDisplay() {
+    // Constant define
+    const String notYet = "Not yet";
+
+    final punchInStr = attendanceDetails?.punchIn;
+    final punchOutStr = attendanceDetails?.punchOut;
+
+    // 1. Basic check
+    if (punchOutStr == null || punchOutStr.isEmpty || punchOutStr == '-') {
+      return notYet;
+    }
+
+    // 2. if punchIn missing directly show formatted output
+    if (punchInStr == null || punchInStr.isEmpty || punchInStr == '-') {
+      return attendanceDetails?.formattedPunchOut ?? notYet;
+    }
+
+    try {
+      final punchInTime = DateTime.parse(punchInStr);
+      final punchOutTime = DateTime.parse(punchOutStr);
+
+      // 3. Business Logic: if new PunchIn  , this means user is logged in
+      if (punchInTime.isAfter(punchOutTime)) {
+        return notYet;
+      }
+
+      return attendanceDetails?.formattedPunchOut ?? notYet;
+    } catch (e) {
+      // Parsing error fallback
+      return attendanceDetails?.formattedPunchOut ?? notYet;
+    }
   }
 
   Widget _buildPunchCard(
@@ -123,26 +200,22 @@ class PunchDetails extends StatelessWidget {
   }) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     return Container(
       padding: EdgeInsets.all(screenWidth * 0.032), // ~3.2% of screen width
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: borderColor.withOpacity(0.3),
-          width: 1,
-        ),
+        border: Border.all(color: borderColor.withOpacity(0.3), width: 1),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
           // Icon with optional progress indicator
-          SvgPicture.asset(
-            icon,
-            fit: BoxFit.contain,
-          ),
+          SvgPicture.asset(icon, fit: BoxFit.contain),
+
+          SizedBox(width: screenWidth * 0.027), // ~2.7% of screen width
           // Time and label
           Flexible(
             child: Column(
@@ -152,17 +225,18 @@ class PunchDetails extends StatelessWidget {
                 Text(
                   time,
                   style: AppTextStyles.bodyMedium(context).copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w400,
                     color: AppColors.textPrimary,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: screenHeight * 0.0025), // 0.25% of screen height
+                SizedBox(height: screenHeight * 0.0025),
+                // 0.25% of screen height
                 Text(
                   label,
-                  style: AppTextStyles.bodySmall(context).copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(color: AppColors.textSecondary),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],

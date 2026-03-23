@@ -4,11 +4,11 @@ class UserProfileModel {
   final int userId;
   final int? departmentId;
   final String? address;
-  final Map<String, dynamic>? contactDetails;
+  final List<dynamic>? contactDetails;
   final Map<String, dynamic>? bankDetails;
-  final Map<String, dynamic>? educationDetails;
+  final List<dynamic>? educationDetails;
   final List<dynamic>? pastExperience;
-  final Map<String, dynamic>? socialLinks;
+  final List<dynamic>? socialLinks;
   final String? birthday;
   final String? bloodGroup;
   final String? userAbout;
@@ -35,6 +35,7 @@ class UserProfileModel {
   final UserDepartmentInfo? userDepartment;
   final UserDesignationInfo? userDesignation;
   final ClientInfo? client;
+  final RoleInfo? role;
 
   UserProfileModel({
     required this.clientId,
@@ -72,60 +73,121 @@ class UserProfileModel {
     this.userDepartment,
     this.userDesignation,
     this.client,
+    this.role,
   });
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
     return UserProfileModel(
-      clientId: (json['client_id'] as int?) ?? 0,
-      userId: (json['user_id'] as int?) ?? 0,
-      departmentId: json['department_id'] as int?,
-      address: json['address'] as String?,
-      contactDetails: json['contact_details'] as Map<String, dynamic>?,
-      bankDetails: json['bank_details'] as Map<String, dynamic>?,
-      educationDetails: json['education_details'] as Map<String, dynamic>?,
+      clientId: _asInt(json['client_id']) ?? 0,
+      userId: _asInt(json['user_id']) ?? 0,
+      departmentId: _asInt(json['department_id']),
+      address: _parseAddress(json['address']),
+      contactDetails: json['contact_details'] as List<dynamic>?,
+      bankDetails: _asMap(json['bank_details']),
+      educationDetails: json['education_details'] as List<dynamic>?,
       pastExperience: json['past_experience'] as List<dynamic>?,
-      socialLinks: json['social_links'] as Map<String, dynamic>?,
-      birthday: json['birthday'] as String?,
-      bloodGroup: json['blood_group'] as String?,
-      userAbout: json['user_about'] as String?,
-      reportingHr: (json['reporting_hr'] as int?) ?? 0,
-      reportingManager: (json['reporting_manager'] as int?) ?? 0,
+      socialLinks: json['social_links'] as List<dynamic>?,
+      birthday: _asString(json['birthday']),
+      bloodGroup: _asString(json['blood_group']),
+      userAbout: _asString(json['user_about']),
+      reportingHr: _asInt(json['reporting_hr']) ?? 0,
+      reportingManager: _asInt(json['reporting_manager']) ?? 0,
       skills: json['skills'] as List<dynamic>? ?? [],
-      esiNumber: json['esi_number'] as String?,
-      uanNumber: json['uan_number'] as String?,
-      pfNumber: json['pf_number'] as String?,
-      ctc: json['ctc'] as String?,
+      esiNumber: _asString(json['esi_number']),
+      uanNumber: _asString(json['uan_number']),
+      pfNumber: _asString(json['pf_number']),
+      ctc: _asString(json['ctc']),
       payrollEnabled: json['payroll_enabled'] as bool? ?? false,
-      belongsTo: json['belongs_to'] as String? ?? 'organization',
-      employmentStatus: json['employment_status'] as String? ?? 'PERMANENT',
+      belongsTo: _asString(json['belongs_to']) ?? 'organization',
+      employmentStatus: _asString(json['employment_status']) ?? 'PERMANENT',
       familyDetails: json['family_details'] as List<dynamic>? ?? [],
-      identityDetails: json['identity_details'] as Map<String, dynamic>?,
-      officialPhone: json['official_phone'] as String?,
+      identityDetails: _asMap(json['identity_details']),
+      officialPhone: _asString(json['official_phone']),
       inProbation: json['in_probation'] as bool? ?? false,
-      l2Manager: json['l2_manager'] as int?,
+      l2Manager: _asInt(json['l2_manager']),
       associateManagers: json['associate_managers'] as List<dynamic>?,
-      legalEntityId: json['legal_entity_id'] as int?,
+      legalEntityId: _asInt(json['legal_entity_id']),
       user: UserInfo.fromJson(json['user'] as Map<String, dynamic>),
-      reportingManagerInfo: json['reportingManager'] != null
-          ? ReportingManagerInfo.fromJson(
-              json['reportingManager'] as Map<String, dynamic>)
-          : null,
-      reportingHrInfo: json['reportingHR'] != null
-          ? ReportingHrInfo.fromJson(
-              json['reportingHR'] as Map<String, dynamic>)
-          : null,
-      userDepartment: json['userDepartment'] != null
-          ? UserDepartmentInfo.fromJson(
-              json['userDepartment'] as Map<String, dynamic>)
-          : null,
-      userDesignation: json['userDesignation'] != null
-          ? UserDesignationInfo.fromJson(
-              json['userDesignation'] as Map<String, dynamic>)
-          : null,
-      client: json['Client'] != null
-          ? ClientInfo.fromJson(json['Client'] as Map<String, dynamic>)
-          : null,
+      reportingManagerInfo:
+          json['reportingManager'] != null
+              ? ReportingManagerInfo.fromJson(
+                json['reportingManager'] as Map<String, dynamic>,
+              )
+              : null,
+      reportingHrInfo:
+          json['reportingHR'] != null
+              ? ReportingHrInfo.fromJson(
+                json['reportingHR'] as Map<String, dynamic>,
+              )
+              : null,
+      userDepartment:
+          json['department_name'] != null
+              ? UserDepartmentInfo(
+                departmentName: json['department_name'] as String?,
+              )
+              : null,
+      userDesignation:
+          json['designation_name'] != null
+              ? UserDesignationInfo(
+                designationName: json['designation_name'] as String?,
+              )
+              : null,
+      client:
+          (json['client_id'] != null || json['client_name'] != null)
+              ? ClientInfo(
+                id: _asInt(json['client_id']) ?? 0,
+                clientName: _asString(json['client_name']),
+              )
+              : null,
+      role:
+          json['Role'] != null
+              ? RoleInfo.fromJson(json['Role'] as Map<String, dynamic>)
+              : null,
     );
+  }
+
+  static int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  static String? _asString(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return value;
+    if (value is num || value is bool || value is DateTime) {
+      return value.toString();
+    }
+    return null;
+  }
+
+  static Map<String, dynamic>? _asMap(dynamic value) {
+    if (value == null) return null;
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map(
+        (key, val) => MapEntry(key.toString(), val),
+      );
+    }
+    return null;
+  }
+
+  static String? _parseAddress(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return value;
+    if (value is List) {
+      final parts =
+          value
+              .whereType<Map>()
+              .map((item) => item['line1'])
+              .whereType<String>()
+              .where((line) => line.trim().isNotEmpty)
+              .toList();
+      if (parts.isNotEmpty) {
+        return parts.join(', ');
+      }
+    }
+    return null;
   }
 }
 
@@ -177,26 +239,26 @@ class UserInfo {
 
   factory UserInfo.fromJson(Map<String, dynamic> json) {
     return UserInfo(
-      id: (json['id'] as int?) ?? 0,
-      title: json['title'] as String?,
-      firstName: json['first_name'] as String?,
-      middleName: json['middle_name'] as String?,
-      lastName: json['last_name'] as String?,
-      location: json['location'] as String?,
-      email: json['email'] as String?,
-      phone: json['phone'] as String?,
-      status: json['status'] as String?,
-      username: json['username'] as String?,
-      personalEmail: json['personal_email'] as String?,
-      imageUrl: json['image_url'] as String?,
-      gender: json['gender'] as String?,
-      joiningDate: json['joining_date'] as String?,
-      employeeType: json['employee_type'] as String?,
-      employeeID: json['employeeID'] as String?,
-      profileColor: json['profile_color'] as String?,
-      coverImageUrl: json['cover_image_url'] as String?,
-      workMode: json['work_mode'] as String?,
-      maritalStatus: json['marital_status'] as String?,
+      id: UserProfileModel._asInt(json['id']) ?? 0,
+      title: UserProfileModel._asString(json['title']),
+      firstName: UserProfileModel._asString(json['first_name']),
+      middleName: UserProfileModel._asString(json['middle_name']),
+      lastName: UserProfileModel._asString(json['last_name']),
+      location: UserProfileModel._asString(json['location']),
+      email: UserProfileModel._asString(json['email']),
+      phone: UserProfileModel._asString(json['phone']),
+      status: UserProfileModel._asString(json['status']),
+      username: UserProfileModel._asString(json['username']),
+      personalEmail: UserProfileModel._asString(json['personal_email']),
+      imageUrl: UserProfileModel._asString(json['image_url']),
+      gender: UserProfileModel._asString(json['gender']),
+      joiningDate: UserProfileModel._asString(json['joining_date']),
+      employeeType: UserProfileModel._asString(json['employee_type']),
+      employeeID: UserProfileModel._asString(json['employeeID']),
+      profileColor: UserProfileModel._asString(json['profile_color']),
+      coverImageUrl: UserProfileModel._asString(json['cover_image_url']),
+      workMode: UserProfileModel._asString(json['work_mode']),
+      maritalStatus: UserProfileModel._asString(json['marital_status']),
     );
   }
 
@@ -334,10 +396,7 @@ class ClientInfo {
   final int id;
   final String? clientName;
 
-  ClientInfo({
-    required this.id,
-    this.clientName,
-  });
+  ClientInfo({required this.id, this.clientName});
 
   factory ClientInfo.fromJson(Map<String, dynamic> json) {
     return ClientInfo(
@@ -347,3 +406,20 @@ class ClientInfo {
   }
 }
 
+/// Role Information
+class RoleInfo {
+  final String? roleName;
+  final List<String>? permissions;
+
+  RoleInfo({this.roleName, this.permissions});
+
+  factory RoleInfo.fromJson(Map<String, dynamic> json) {
+    return RoleInfo(
+      roleName: json['role_name'] as String?,
+      permissions:
+          (json['permissions'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList(),
+    );
+  }
+}

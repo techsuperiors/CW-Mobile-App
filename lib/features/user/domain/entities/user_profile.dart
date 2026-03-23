@@ -27,6 +27,7 @@ class UserProfile {
   final UserDepartmentInfo? userDepartment;
   final UserDesignationInfo? userDesignation;
   final ClientInfo? client;
+  final RoleInfo? role;
 
   UserProfile({
     required this.clientId,
@@ -56,6 +57,7 @@ class UserProfile {
     this.userDepartment,
     this.userDesignation,
     this.client,
+    this.role,
   });
 }
 
@@ -205,9 +207,13 @@ class ClientInfo {
   final int id;
   final String? clientName;
 
-  ClientInfo({
-    required this.id,
-    this.clientName,
-  });
+  ClientInfo({required this.id, this.clientName});
 }
 
+/// Role Information entity
+class RoleInfo {
+  final String? roleName;
+  final List<String>? permissions;
+
+  RoleInfo({this.roleName, this.permissions});
+}

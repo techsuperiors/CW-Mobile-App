@@ -27,15 +27,12 @@ class RegularizeRequestCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: Container(
         margin: EdgeInsets.only(
-          bottom: screenHeight * 0.012, // 1.2% of screen height
+          bottom: screenHeight * 0.010, // 1.2% of screen height
         ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: AppColors.border,
-            width: 1,
-          ),
+          border: Border.all(color: AppColors.border, width: 1),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -54,7 +51,8 @@ class RegularizeRequestCard extends StatelessWidget {
               Container(
                 width: screenWidth * 0.032, // 3.2% of screen width
                 decoration: BoxDecoration(
-                  color: statusColor, // Use status color (blue for pending, green for approved, red for rejected)
+                  color: statusColor,
+                  // Use status color (blue for pending, green for approved, red for rejected)
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(8),
                     bottomLeft: Radius.circular(8),
@@ -65,8 +63,8 @@ class RegularizeRequestCard extends StatelessWidget {
               Expanded(
                 child: Padding(
                   padding: EdgeInsets.symmetric(
-                    horizontal: screenWidth * 0.022, // 2.2% of screen width
-                    vertical: screenHeight * 0.018, // 1.8% of screen height
+                    horizontal: screenWidth * 0.022,
+                    vertical: screenHeight * 0.012,
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,38 +77,46 @@ class RegularizeRequestCard extends StatelessWidget {
                           children: [
                             // Request Type (Punch-In, Punch-Out, Both)
                             Text(
-                              regularizeRequest.requestType.displayName,
+                              regularizeRequest.reason,
                               style: AppTextStyles.bodyMedium(context).copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.textPrimary,
                               ),
                             ),
-                            SizedBox(height: screenHeight * 0.006), // 0.6% of screen height
+                            SizedBox(height: screenHeight * 0.006),
+                            // 0.6% of screen height
                             // Date range with calendar icon
                             Row(
                               children: [
                                 Icon(
                                   Icons.calendar_today,
-                                  size: screenWidth * 0.032, // 3.2% of screen width
-                                  color: statusColor, // Use status color for calendar icon
+                                  size: screenWidth * 0.038,
+                                  // 3.2% of screen width
+                                  color:
+                                      statusColor, // Use status color for calendar icon
                                 ),
-                                SizedBox(width: screenWidth * 0.016), // 1.6% of screen width
+                                SizedBox(width: screenWidth * 0.005),
+                                // 1.6% of screen width
                                 Flexible(
                                   child: Text(
                                     regularizeRequest.dateRange,
-                                    style: AppTextStyles.bodySmall(context).copyWith(
+                                    style: AppTextStyles.bodySmall(
+                                      context,
+                                    ).copyWith(
                                       fontWeight: FontWeight.w400,
-                                      color: statusColor, // Use status color for date text
+                                      color:
+                                          statusColor, // Use status color for date text
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
                             ),
-                            SizedBox(height: screenHeight * 0.006), // 0.6% of screen height
+                            SizedBox(height: screenHeight * 0.006),
+                            // 0.6% of screen height
                             // Reason
                             Text(
-                              regularizeRequest.reason,
+                              regularizeRequest.requestType.displayName,
                               style: AppTextStyles.bodySmall(context).copyWith(
                                 fontWeight: FontWeight.w400,
                                 color: AppColors.textSecondary,
@@ -121,15 +127,19 @@ class RegularizeRequestCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      SizedBox(width: screenWidth * 0.021), // 2.1% of screen width
+                      SizedBox(width: screenWidth * 0.021),
+                      // 2.1% of screen width
                       // Status badge (white text on colored background)
                       Container(
                         constraints: BoxConstraints(
                           maxWidth: screenWidth * 0.25, // Prevent overflow
                         ),
+
                         padding: EdgeInsets.symmetric(
-                          horizontal: screenWidth * 0.027, // 2.7% of screen width
-                          vertical: screenHeight * 0.008, // 0.8% of screen height
+                          horizontal:
+                          screenWidth * 0.027, // 2.7% of screen width
+                          vertical:
+                          screenHeight * 0.004, // 0.8% of screen height
                         ),
                         decoration: BoxDecoration(
                           color: statusColor,
@@ -154,15 +164,16 @@ class RegularizeRequestCard extends StatelessWidget {
       ),
     );
   }
-
   Color _getStatusColor(RegularizeStatus status) {
     switch (status) {
       case RegularizeStatus.pending:
-        return const Color(0xFF2196F3); // Blue
+        return const Color(0xFF0086C9); // Blue
       case RegularizeStatus.approved:
-        return const Color(0xFF4CAF50); // Green
+        return const Color(0xFF12B76A); // Green
       case RegularizeStatus.rejected:
-        return const Color(0xFFE53935); // Red
+        return const Color(0xFFF04438); // Red
+      case RegularizeStatus.withdrawn:
+        return const Color(0xFFF79009); // Orange
     }
   }
 }

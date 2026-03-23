@@ -197,11 +197,13 @@ class TicketCard extends StatelessWidget {
             ),
           ),
         ),
-        Text(
-          value,
-          style: AppTextStyles.bodySmall(context).copyWith(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w500,
+        Flexible(
+          child: Text(
+            value,
+            style: AppTextStyles.bodySmall(context).copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],

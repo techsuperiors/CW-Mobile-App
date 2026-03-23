@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:dartz/dartz.dart';
 import '../../../../core/error/failures.dart';
 import '../entities/leave_type.dart';
 import '../entities/leave_apply_result.dart';
+import '../entities/leave_uploaded_file.dart';
 
 /// Leave Types repository interface
 abstract class LeaveTypesRepository {
@@ -21,6 +23,29 @@ abstract class LeaveTypesRepository {
     required String shortCode,
     required int requestTo,
     required List<String> rHDates,
+    List<File> attachmentFiles,
+  });
+  Future<Either<Failure, LeaveApplyResult>> updateLeave({
+    required int leaveId,
+    required String leaveType,
+    required List<String?> clubing,
+    required bool isClubbing,
+    required String startDate,
+    required String? endDate,
+    required String subject,
+    required String reason,
+    required String startHalf,
+    required String endHalf,
+    required String dayType,
+    required String description,
+    required int requestTo,
+  });
+  Future<Either<Failure, List<LeaveUploadedFile>>> uploadLeaveFiles({
+    required int leaveId,
+    required List<File> files,
+  });
+  Future<Either<Failure, String>> deleteLeaveFile({
+    required int leaveFileId,
+    required String fileId,
   });
 }
-

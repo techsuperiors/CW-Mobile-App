@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 /// Agreement remote data source interface
 abstract class AgreementRemoteDataSource {
   Future<List<AgreementModel>> getAgreementList(int userId);
+
   Future<AgreementConsentResponse> submitAgreementConsent(
     AgreementConsentRequest request,
     String signatureFilePath,
@@ -32,11 +33,7 @@ class AgreementRemoteDataSourceImpl implements AgreementRemoteDataSource {
 
       final response = await apiClient.get(
         url,
-        options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        ),
+        options: Options(headers: {'Content-Type': 'application/json'}),
       );
 
       final apiResponse = AgreementListApiResponse.fromJson(

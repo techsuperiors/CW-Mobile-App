@@ -14,6 +14,7 @@ class ServicesData {
         iconPath: AppAssets.iconAttendance,
         iconColor: AppColors.serviceBlue,
         backgroundColor: AppColors.serviceBlueBg,
+        requiredPermission: 'Attendance:Attendance Dashboard:Read',
       ),
       ServiceModel(
         id: '2',
@@ -22,6 +23,10 @@ class ServicesData {
         iconPath: AppAssets.iconLeave,
         iconColor: AppColors.servicePurple,
         backgroundColor: AppColors.servicePurpleBg,
+        anyOfPermissions: [
+          'Leave Management:My Leaves:Read',
+          'Leave Management:Team Leaves:Read',
+        ],
       ),
       ServiceModel(
         id: '3',
@@ -30,6 +35,10 @@ class ServicesData {
         iconPath: AppAssets.iconPolicies,
         iconColor: AppColors.serviceGreen,
         backgroundColor: AppColors.serviceGreenBg,
+        anyOfPermissions: [
+        "Company Policies:My Policy:Read",
+        "Company Policies:Team Policy:Read"
+        ],
       ),
       ServiceModel(
         id: '4',
@@ -38,6 +47,7 @@ class ServicesData {
         iconPath: AppAssets.iconEmployeeAgreement,
         iconColor: AppColors.serviceOrange,
         backgroundColor: AppColors.serviceOrangeBg,
+        requiredPermission: 'Employee Agreements:Employee Agreements:Read',
       ),
       ServiceModel(
         id: '5',
@@ -46,6 +56,7 @@ class ServicesData {
         iconPath: AppAssets.iconVisit,
         iconColor: AppColors.serviceBlue,
         backgroundColor: AppColors.serviceBlueBg,
+        requiredPermission: 'Visit & Geo Tracking:Dashboard:Read',
       ),
       ServiceModel(
         id: '6',
@@ -54,6 +65,10 @@ class ServicesData {
         iconPath: AppAssets.iconExpenses,
         iconColor: AppColors.servicePinkDark,
         backgroundColor: AppColors.servicePinkDarkBg,
+        anyOfPermissions: [
+          'Expense Management:Trip:Read',
+          'Expense Management:Reimbursements:Reimbursement:Read',
+        ],
       ),
       ServiceModel(
         id: '7',
@@ -62,6 +77,7 @@ class ServicesData {
         iconPath: AppAssets.iconPayslip,
         iconColor: AppColors.serviceTeal,
         backgroundColor: AppColors.serviceTealBg,
+        requiredPermission: 'Payroll Management:Payslip:Read',
       ),
       ServiceModel(
         id: '8',
@@ -70,6 +86,9 @@ class ServicesData {
         iconPath: AppAssets.iconDocument,
         iconColor: AppColors.serviceYellow,
         backgroundColor: AppColors.serviceYellowBg,
+        requiredPermission:
+          'Document Management:My Drive:Read',
+
       ),
       ServiceModel(
         id: '9',
@@ -78,6 +97,9 @@ class ServicesData {
         iconPath: AppAssets.iconAssets,
         iconColor: AppColors.servicePurple,
         backgroundColor: AppColors.servicePurpleBg,
+        anyOfPermissions: [
+          'Asset Management:Assigned Asset:Read',
+        ],
       ),
       ServiceModel(
         id: '10',
@@ -86,6 +108,10 @@ class ServicesData {
         iconPath: AppAssets.iconTickets,
         iconColor: AppColors.servicePinkDark,
         backgroundColor: AppColors.servicePinkDarkBg,
+        anyOfPermissions: [
+          'Ticket Management:Ticket Dashboard:Read',
+          'Ticket Management:My Tickets:Read',
+        ],
       ),
     ];
   }

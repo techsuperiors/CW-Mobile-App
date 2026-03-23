@@ -1,9 +1,13 @@
+import 'package:collectivWork/core/widgets/permission_guard.dart';
+import 'package:collectivWork/features/services/presentation/pages/sub_services/attendence/presentation/widgets/day_logs_card.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../attendance/domain/entities/attendance_day_detail.dart';
 import '../../../../../../../attendance/domain/entities/attendance_details.dart';
+import '../../../../../../../calendar/domain/entities/calendar_day_entity.dart';
 import '../../../../../../../request/presentation/pages/sub_requets/leaves/presentation/pages/apply_leave_page.dart';
 import '../../../../../../../request/presentation/pages/sub_requets/regularize/presentation/pages/apply_regularize_page.dart';
 
@@ -11,100 +15,149 @@ import '../../../../../../../request/presentation/pages/sub_requets/regularize/p
 class DayDetailsCard extends StatelessWidget {
   final DateTime selectedDate;
   final AttendanceDetails? attendanceDetails;
+  final AttendanceDayDetail? selectedDayDetail;
   final bool isLoading;
   final String? errorMessage;
+  final List<CalendarDayEntity> calendarDays; // ADD THIS
 
   const DayDetailsCard({
     super.key,
     required this.selectedDate,
     this.attendanceDetails,
+    this.selectedDayDetail,
     required this.isLoading,
     this.errorMessage,
+    this.calendarDays = const [], // ADD THIS
   });
-
-  /// Format time from API response
-  String? _formatTime(String? timeString) {
-    if (timeString == null || timeString.isEmpty) return null;
-    try {
-      final utcDateTime = DateTime.parse(timeString);
-      final localDateTime = utcDateTime.toLocal();
-      final hour = localDateTime.hour;
-      final minute = localDateTime.minute;
-      final second = localDateTime.second;
-      final period = hour >= 12 ? 'PM' : 'AM';
-      final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-      final displayMinute = minute.toString().padLeft(2, '0');
-      final displaySecond = second.toString().padLeft(2, '0');
-      return '$displayHour:$displayMinute:$displaySecond $period';
-    } catch (e) {
-      return timeString;
-    }
-  }
-
-  /// Get punch in/out logs from activity array
-  List<String> _getPunchInLogs() {
-    if (attendanceDetails?.activity == null) return [];
-    final logs = <String>[];
-    for (var activity in attendanceDetails!.activity!) {
-      if (activity.activityType == 'Punch In' && activity.time != null) {
-        final formatted = _formatTime(activity.time);
-        if (formatted != null) logs.add(formatted);
-      }
-    }
-    return logs;
-  }
-
-  List<String> _getPunchOutLogs() {
-    if (attendanceDetails?.activity == null) return [];
-    final logs = <String>[];
-    for (var activity in attendanceDetails!.activity!) {
-      if (activity.activityType == 'Punch Out' && activity.time != null) {
-        final formatted = _formatTime(activity.time);
-        if (formatted != null) logs.add(formatted);
-      }
-    }
-    return logs;
-  }
 
   /// Get shift timing for selected date
   String _getShiftTiming() {
-    if (attendanceDetails?.shift?.shiftDayTiming == null) {
-      return '09:30 AM - 07:30 PM'; // Default
+    final shiftTiming = selectedDayDetail?.shiftTiming;
+    if (shiftTiming != null &&
+        shiftTiming.punchIn.isNotEmpty &&
+        shiftTiming.punchOut.isNotEmpty) {
+      return '${shiftTiming.punchIn} - ${shiftTiming.punchOut}';
     }
-    
+
+    if (attendanceDetails?.shift?.shiftDayTiming == null) {
+      return '--';
+    }
     final dayName = DateFormat('EEEE').format(selectedDate);
     final dayTiming = attendanceDetails!.shift!.shiftDayTiming.firstWhere(
       (timing) => timing.day == dayName,
       orElse: () => attendanceDetails!.shift!.shiftDayTiming.first,
     );
-    
+
     return '${dayTiming.punchIn} - ${dayTiming.punchOut}';
   }
 
-  /// Format break time
-  String _formatBreakTime() {
-    if (attendanceDetails?.breakTime == null) return '--';
-    final breakTimeSeconds = int.tryParse(attendanceDetails!.breakTime ?? '0') ?? 0;
-    final minutes = breakTimeSeconds ~/ 60;
-    return '$minutes min';
+  /// Returns a block reason string, or null if regularization is allowed.
+  String? _getRegularizeBlockReason(DateTime date) {
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final isBlocked = calendarDays.any(
+      (d) => d.date.startsWith(dateStr) && (d.status == 'Leave' || d.isHoliday),
+    );
+    if (isBlocked) {
+      return 'Regularization is not allowed on leave or holiday dates.';
+    }
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    final dateOnly = DateTime(date.year, date.month, date.day);
+
+    if (dateOnly.isAfter(todayOnly)) {
+      return 'Regularization is not allowed for future dates.';
+    }
+    return null;
   }
 
-  /// Format hours
-  String _formatHours(double? hours) {
-    if (hours == null) return '--';
-    final hrs = hours.toInt();
-    final mins = ((hours - hrs) * 60).toInt();
-    if (mins == 0) {
-      return '$hrs hr';
+  void _showBlockedDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Cannot Regularize'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  String _getExpectedGrossHours() {
+    final shiftTiming = selectedDayDetail?.shiftTiming;
+    if (shiftTiming != null && shiftTiming.grossHours.isNotEmpty) {
+      return shiftTiming.grossHours;
     }
-    return '$hrs hr $mins min';
+    return '--';
+  }
+
+  String _getExpectedEffectiveHours() {
+    final shiftTiming = selectedDayDetail?.shiftTiming;
+    if (shiftTiming != null && shiftTiming.effectiveHours.isNotEmpty) {
+      return shiftTiming.effectiveHours;
+    }
+    return '--';
+  }
+
+  _StatusChipData? _getStatusChipData() {
+    final detail = selectedDayDetail;
+    if (detail == null) return null;
+
+    final status = (detail.status ?? '').trim();
+    if (detail.holiday || status.toLowerCase() == 'holiday') {
+      return _StatusChipData(
+        label: 'Holiday',
+        backgroundColor: AppColors.error.withValues(alpha: 0.15),
+        textColor: AppColors.error,
+      );
+    }
+
+    switch (status.toLowerCase()) {
+      case 'present':
+        return _StatusChipData(
+          label: 'Present',
+          backgroundColor: AppColors.success.withValues(alpha: 0.15),
+          textColor: AppColors.success,
+        );
+      case 'leave':
+        return _StatusChipData(
+          label: 'Leave',
+          backgroundColor: AppColors.warning.withValues(alpha: 0.15),
+          textColor: AppColors.warning,
+        );
+      case 'wfh':
+        return _StatusChipData(
+          label: AppStrings.wfh,
+          backgroundColor: AppColors.success.withValues(alpha: 0.15),
+          textColor: AppColors.success,
+        );
+      case 'absent':
+        return _StatusChipData(
+          label: 'Absent',
+          backgroundColor: AppColors.error.withValues(alpha: 0.15),
+          textColor: AppColors.error,
+        );
+      case 'holiday':
+        return _StatusChipData(
+          label: 'Holiday',
+          backgroundColor: AppColors.error.withValues(alpha: 0.15),
+          textColor: AppColors.error,
+        );
+      default:
+        return null;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+    final statusChip = _getStatusChipData();
+
     final formattedDate = DateFormat('d MMMM yyyy').format(selectedDate);
 
     if (isLoading) {
@@ -122,9 +175,9 @@ class DayDetailsCard extends StatelessWidget {
         child: Center(
           child: Text(
             errorMessage!,
-            style: AppTextStyles.bodyMedium(context).copyWith(
-              color: AppColors.error,
-            ),
+            style: AppTextStyles.bodyMedium(
+              context,
+            ).copyWith(color: AppColors.error),
           ),
         ),
       );
@@ -138,7 +191,7 @@ class DayDetailsCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -173,25 +226,24 @@ class DayDetailsCard extends StatelessWidget {
             children: [
               Text(
                 _getShiftTiming(),
-                style: AppTextStyles.bodySmall(context).copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: AppTextStyles.bodySmall(
+                  context,
+                ).copyWith(color: AppColors.textSecondary),
               ),
-              if (attendanceDetails?.punchType == 'remote' || 
-                  attendanceDetails?.wfhShowPunch == true)
+              if (statusChip != null)
                 Container(
                   padding: EdgeInsets.symmetric(
                     horizontal: screenWidth * 0.025,
                     vertical: screenHeight * 0.005,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.15),
+                    color: statusChip.backgroundColor,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    AppStrings.wfh,
+                    statusChip.label,
                     style: AppTextStyles.labelSmall(context).copyWith(
-                      color: AppColors.success,
+                      color: statusChip.textColor,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -218,12 +270,10 @@ class DayDetailsCard extends StatelessWidget {
                   ),
                   SizedBox(height: screenHeight * 0.005),
                   Text(
-                    attendanceDetails?.shift?.shiftDayTiming.isNotEmpty == true
-                        ? attendanceDetails!.shift!.shiftDayTiming.first.grossHours
-                        : '--',
-                    style: AppTextStyles.bodySmall(context).copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                    _getExpectedGrossHours(),
+                    style: AppTextStyles.bodySmall(
+                      context,
+                    ).copyWith(color: AppColors.textSecondary),
                   ),
                 ],
               ),
@@ -239,12 +289,10 @@ class DayDetailsCard extends StatelessWidget {
                   ),
                   SizedBox(height: screenHeight * 0.005),
                   Text(
-                    attendanceDetails?.shift?.shiftDayTiming.isNotEmpty == true
-                        ? attendanceDetails!.shift!.shiftDayTiming.first.effectiveHours
-                        : '--',
-                    style: AppTextStyles.bodySmall(context).copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                    _getExpectedEffectiveHours(),
+                    style: AppTextStyles.bodySmall(
+                      context,
+                    ).copyWith(color: AppColors.textSecondary),
                   ),
                 ],
               ),
@@ -258,58 +306,76 @@ class DayDetailsCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: TextButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ApplyRegularizePage(selectedDate: selectedDate),
-                      ),
-                    );
-                  },
-                  icon: Icon(
-                    Icons.edit,
-                    size: screenWidth * 0.03,
-                    color: AppColors.primary,
-                  ),
-                  label: Text(
-                    AppStrings.regularize,
-                    style: AppTextStyles.buttonSmall(context).copyWith(
+              PermissionGuard(
+                requiredPermission: "Attendance:Regularize:Write",
+                child: Expanded(
+                  child: TextButton.icon(
+                    onPressed: () {
+                      final reason = _getRegularizeBlockReason(selectedDate);
+                      if (reason != null) {
+                        _showBlockedDialog(context, reason);
+                        return;
+                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => ApplyRegularizePage(
+                                selectedDate: selectedDate,
+                              ),
+                        ),
+                      );
+                    },
+                    icon: Icon(
+                      Icons.edit,
+                      size: screenWidth * 0.03,
                       color: AppColors.primary,
                     ),
-                  ),
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: screenHeight * 0.012),
-                    alignment: Alignment.centerLeft,
+                    label: Text(
+                      AppStrings.regularize,
+                      style: AppTextStyles.buttonSmall(
+                        context,
+                      ).copyWith(color: AppColors.primary),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(
+                        vertical: screenHeight * 0.012,
+                      ),
+                      alignment: Alignment.centerLeft,
+                    ),
                   ),
                 ),
               ),
               SizedBox(width: screenWidth * 0.02),
-              Expanded(
-                child: TextButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ApplyLeavePage(),
-                      ),
-                    );
-                  },
-                  icon: Icon(
-                    Icons.calendar_today,
-                    size: screenWidth * 0.03,
-                    color: AppColors.primary,
-                  ),
-                  label: Text(
-                    AppStrings.applyLeave,
-                    style: AppTextStyles.buttonSmall(context).copyWith(
+              PermissionGuard(
+                anyOf: ["Leave Management:My Leaves:Write"],
+                child: Expanded(
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ApplyLeavePage(),
+                        ),
+                      );
+                    },
+                    icon: Icon(
+                      Icons.calendar_today,
+                      size: screenWidth * 0.03,
                       color: AppColors.primary,
                     ),
-                  ),
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: screenHeight * 0.012),
-                    alignment: Alignment.centerLeft,
+                    label: Text(
+                      AppStrings.applyLeave,
+                      style: AppTextStyles.buttonSmall(
+                        context,
+                      ).copyWith(color: AppColors.primary),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(
+                        vertical: screenHeight * 0.012,
+                      ),
+                      alignment: Alignment.centerLeft,
+                    ),
                   ),
                 ),
               ),
@@ -319,274 +385,43 @@ class DayDetailsCard extends StatelessWidget {
           // Divider
           Divider(color: AppColors.border, height: 1),
           SizedBox(height: screenHeight * 0.02),
+
           // Day Logs
-          _buildSectionTitle(context, 'Day Logs'),
-          SizedBox(height: screenHeight * 0.01),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left Column: Punch-in
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: _getPunchInLogs().isEmpty
-                      ? [_buildLogEntry(context, '--:--:--', true, true)]
-                      : _getPunchInLogs()
-                          .map((log) => _buildLogEntry(context, log, true, false))
-                          .toList(),
-                ),
-              ),
-              SizedBox(width: screenWidth * 0.04),
-              // Right Column: Punch-out
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: _getPunchOutLogs().isEmpty
-                      ? [_buildLogEntry(context, '--:--:--', false, true)]
-                      : _getPunchOutLogs()
-                          .map((log) => _buildLogEntry(context, log, false, false))
-                          .toList(),
-                ),
-              ),
-              SizedBox(width: screenWidth * 0.04),
-            ],
-          ),
-          // Adjusted Logs (if available)
-          if (attendanceDetails?.punchIn != null || attendanceDetails?.punchOut != null)
-            SizedBox(height: screenHeight * 0.02),
-          if (attendanceDetails?.punchIn != null || attendanceDetails?.punchOut != null)
-            Divider(color: AppColors.border, height: 1),
-          if (attendanceDetails?.punchIn != null || attendanceDetails?.punchOut != null)
-            SizedBox(height: screenHeight * 0.02),
-          if (attendanceDetails?.punchIn != null || attendanceDetails?.punchOut != null)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSectionTitle(context, 'Adjusted Logs'),
-                SizedBox(height: screenHeight * 0.01),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Left Column: Adjusted Punch-in
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildLogEntry(
-                            context,
-                            attendanceDetails?.formattedPunchIn ?? '--:--:--',
-                            true,
-                            attendanceDetails?.punchIn == null,
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(width: screenWidth * 0.04),
-                    // Right Column: Adjusted Punch-out
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildLogEntry(
-                            context,
-                            attendanceDetails?.formattedPunchOut ?? '--:--:--',
-                            false,
-                            attendanceDetails?.punchOut == null,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: screenHeight * 0.02),
-                Divider(color: AppColors.border, height: 1),
-                SizedBox(height: screenHeight * 0.02),
-              ],
-            ),
-          SizedBox(height: screenHeight * 0.02),
-          // Divider
-          Divider(color: AppColors.border, height: 1),
-          SizedBox(height: screenHeight * 0.02),
-          // Actual Hours and Break Time
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left Column: Actual Gross hour and Break Time
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Actual Gross hour',
-                      style: AppTextStyles.bodySmall(context).copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    SizedBox(height: screenHeight * 0.005),
-                    Text(
-                      _formatHours(attendanceDetails?.grossHours),
-                      style: AppTextStyles.bodySmall(context).copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    SizedBox(height: screenHeight * 0.015),
-                    // Break Time with icon
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: screenWidth * 0.06,
-                          height: screenWidth * 0.06,
-                          decoration: BoxDecoration(
-                            color: AppColors.textSecondary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              'T',
-                              style: TextStyle(
-                                color: AppColors.textWhite,
-                                fontSize: screenWidth * 0.035,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: screenWidth * 0.02),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Break Time',
-                              style: AppTextStyles.bodySmall(context).copyWith(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            SizedBox(height: screenHeight * 0.005),
-                            Text(
-                              _formatBreakTime(),
-                              style: AppTextStyles.bodySmall(context).copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Right Column: Actual Effective hour
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Actual Effective hour',
-                      style: AppTextStyles.bodySmall(context).copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    SizedBox(height: screenHeight * 0.005),
-                    Text(
-                      _formatHours(attendanceDetails?.effectiveHours),
-                      style: AppTextStyles.bodySmall(context).copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(BuildContext context, String title) {
-    return Text(
-      title,
-      style: AppTextStyles.bodyMedium(context).copyWith(
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
-      ),
-    );
-  }
-
-  Widget _buildLogEntry(BuildContext context, String time, bool isPunchIn, bool isDashed) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    
-    return Padding(
-      padding: EdgeInsets.only(bottom: screenHeight * 0.008),
-      child: Row(
-        children: [
-          // Checkmark for punch-in, upward arrow for punch-out
-          if (isPunchIn)
-            Text(
-              '✓',
-              style: TextStyle(
-                fontSize: AppTextStyles.bodySmall(context).fontSize,
-                color: AppColors.success,
-                fontWeight: FontWeight.bold,
-              ),
-            )
-          else
-            Text(
-              '↗',
-              style: TextStyle(
-                fontSize: AppTextStyles.bodySmall(context).fontSize,
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          SizedBox(width: screenWidth * 0.02),
-          if (isDashed)
-            Expanded(
-              child: Text(
-                time,
-                style: AppTextStyles.bodySmall(context).copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            )
-          else
-            Text(
-              time,
-              style: AppTextStyles.bodySmall(context).copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
+          DayLogsCard(dayDetail: selectedDayDetail),
         ],
       ),
     );
   }
 }
 
+class _StatusChipData {
+  final String label;
+  final Color backgroundColor;
+  final Color textColor;
+
+  const _StatusChipData({
+    required this.label,
+    required this.backgroundColor,
+    required this.textColor,
+  });
+}
+
 /// Custom painter for dashed lines
 class DashedLinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.border
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
+    final paint =
+        Paint()
+          ..color = AppColors.border
+          ..strokeWidth = 1
+          ..style = PaintingStyle.stroke;
 
     const dashWidth = 5.0;
     const dashSpace = 3.0;
     double startX = 0;
 
     while (startX < size.width) {
-      canvas.drawLine(
-        Offset(startX, 0),
-        Offset(startX + dashWidth, 0),
-        paint,
-      );
+      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
       startX += dashWidth + dashSpace;
     }
   }
@@ -594,4 +429,3 @@ class DashedLinePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-

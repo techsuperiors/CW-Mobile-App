@@ -15,6 +15,21 @@ class LoadRegularizeRequests extends RegularizeRequestEvent {
   const LoadRegularizeRequests();
 }
 
+class LoadTeamRegularizeRequests extends RegularizeRequestEvent {
+  final int page;
+  final int limit;
+  final String requestType;
+
+  const LoadTeamRegularizeRequests({
+    this.page = 1,
+    this.limit = 50,
+    this.requestType = 'All',
+  });
+
+  @override
+  List<Object> get props => [page, limit, requestType];
+}
+
 /// Search regularize requests event
 class SearchRegularizeRequests extends RegularizeRequestEvent {
   final String query;

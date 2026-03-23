@@ -1,22 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:intl/intl.dart';
+import '../../../../../../../../core/constants/app_assets.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/constants/app_urls.dart';
+import '../../../../../../../../core/utils/data_encoder.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/utils/token_storage.dart';
+import '../../../../../../../../core/utils/app_navigator.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
+import '../../../../../../../../core/network/api_service.dart';
+import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
+import '../../../../../../../attendance/data/datasources/attendance_regularize_remote_datasource.dart';
+import '../../../../../../../attendance/data/repositories/attendance_regularize_repository_impl.dart';
+import '../../../../../../../attendance/domain/usecases/add_attendance_request_comment_usecase.dart';
+import '../../../../../../../attendance/domain/usecases/get_attendance_request_comments_usecase.dart';
+import '../../../../../../../attendance/domain/entities/attendance_regularize_detail.dart';
+import '../../../../../../../attendance/domain/usecases/get_regularize_request_detail_usecase.dart';
+import '../../../../../../../attendance/domain/usecases/update_regularize_request_status_usecase.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
-import '../../models/regularize_request_model.dart';
-import '../../../leaves/presentation/widgets/activity_section.dart';
+import '../../../../../../../authentication/presentation/pages/login_page.dart';
+import '../../../../../../../user/presentation/bloc/user_profile_bloc.dart';
+import '../../../../../../../user/presentation/bloc/user_profile_state.dart';
+import '../../../../../../../approval/presentation/widgets/approval_action_bar.dart';
+import '../../../../../../../approval/presentation/widgets/reject_remark_sheet.dart';
+import '../../../../../bloc/approvers/approvers_bloc.dart';
+import '../../../leaves/data/datasources/approvers_remote_datasource.dart';
+import '../../../leaves/data/repositories/approvers_repository_impl.dart';
+import '../../../leaves/domain/usecases/get_approvers.dart';
 import '../../../leaves/presentation/widgets/approvers_section.dart';
+import '../../bloc/regularize_detail_bloc.dart';
+import '../../bloc/regularize_detail_event.dart';
+import '../../bloc/regularize_detail_state.dart';
+import '../../models/regularize_request_model.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import '../../../../../../../../core/network/api_client.dart';
+import '../../../../../../../../core/network/network_info.dart';
 import 'apply_regularize_page.dart';
+import '../widgets/regularize_activity_bottom_sheet.dart';
 
 /// Regularize detail page showing full information about a regularize request
 class RegularizeDetailPage extends StatefulWidget {
   final RegularizeRequestModel regularizeRequest;
+  final bool isApprovalMode;
 
   const RegularizeDetailPage({
     super.key,
     required this.regularizeRequest,
+    this.isApprovalMode = false,
   });
 
   @override
@@ -25,171 +59,206 @@ class RegularizeDetailPage extends StatefulWidget {
 
 class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
   final _commentController = TextEditingController();
+  late final RegularizeDetailBloc _regularizeDetailBloc;
+  bool _shouldRefreshListing = false;
+
+  RegularizeRequestModel get _fallbackRequest => widget.regularizeRequest;
+
+  int get _clientId => _resolveClientId();
+
+  @override
+  void initState() {
+    super.initState();
+    final networkInfo = NetworkInfoImpl(Connectivity());
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final remoteDataSource = AttendanceRegularizeRemoteDataSourceImpl(
+      apiClient,
+    );
+    final repository = AttendanceRegularizeRepositoryImpl(
+      remoteDataSource: remoteDataSource,
+      networkInfo: networkInfo,
+    );
+    _regularizeDetailBloc = RegularizeDetailBloc(
+      getRegularizeRequestDetailUseCase: GetRegularizeRequestDetailUseCase(
+        repository,
+      ),
+      updateRegularizeRequestStatusUseCase:
+          UpdateRegularizeRequestStatusUseCase(repository),
+      getAttendanceRequestCommentsUseCase: GetAttendanceRequestCommentsUseCase(
+        repository,
+      ),
+      addAttendanceRequestCommentUseCase: AddAttendanceRequestCommentUseCase(
+        repository,
+      ),
+    )..add(
+      LoadRegularizeDetail(
+        requestId: int.tryParse(widget.regularizeRequest.id) ?? 0,
+        clientId: _clientId,
+      ),
+    );
+  }
 
   @override
   void dispose() {
     _commentController.dispose();
+    _regularizeDetailBloc.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
 
-    return ResponsiveScaffold(
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        leading: GestureDetector(
-          onTap: () => Navigator.of(context).pop(),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.arrow_back_ios,
-                color: Theme.of(context).colorScheme.primary,
-                size: screenWidth * 0.048,
+    return BlocProvider.value(
+      value: _regularizeDetailBloc,
+      child: BlocConsumer<RegularizeDetailBloc, RegularizeDetailState>(
+        listener: (context, state) {
+          if (state is RegularizeDetailStatusUpdated) {
+            _shouldRefreshListing = true;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppColors.success,
               ),
-              Flexible(
-                child: Text(
-                  'Back',
-                  style: AppTextStyles.bodyLarge(context).copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+            );
+          } else if (state is RegularizeDetailError) {
+            debugPrint('--- Regularize Detail Error ---');
+            debugPrint('Error Message: ${state.message}');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppColors.error,
               ),
-            ],
-          ),
-        ),
-        leadingWidth: 110,
-        title: Text(
-          'Regularize',
-          style: AppTextStyles.heading4(context).copyWith(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          PopupMenuButton<String>(
-            icon: Icon(
-              Icons.more_vert,
-              color: AppColors.textPrimary,
-            ),
-            onSelected: (value) {
-              if (value == 'Edit') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ApplyRegularizePage(
-                      regularizeRequest: widget.regularizeRequest,
-                    ),
-                  ),
-                );
-              } else if (value == 'Withdraw') {
-                // Handle withdraw
-              }
+            );
+          }
+        },
+        builder: (context, state) {
+          final screenHeight = MediaQuery.of(context).size.height;
+          final detail = _detailFromState(state);
+          final currentRequest = _currentRequest(detail);
+          final currentStatus = currentRequest.status;
+          final comments = _commentsFromState(state);
+          final isBusy =
+              state is RegularizeDetailLoading ||
+              state is RegularizeDetailStatusUpdating ||
+              state is RegularizeCommentSubmitting;
+
+          return WillPopScope(
+            onWillPop: () async {
+              Navigator.of(context).pop(_shouldRefreshListing);
+              return false;
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'Edit',
-                child: Text('Edit'),
-              ),
-              const PopupMenuItem(
-                value: 'Withdraw',
-                child: Text('Withdraw'),
-              ),
-            ],
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: 3, // Request is active
-        onTap: NavigationHelper.getBottomNavHandler(context),
-      ),
-      body: _buildDetailsContent(context, screenWidth, screenHeight),
-    );
-  }
-
-  Widget _buildDetailsContent(BuildContext context, double screenWidth, double screenHeight) {
-    final statusColor = _getStatusColor(widget.regularizeRequest.status);
-    final dateFormat = DateFormat('dd-MMM-yyyy');
-    final dateTimeFormat = DateFormat('dd-MMM-yyyy HH:mm');
-    
-    // Calculate number of days
-    final numberOfDays = widget.regularizeRequest.toDate != null
-        ? widget.regularizeRequest.toDate!.difference(widget.regularizeRequest.fromDate).inDays + 1
-        : 1;
-
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(screenWidth * 0.022),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title Card with green left border
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.border,
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                  spreadRadius: 0,
-                ),
-              ],
-            ),
-            clipBehavior: Clip.none,
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Colored left border
-                  Container(
-                    width: screenWidth * 0.032, // 3.2% of screen width
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        bottomLeft: Radius.circular(12),
-                      ),
-                    ),
-                  ),
-                  // Content
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.all(screenWidth * 0.042),
+            child: Stack(
+              children: [
+                ResponsiveScaffold(
+                  backgroundColor: AppColors.backgroundMedium,
+                  appBar: AppBar(
+                    forceMaterialTransparency: true,
+                    elevation: 0,
+                    backgroundColor: AppColors.background,
+                    foregroundColor: AppColors.textPrimary,
+                    leading: GestureDetector(
+                      onTap:
+                          () =>
+                              Navigator.of(context).pop(_shouldRefreshListing),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Expanded(
+                          Icon(
+                            Icons.arrow_back_ios,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: screenWidth * 0.048,
+                          ),
+                          Flexible(
                             child: Text(
-                              widget.regularizeRequest.reason,
-                              style: AppTextStyles.heading4(context).copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: statusColor, // Green color for title
+                              'Back',
+                              style: AppTextStyles.bodyMedium(context).copyWith(
+                                fontWeight: FontWeight.w400,
+                                color: Theme.of(context).colorScheme.primary,
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       ),
                     ),
+                    leadingWidth: 110,
+                    title: Text(
+                      widget.isApprovalMode ? 'Regularize Approval' : 'Regularize',
+                      style: AppTextStyles.heading4(context).copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    centerTitle: true,
                   ),
-                ],
-              ),
+                  bottomNavigationBar:
+                      widget.isApprovalMode
+                          ? (currentStatus == RegularizeStatus.pending &&
+                                  currentRequest.isEligibleToApprove
+                              ? ApprovalActionBar(
+                                isLoading:
+                                    state is RegularizeDetailStatusUpdating,
+                                onApprove: () => _updateRequestStatus('Approved'),
+                                onReject:
+                                    () => _showRejectRemarkSheet(context),
+                              )
+                              : null)
+                          : BottomNavBar(
+                            currentIndex: 3,
+                            onTap: NavigationHelper.getBottomNavHandler(context),
+                          ),
+                  body: _buildDetailsContent(
+                    context,
+                    screenWidth,
+                    screenHeight,
+                    detail,
+                    currentRequest,
+                    comments,
+                    state,
+                  ),
+                ),
+                if (isBusy)
+                  Container(
+                    color: Colors.black.withOpacity(0.08),
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+              ],
             ),
-          ),
-          SizedBox(height: screenHeight * 0.02),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDetailsContent(
+    BuildContext context,
+    double screenWidth,
+    double screenHeight,
+    AttendanceRegularizeDetail? detail,
+    RegularizeRequestModel currentRequest,
+    List<AttendanceRequestComment> comments,
+    RegularizeDetailState state,
+  ) {
+    final statusColor = _getStatusColor(currentRequest.status);
+    final dateFormat = DateFormat('dd-MMM-yyyy');
+    final dateTimeFormat = DateFormat('dd-MMM-yyyy HH:mm');
+
+    // Calculate number of days
+    final numberOfDays =
+        currentRequest.toDate != null
+            ? currentRequest.toDate!
+                    .difference(currentRequest.fromDate)
+                    .inDays +
+                1
+            : 1;
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(screenWidth * 0.002),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           // Regularize Details Card
           _buildDetailsCard(
             context,
@@ -199,13 +268,14 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
             dateFormat,
             dateTimeFormat,
             numberOfDays,
+            currentRequest,
+            state,
           ),
           SizedBox(height: screenHeight * 0.02),
           // Description Section
-          _buildDescriptionSection(context, screenWidth, screenHeight),
-          SizedBox(height: screenHeight * 0.02),
+
           // Comments Section
-          _buildCommentsSection(context, screenWidth, screenHeight),
+          _buildCommentsSection(context, screenWidth, screenHeight, comments),
         ],
       ),
     );
@@ -219,15 +289,17 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     DateFormat dateFormat,
     DateFormat dateTimeFormat,
     int numberOfDays,
+    RegularizeRequestModel currentRequest,
+    RegularizeDetailState state,
   ) {
+    final requestId = int.tryParse(widget.regularizeRequest.id) ?? 0;
+    final detail = _detailFromState(state);
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-          width: 1,
-        ),
+        border: Border.all(color: AppColors.border, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -241,38 +313,163 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  currentRequest.reason,
+                  style: AppTextStyles.heading4(context).copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: statusColor, // Green color for title
+                  ),
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
+                onSelected: (value) async {
+                  if (value == 'Edit') {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => ApplyRegularizePage(
+                              regularizeRequest: currentRequest,
+                            ),
+                      ),
+                    );
+                    if (result == true && context.mounted) {
+                      _shouldRefreshListing = true;
+                      context.read<RegularizeDetailBloc>().add(
+                        LoadRegularizeDetail(
+                          requestId: requestId,
+                          clientId: _clientId,
+                        ),
+                      );
+                    }
+                  } else if (value == 'Withdraw') {
+                    context.read<RegularizeDetailBloc>().add(
+                      UpdateRegularizeRequestStatus(
+                        requestId: requestId,
+                        clientId: _clientId,
+                        status: 'Withdrawn',
+                      ),
+                    );
+                  } else if (value == 'Activity') {
+                    _showActivityBottomSheet(
+                      context,
+                      detail?.activity ?? const [],
+                    );
+                  }
+                },
+                itemBuilder:
+                    (context){
+                      final isPending =
+                          currentRequest.status == RegularizeStatus.pending;
+                      return [
+                        if (isPending && !widget.isApprovalMode)
+                          PopupMenuItem(
+                            value: 'Edit',
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: screenWidth * 0.05,
+
+                                  height: screenHeight * 0.05,
+                                  child: SvgPicture.asset(
+                                    AppAssets.editIconwfh,
+                                  ),
+                                ),
+                                SizedBox(width: screenWidth * 0.02),
+                                Text(
+                                  'Edit',
+                                  style: AppTextStyles.heading5(
+                                    context,
+                                  ).copyWith(
+                                    fontWeight: FontWeight.w400,
+                                    color: AppColors.textHeading,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (isPending && !widget.isApprovalMode)
+                          PopupMenuItem(
+                            value: 'Withdraw',
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: screenWidth * 0.05,
+
+                                  height: screenHeight * 0.05,
+                                  child: SvgPicture.asset(
+                                    AppAssets.withdrawIcon,
+                                  ),
+                                ),
+                                SizedBox(width: screenWidth * 0.02),
+                                Text(
+                                  'Withdraw',
+                                  style: AppTextStyles.heading5(
+                                    context,
+                                  ).copyWith(
+                                    fontWeight: FontWeight.w400,
+                                    color: AppColors.textHeading,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        PopupMenuItem(
+                          value: 'Activity',
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: screenWidth * 0.05,
+
+                                height: screenHeight * 0.05,
+                                child: SvgPicture.asset(
+                                  AppAssets.activityIcon,
+                                ),
+                              ),
+                              SizedBox(width: screenWidth * 0.02),
+                              Text(
+                                'Activity',
+                                style: AppTextStyles.heading5(
+                                  context,
+                                ).copyWith(
+                                  fontWeight: FontWeight.w400,
+                                  color: AppColors.textHeading,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ];
+                    }
+
+              ),
+            ],
+          ),
+          SizedBox(height: screenHeight*0.02,),
           _buildDetailRow(
             context,
             'Leave Type:',
-            widget.regularizeRequest.reason,
+            currentRequest.reason,
             screenWidth,
             screenHeight,
           ),
           Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRow(
-            context,
-            'Request Type:',
-            widget.regularizeRequest.toDate == null ? 'Single Day' : 'Multiple Days',
-            screenWidth,
-            screenHeight,
-          ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
+
           _buildDetailRow(
             context,
             'Request For:',
-            widget.regularizeRequest.requestType.displayName,
+            currentRequest.requestType.displayName,
             screenWidth,
             screenHeight,
           ),
           Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRowWithAvatar(
-            context,
-            'Request To:',
-            'Riya Rawat',
-            screenWidth,
-            screenHeight,
-          ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
+
           _buildDetailRow(
             context,
             'No. of Days:',
@@ -284,7 +481,7 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
           _buildDetailRow(
             context,
             'From:',
-            dateFormat.format(widget.regularizeRequest.fromDate),
+            dateFormat.format(currentRequest.fromDate),
             screenWidth,
             screenHeight,
           ),
@@ -292,32 +489,57 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
           _buildDetailRow(
             context,
             'To:',
-            widget.regularizeRequest.toDate != null
-                ? dateFormat.format(widget.regularizeRequest.toDate!)
-                : dateFormat.format(widget.regularizeRequest.fromDate),
+            currentRequest.toDate != null
+                ? dateFormat.format(currentRequest.toDate!)
+                : dateFormat.format(currentRequest.fromDate),
             screenWidth,
             screenHeight,
           ),
           Divider(height: screenHeight * 0.03, color: AppColors.border),
           _buildDetailRow(
             context,
-            'Last Updated At:',
-            dateTimeFormat.format(DateTime.now()),
+            'Check-In:',
+            currentRequest.checkIn != null
+                ? dateTimeFormat.format(currentRequest.checkIn!)
+                : 'N/A',
             screenWidth,
             screenHeight,
           ),
           Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRowWithAvatar(
+          _buildDetailRow(
             context,
-            'Last Updated By:',
-            'Priya Rawat',
+            'Check-Out:',
+            currentRequest.checkOut != null
+                ? dateTimeFormat.format(currentRequest.checkOut!)
+                : 'N/A',
             screenWidth,
             screenHeight,
           ),
+          Divider(height: screenHeight * 0.03, color: AppColors.border),
+          _buildDetailRow(
+            context,
+            'Applied On:',
+            dateTimeFormat.format(currentRequest.appliedDate),
+            screenWidth,
+            screenHeight,
+          ),
+          // Show reject remark if rejected
+          if (currentRequest.status == RegularizeStatus.rejected &&
+              currentRequest.rejectRemark != null) ...[
+            Divider(height: screenHeight * 0.03, color: AppColors.border),
+            _buildDetailRow(
+              context,
+              'Reject Remark:',
+              currentRequest.rejectRemark!,
+              screenWidth,
+              screenHeight,
+            ),
+          ],
+          Divider(height: screenHeight * 0.03, color: AppColors.border),
+          _buildApproversRow(context, screenWidth, screenHeight, detail),
           Divider(height: screenHeight * 0.03, color: AppColors.border),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
                 width: screenWidth * 0.3,
@@ -329,6 +551,7 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                   ),
                 ),
               ),
+              const Spacer(),
               Container(
                 padding: EdgeInsets.symmetric(
                   horizontal: screenWidth * 0.032,
@@ -339,19 +562,136 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  widget.regularizeRequest.status.displayName,
-                  style: AppTextStyles.bodySmall(context).copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white,
-                  ),
+                  currentRequest.status.displayName,
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w500, color: Colors.white),
                 ),
               ),
             ],
+          ),
+          Divider(height: screenHeight * 0.03, color: AppColors.border),
+
+          _buildDescriptionSection(
+            context,
+            screenWidth,
+            screenHeight,
+            currentRequest,
           ),
         ],
       ),
     );
   }
+
+  Widget _buildApproversRow(
+    BuildContext context,
+    double screenWidth,
+    double screenHeight,
+    AttendanceRegularizeDetail? detail,
+  ) {
+    final approvers =
+        detail?.approvers.expand((level) => level.users).toList() ?? const [];
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: screenWidth * 0.3,
+          child: Text(
+            'Approvers:',
+            style: AppTextStyles.bodyMediumHeading(context).copyWith(
+              fontWeight: FontWeight.w500,
+              color: AppColors.textHeading,
+            ),
+          ),
+        ),
+        const Spacer(),
+        if (approvers.isNotEmpty)
+          GestureDetector(
+            onTap: () => _showApproversBottomSheet(context),
+            child: Row(
+              children: [
+                _RegularizeApproverAvatarStack(
+                  approvers: approvers,
+                  avatarSize: screenWidth * 0.07,
+                ),
+                SizedBox(width: screenWidth * 0.02),
+                Text(
+                  approvers.length == 1
+                      ? approvers.first.fullName
+                      : '${approvers.length} approvers',
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Text('—', style: AppTextStyles.bodySmall(context)),
+      ],
+    );
+  }
+
+  ///Approver bottomsheet
+  void _showApproversBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder:
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.5,
+            minChildSize: 0.3,
+            maxChildSize: 0.9,
+            builder:
+                (context, scrollController) => Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: BlocProvider(
+                    create: (context) {
+                      final apiService = ApiService(
+                        networkInfo: NetworkInfoImpl(Connectivity()),
+                        onTokenExpired:
+                            () => AppNavigator.pushAndRemoveAll(
+                              MaterialPageRoute(
+                                builder: (_) => const LoginPage(),
+                              ),
+                            ),
+                      );
+                      final remoteDataSource = ApproversRemoteDataSourceImpl(
+                        apiService: apiService,
+                      );
+                      final repository = ApproversRepositoryImpl(
+                        remoteDataSource: remoteDataSource,
+                      );
+                      final getApprovers = GetApprovers(repository);
+
+                      return ApproversBloc(getApprovers: getApprovers);
+                    },
+                    child: ApproversSection(
+                      scrollController: scrollController,
+                      endpoint: AppUrls.regularizeRequestDetails,
+                      payload: {
+                        'request_id':
+                            int.tryParse(widget.regularizeRequest.id) ?? 0,
+                      },
+                    ),
+                  ),
+                ),
+          ),
+    );
+  }
+
+
 
   Widget _buildDetailRow(
     BuildContext context,
@@ -388,74 +728,16 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     );
   }
 
-  Widget _buildDetailRowWithAvatar(
+  Widget _buildDescriptionSection(
     BuildContext context,
-    String label,
-    String value,
     double screenWidth,
     double screenHeight,
+    RegularizeRequestModel currentRequest,
   ) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        SizedBox(
-          width: screenWidth * 0.3,
-          child: Text(
-            label,
-            style: AppTextStyles.bodyMediumHeading(context).copyWith(
-              fontWeight: FontWeight.w500,
-              color: AppColors.textHeading,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              CircleAvatar(
-                radius: screenWidth * 0.032,
-                backgroundColor: AppColors.primary,
-                child: Text(
-                  value.split(' ').map((n) => n[0]).take(2).join(),
-                  style: AppTextStyles.bodySmall(context).copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              SizedBox(width: screenWidth * 0.021),
-              Text(
-                value,
-                style: AppTextStyles.bodySmall(context).copyWith(
-                  fontWeight: FontWeight.w400,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDescriptionSection(BuildContext context, double screenWidth, double screenHeight) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-            spreadRadius: 0,
-          ),
-        ],
+
       ),
       padding: EdgeInsets.all(screenWidth * 0.042),
       width: double.infinity,
@@ -471,26 +753,29 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
           ),
           SizedBox(height: screenHeight * 0.012),
           Text(
-            widget.regularizeRequest.reason,
-            style: AppTextStyles.bodySmall(context).copyWith(
-              color: AppColors.textSecondary,
-              height: 1.5,
-            ),
+            currentRequest.description?.isNotEmpty == true
+                ? currentRequest.description!
+                : currentRequest.reason,
+            style: AppTextStyles.bodySmall(
+              context,
+            ).copyWith(color: AppColors.textSecondary, height: 1.5),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCommentsSection(BuildContext context, double screenWidth, double screenHeight) {
+  Widget _buildCommentsSection(
+    BuildContext context,
+    double screenWidth,
+    double screenHeight,
+    List<AttendanceRequestComment> comments,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-          width: 1,
-        ),
+        border: Border.all(color: AppColors.border, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -504,41 +789,67 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Comments',
-            style: AppTextStyles.heading5(context).copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Comments',
+                style: AppTextStyles.heading5(context).copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: screenWidth * 0.025,
+                  vertical: screenHeight * 0.004,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.attendanceTeal.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '${comments.length}',
+                  style: AppTextStyles.bodySmall(context).copyWith(
+                    color: AppColors.attendanceTeal,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
           SizedBox(height: screenHeight * 0.015),
+
+            ...comments.map(
+              (comment) => Padding(
+                padding: EdgeInsets.only(bottom: screenHeight * 0.012),
+                child: _buildCommentTile(
+                  context,
+                  screenWidth,
+                  screenHeight,
+                  comment,
+                ),
+              ),
+            ),
+          SizedBox(height: screenHeight * 0.01),
           TextField(
             controller: _commentController,
             decoration: InputDecoration(
               hintText: 'Add a comment...',
-              hintStyle: AppTextStyles.bodyMedium(context).copyWith(
-                color: AppColors.textTertiary,
-              ),
+              hintStyle: AppTextStyles.bodyMedium(
+                context,
+              ).copyWith(color: AppColors.textTertiary),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: AppColors.border,
-                  width: 1,
-                ),
+                borderSide: BorderSide(color: AppColors.border, width: 1),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: AppColors.border,
-                  width: 1,
-                ),
+                borderSide: BorderSide(color: AppColors.border, width: 1),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: AppColors.primary,
-                  width: 1,
-                ),
+                borderSide: BorderSide(color: AppColors.primary, width: 1),
               ),
               contentPadding: EdgeInsets.symmetric(
                 horizontal: screenWidth * 0.032,
@@ -549,21 +860,20 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
             style: AppTextStyles.bodyMedium(context),
           ),
           SizedBox(height: screenHeight * 0.02),
-          // Submit Button
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                if (_commentController.text.isNotEmpty) {
-                  // Handle submit comment
-                  _commentController.clear();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Comment submitted'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                }
+                final comment = _commentController.text.trim();
+                if (comment.isEmpty) return;
+                context.read<RegularizeDetailBloc>().add(
+                  AddRegularizeComment(
+                    requestId: int.tryParse(widget.regularizeRequest.id) ?? 0,
+                    clientId: _clientId,
+                    comment: comment,
+                  ),
+                );
+                _commentController.clear();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -576,9 +886,9 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
               ),
               child: Text(
                 'Submit',
-                style: AppTextStyles.buttonLarge(context).copyWith(
-                  color: AppColors.textWhite,
-                ),
+                style: AppTextStyles.buttonLarge(
+                  context,
+                ).copyWith(color: AppColors.textWhite),
               ),
             ),
           ),
@@ -587,49 +897,148 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     );
   }
 
-  void _showActivityBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.5, // Start at half screen
-        minChildSize: 0.3, // Minimum 30% of screen
-        maxChildSize: 0.9, // Maximum 90% of screen (can be dragged up)
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
+  Widget _buildCommentTile(
+    BuildContext context,
+    double screenWidth,
+    double screenHeight,
+    AttendanceRequestComment comment,
+  ) {
+    final userName =
+        comment.user?.fullName.isNotEmpty == true
+            ? comment.user!.fullName
+            : 'User';
+    final initials =
+        userName
+            .split(' ')
+            .where((part) => part.isNotEmpty)
+            .take(2)
+            .map((part) => part[0].toUpperCase())
+            .join();
+
+    return Container(
+      padding: EdgeInsets.all(screenWidth * 0.035),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: screenWidth * 0.04,
+            backgroundColor:
+                comment.user?.profileColor != null
+                    ? Color(
+                      int.parse(
+                        comment.user!.profileColor!.replaceFirst('#', '0xff'),
+                      ),
+                    )
+                    : AppColors.attendanceTeal,
+            child: Text(
+              initials.isEmpty ? 'U' : initials,
+              style: AppTextStyles.bodySmall(
+                context,
+              ).copyWith(color: Colors.white, fontWeight: FontWeight.w600),
             ),
           ),
-          child: ActivitySection(scrollController: scrollController),
-        ),
+          SizedBox(width: screenWidth * 0.03),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  userName,
+                  style: AppTextStyles.bodyMediumHeading(
+                    context,
+                  ).copyWith(color: AppColors.textPrimary),
+                ),
+                SizedBox(height: screenHeight * 0.004),
+                Text(
+                  comment.comment,
+                  style: AppTextStyles.bodyMedium(
+                    context,
+                  ).copyWith(color: AppColors.textSecondary, height: 1.4),
+                ),
+                SizedBox(height: screenHeight * 0.006),
+                Text(
+                  comment.createdAt != null
+                      ? DateFormat(
+                        'dd MMM yyyy, hh:mm a',
+                      ).format(comment.createdAt!)
+                      : 'N/A',
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(color: AppColors.textTertiary),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  void _showApproversBottomSheet(BuildContext context) {
+  void _showActivityBottomSheet(
+    BuildContext context,
+    List<AttendanceRegularizeActivity> activity,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.5, // Start at half screen
-        minChildSize: 0.3, // Minimum 30% of screen
-        maxChildSize: 0.9, // Maximum 90% of screen (can be dragged up)
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
+      builder:
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.5, // Start at half screen
+            minChildSize: 0.3, // Minimum 30% of screen
+            maxChildSize: 0.9, // Maximum 90% of screen (can be dragged up)
+            builder:
+                (context, scrollController) => Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: RegularizeActivityBottomSheet(
+                    scrollController: scrollController,
+                    activity: activity,
+                  ),
+                ),
+          ),
+    );
+  }
+
+  Future<void> _updateRequestStatus(String status) async {
+    _regularizeDetailBloc.add(
+      UpdateRegularizeRequestStatus(
+        requestId: int.tryParse(widget.regularizeRequest.id) ?? 0,
+        clientId: _clientId,
+        status: status,
+      ),
+    );
+  }
+
+  void _showRejectRemarkSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (sheetContext) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+            ),
+            child: RejectRemarkSheet(
+              onSubmit: (_) async {
+                await _updateRequestStatus('Rejected');
+              },
             ),
           ),
-          child: ApproversSection(scrollController: scrollController),
-        ),
-      ),
     );
   }
 
@@ -641,6 +1050,155 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
         return const Color(0xFF4CAF50); // Green
       case RegularizeStatus.rejected:
         return const Color(0xFFE53935); // Red
+      case RegularizeStatus.withdrawn:
+        return const Color(0xFF667085); // Gray
     }
+  }
+
+  AttendanceRegularizeDetail? _detailFromState(RegularizeDetailState state) {
+    if (state is RegularizeDetailLoaded) return state.detail;
+    if (state is RegularizeDetailStatusUpdating) return state.detail;
+    if (state is RegularizeCommentSubmitting) return state.detail;
+    if (state is RegularizeDetailError) return state.detail;
+    return null;
+  }
+
+  List<AttendanceRequestComment> _commentsFromState(
+    RegularizeDetailState state,
+  ) {
+    if (state is RegularizeDetailLoaded) return state.comments;
+    if (state is RegularizeDetailStatusUpdating) return state.comments;
+    if (state is RegularizeCommentSubmitting) return state.comments;
+    if (state is RegularizeDetailError) return state.comments;
+    return const [];
+  }
+
+  RegularizeRequestModel _currentRequest(AttendanceRegularizeDetail? detail) {
+    if (detail == null) return _fallbackRequest;
+
+    return _fallbackRequest.copyWith(
+      id: detail.id.toString(),
+      requestType: RegularizeRequestModel.parseRequestTypeValue(
+        detail.requestFor,
+      ),
+      fromDate: detail.requestDate ?? _fallbackRequest.fromDate,
+      checkIn: detail.checkIn ?? _fallbackRequest.checkIn,
+      checkOut: detail.checkOut ?? _fallbackRequest.checkOut,
+      reason: detail.reason,
+      description: detail.description ?? _fallbackRequest.description,
+      modeType: detail.modeType ?? _fallbackRequest.modeType,
+      status: RegularizeRequestModel.parseStatusValue(detail.requestStatus),
+      appliedDate: detail.createdAt ?? _fallbackRequest.appliedDate,
+      rejectRemark: detail.rejectRemark ?? _fallbackRequest.rejectRemark,
+    );
+  }
+
+  int _resolveClientId() {
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is UserProfileLoaded) {
+      return profileState.profile.clientId;
+    }
+
+    final token = TokenStorage.getToken();
+    if (token == null || token.isEmpty) {
+      return 0;
+    }
+
+    final decoded = decodeData<Map<String, dynamic>>(token);
+    final clientId = decoded?['client_id'];
+    if (clientId is int) return clientId;
+    if (clientId is String) return int.tryParse(clientId) ?? 0;
+    return 0;
+  }
+}
+
+class _RegularizeApproverAvatar extends StatelessWidget {
+  final AttendanceRegularizeApprover approver;
+  final double size;
+
+  const _RegularizeApproverAvatar({
+    required this.approver,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color bgColor = AppColors.primary;
+    if (approver.profileColor != null && approver.profileColor!.startsWith('#')) {
+      try {
+        bgColor = Color(
+          int.parse(
+            approver.profileColor!.replaceFirst('#', 'FF'),
+            radix: 16,
+          ),
+        );
+      } catch (_) {}
+    }
+
+    return CircleAvatar(
+      radius: size / 2,
+      backgroundColor: bgColor,
+      backgroundImage:
+          approver.imageUrl != null && approver.imageUrl!.isNotEmpty
+              ? NetworkImage(approver.imageUrl!)
+              : null,
+      child:
+          approver.imageUrl == null || approver.imageUrl!.isEmpty
+              ? Text(
+                  approver.firstName.isNotEmpty
+                      ? approver.firstName[0].toUpperCase()
+                      : '?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: size * 0.45,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              : null,
+    );
+  }
+}
+
+class _RegularizeApproverAvatarStack extends StatelessWidget {
+  final List<AttendanceRegularizeApprover> approvers;
+  final double avatarSize;
+
+  const _RegularizeApproverAvatarStack({
+    required this.approvers,
+    required this.avatarSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleApprovers = approvers.take(3).toList();
+    final overlap = avatarSize * 0.35;
+    final width =
+        visibleApprovers.length == 1
+            ? avatarSize
+            : avatarSize +
+                ((visibleApprovers.length - 1) * (avatarSize - overlap));
+
+    return SizedBox(
+      width: width,
+      height: avatarSize,
+      child: Stack(
+        children: [
+          for (var i = 0; i < visibleApprovers.length; i++)
+            Positioned(
+              left: i * (avatarSize - overlap),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: _RegularizeApproverAvatar(
+                  approver: visibleApprovers[i],
+                  size: avatarSize,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

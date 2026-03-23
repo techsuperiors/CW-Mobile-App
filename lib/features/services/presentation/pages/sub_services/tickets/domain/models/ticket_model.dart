@@ -14,6 +14,7 @@ class TicketModel {
   final String? raisedBy;
   final String? raisedByAvatar;
   final List<String>? attachments;
+  final DateTime createdAt; // ✅ Add this
 
   TicketModel({
     required this.ticketId,
@@ -28,6 +29,8 @@ class TicketModel {
     this.raisedBy,
     this.raisedByAvatar,
     this.attachments,
+    required this.createdAt, // ✅ Add this
+
   });
 }
 

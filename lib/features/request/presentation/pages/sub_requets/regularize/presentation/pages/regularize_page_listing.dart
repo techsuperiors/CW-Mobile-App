@@ -1,12 +1,21 @@
+import 'package:collectivWork/core/widgets/permission_guard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/svg.dart';
 
+import '../../../../../../../../core/constants/app_assets.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
+import '../../../../../../../../core/widgets/status_tabbed_section.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
+import '../../../../../widgets/request_listing/request_empty_state.dart';
+import '../../../../../widgets/request_listing/request_grouping_utils.dart';
+import '../../../../../widgets/request_listing/request_tab_theme.dart';
+import '../../../leaves/domain/entities/leave_entity.dart';
 import '../../bloc/regularize_request_bloc.dart';
 import '../../bloc/regularize_request_event.dart';
 import '../../bloc/regularize_request_state.dart';
@@ -23,19 +32,36 @@ class RegularizePageListing extends StatefulWidget {
   State<RegularizePageListing> createState() => _RegularizePageListingState();
 }
 
-class _RegularizePageListingState extends State<RegularizePageListing> {
+class _RegularizePageListingState extends State<RegularizePageListing>
+    with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   RegularizeStatus? _selectedStatusFilter;
+  late TabController _tabController;
+  final List<StatusTabDefinition<RegularizeStatus>> _tabsregulrize = [
+    StatusTabDefinition(label: 'All', status: null),
+    StatusTabDefinition(label: 'Pending', status: RegularizeStatus.pending),
+    StatusTabDefinition(label: 'Approved', status: RegularizeStatus.approved),
+    StatusTabDefinition(label: 'Rejected', status: RegularizeStatus.rejected),
+    StatusTabDefinition(label: 'Withdrawn', status: RegularizeStatus.withdrawn),
+  ];
 
   @override
   void initState() {
     super.initState();
+
+    ///For the tab bar and for controlling the behaviour of it
+    _tabController = TabController(length: _tabsregulrize.length, vsync: this);
+    _tabController.addListener(() {
+      setState(() {});
+    });
     // BlocProvider will load regularize requests automatically in its create method
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.dispose();
+
     super.dispose();
   }
 
@@ -45,9 +71,13 @@ class _RegularizePageListingState extends State<RegularizePageListing> {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return BlocProvider(
-      create: (_) => RegularizeRequestBloc()..add(const LoadRegularizeRequests()),
+      create:
+          (_) => RegularizeRequestBloc()..add(const LoadRegularizeRequests()),
       child: ResponsiveScaffold(
+        backgroundColor: AppColors.backgroundLight,
+
         appBar: AppBar(
+          forceMaterialTransparency: true,
           elevation: 0,
           backgroundColor: AppColors.background,
           foregroundColor: AppColors.textPrimary,
@@ -65,8 +95,8 @@ class _RegularizePageListingState extends State<RegularizePageListing> {
                 Flexible(
                   child: Text(
                     'Back',
-                    style: AppTextStyles.bodyLarge(context).copyWith(
-                      fontWeight: FontWeight.w500,
+                    style: AppTextStyles.bodyMedium(context).copyWith(
+                      fontWeight: FontWeight.w400,
                       color: Theme.of(context).colorScheme.primary,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -90,115 +120,134 @@ class _RegularizePageListingState extends State<RegularizePageListing> {
           onTap: NavigationHelper.getBottomNavHandler(context),
         ),
         body: Builder(
-          builder: (blocContext) => Column(
-            children: [
-              // Search and filter section
-              _buildSearchAndFilterSection(blocContext),
-              // Divider
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.012, // 1.2% of screen width
-                  vertical: screenHeight * 0.01, // 1% of screen height
-                ),
-                child: CustomPaint(
-                  painter: DottedLinePainter(),
-                  size: Size(screenWidth * 0.916, 1), // Account for padding
-                ),
-              ),
-              // Regularize requests list
-              Expanded(
-                child: BlocBuilder<RegularizeRequestBloc, RegularizeRequestState>(
-                  builder: (context, state) {
-                    if (state is RegularizeRequestLoading) {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
-                    }
+          builder:
+              (blocContext) => Column(
+                children: [
+                  // Search and filter section
+                  _buildSearchAndFilterSection(blocContext),
+                  SizedBox(height: screenHeight*0.01),
 
-                    if (state is RegularizeRequestError) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              size: screenWidth * 0.15,
-                              color: AppColors.error,
-                            ),
-                            SizedBox(height: screenHeight * 0.02),
-                            Text(
-                              state.message,
-                              style: AppTextStyles.bodyMedium(context),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      );
-                    }
+                  // Regularize requests list
+                  Expanded(
+                    child: BlocBuilder<
+                      RegularizeRequestBloc,
+                      RegularizeRequestState
+                    >(
+                      builder: (context, state) {
+                        if (state is RegularizeRequestLoading) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
 
-                    if (state is RegularizeRequestLoaded) {
-                      if (state.filteredRegularizeRequests.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.inbox_outlined,
-                                size: screenWidth * 0.15,
-                                color: AppColors.textTertiary,
-                              ),
-                              SizedBox(height: screenHeight * 0.02),
-                              Text(
-                                AppStrings.noData,
-                                style: AppTextStyles.bodyMedium(context).copyWith(
-                                  color: AppColors.textSecondary,
+                        if (state is RegularizeRequestError) {
+                          return
+                            ApiErrorState(
+                              rawMessage: state.message,
+                              onRetry: () {
+                                final bloc =
+                                context.read<RegularizeRequestBloc>();
+                                bloc.add(const LoadRegularizeRequests());
+                              },
+                            );
+                        }
+
+                        if (state is RegularizeRequestLoaded) {
+                          return StatusTabbedSection<
+                            RegularizeStatus,
+                            RegularizeRequestModel
+                          >(
+                            controller: _tabController,
+                            tabs: _tabsregulrize,
+                            items: state.regularizeRequests,
+                            searchQuery: state.searchQuery?.toLowerCase() ?? '',
+                            statusSelector: (item) => item.status,
+                            matchesSearch: (item, query) {
+                              if (query.isEmpty) return true;
+                              return item.reason.toLowerCase().contains(
+                                    query,
+                                  ) ||
+                                  (item.description?.toLowerCase().contains(
+                                        query,
+                                      ) ??
+                                      false) ||
+                                  item.requestType.displayName
+                                      .toLowerCase()
+                                      .contains(query) ||
+                                  (item.regularizedBy?.toLowerCase().contains(
+                                        query,
+                                      ) ??
+                                      false);
+                            },
+                            tabColorBuilder: RequestTabTheme.colorForIndex,
+                            emptyBuilder: (context) => RequestEmptyState(),
+                            listBuilder: (context, list) {
+                              final grouped = RequestGroupingUtils.groupByMonth(
+                                items: list,
+                                dateSelector: (item) => item.appliedDate,
+                              );
+                              return ListView.builder(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: screenHeight * 0.012,
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
+                                itemCount: grouped.length,
+                                itemBuilder: (context, index) {
+                                  final entry = grouped[index];
+                                  if (entry is String) {
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                        top:
+                                            index == 0
+                                                ? 0
+                                                : screenHeight * 0.014,
+                                        bottom: screenHeight * 0.010,
+                                      ),
+                                      child: Text(
+                                        entry,
+                                        style: AppTextStyles.bodySmall(
+                                          context,
+                                        ).copyWith(
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  final req = entry as RegularizeRequestModel;
 
-                      return ListView.builder(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: screenWidth * 0.012, // 1.2% of screen width
-                          vertical: screenHeight * 0.015, // 1.5% of screen height
-                        ),
-                        itemCount: state.filteredRegularizeRequests.length,
-                        itemBuilder: (context, index) {
-                          return RegularizeRequestCard(
-                            regularizeRequest: state.filteredRegularizeRequests[index],
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => RegularizeDetailPage(
-                                    regularizeRequest: state.filteredRegularizeRequests[index],
-                                  ),
-                                ),
+                                  return RegularizeRequestCard(
+                                    regularizeRequest: req,
+                                    onTap: () async {
+                                      final result = await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => RegularizeDetailPage(
+                                                regularizeRequest: req,
+                                              ),
+                                        ),
+                                      );
+                                      if (result == true && context.mounted) {
+                                        context
+                                            .read<RegularizeRequestBloc>()
+                                            .add(
+                                              const LoadRegularizeRequests(),
+                                            );
+                                      }
+                                    },
+                                  );
+                                },
                               );
                             },
                           );
-                        },
-                      );
-                    }
+                        }
 
-                    return const SizedBox.shrink();
-                  },
-                ),
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ],
               ),
-              // Divider before bottom nav
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.042,
-                ),
-                child: CustomPaint(
-                  painter: DottedLinePainter(),
-                  size: Size(screenWidth * 0.916, 1), // Account for padding
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -208,123 +257,110 @@ class _RegularizePageListingState extends State<RegularizePageListing> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: screenWidth * 0.012, // 1.2% of screen width
-        vertical: screenHeight * 0.015, // 1.5% of screen height
-      ),
-      child: Row(
-        children: [
-          // Search bar
-          Expanded(
-            child: Container(
-              height: screenHeight * 0.055, // 5.5% of screen height
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.border,
-                  width: 1,
+    return Row(
+      children: [
+        // Search bar
+        Expanded(
+          child: Container(
+            height: screenHeight * 0.050, // 5.0% of screen height
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F2F2), // light grey background
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: AppStrings.search,
-                  hintStyle: AppTextStyles.bodySmall(context).copyWith(
-                    color: AppColors.textTertiary,
-                  ),
-                  prefixIcon: Padding(
-                    padding: EdgeInsets.all(screenWidth * 0.032),
-                    child: Icon(
-                      Icons.search,
-                      size: screenWidth * 0.048, // 4.8% of screen width
-                      color: AppColors.textSecondary,
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              textAlignVertical: TextAlignVertical.center,
+              decoration: InputDecoration(
+                hintText: AppStrings.search,
+                hintStyle: AppTextStyles.bodyMedium(
+                  context,
+                ).copyWith(color: AppColors.textTertiary),
+                prefixIcon: Padding(
+                  padding: EdgeInsets.all(screenWidth * 0.03),
+                  child: SvgPicture.asset(
+                    AppAssets.searchIcon,
+                    width: screenWidth * 0.045,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.grey,
+                      BlendMode.srcIn,
                     ),
                   ),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: screenWidth * 0.032, // 3.2% of screen width
-                    vertical: screenHeight * 0.012, // 1.2% of screen height
-                  ),
                 ),
-                style: AppTextStyles.bodyMedium(context),
-                onChanged: (value) {
-                  context.read<RegularizeRequestBloc>().add(SearchRegularizeRequests(value));
-                },
+
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8), // 👈 curved border
+                  borderSide: BorderSide.none,
+                ),
+
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: screenHeight * 0.010,
+                ),
               ),
+
+              style: AppTextStyles.bodyMedium(context),
+              onChanged: (value) {
+                context.read<RegularizeRequestBloc>().add(
+                  SearchRegularizeRequests(value),
+                );
+              },
             ),
           ),
-          SizedBox(width: screenWidth * 0.021), // 2.1% of screen width
-          // Filter icon button (square with rounded corners)
-          Container(
-            width: screenHeight * 0.055, // 5.5% of screen height
-            height: screenHeight * 0.055,
-            decoration: BoxDecoration(
-              color: AppColors.backgroundLight,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppColors.border,
-                width: 1,
-              ),
-            ),
+        ),
+        SizedBox(width: screenWidth * 0.042), // 4.2% of screen width
+        // Add button (green circular button with plus) - opens form page
+        PermissionGuard(
+          requiredPermission: "Attendance:Regularize:Write",
+          child: SizedBox(
+            height: screenHeight * 0.050,// 5.0% of screen height
+
+
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () {
-                  _showFilterBottomSheet(context);
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Center(
-                  child: Icon(
-                    Icons.filter_alt, // Funnel/filter icon
-                    size: screenWidth * 0.048, // 4.8% of screen width
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SizedBox(width: screenWidth * 0.021), // 2.1% of screen width
-          // Add button (green circular button with plus) - opens form page
-          Container(
-            width: screenHeight * 0.055, // 5.5% of screen height
-            height: screenHeight * 0.055,
-            decoration: BoxDecoration(
-              color: AppColors.success,
-              shape: BoxShape.circle,
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  Navigator.push(
+                onTap: () async {
+                  final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const ApplyRegularizePage(),
                     ),
                   );
+                  if (result == true && context.mounted) {
+                    context.read<RegularizeRequestBloc>().add(
+                      const LoadRegularizeRequests(),
+                    );
+                  }
                 },
                 customBorder: const CircleBorder(),
-                child: Center(
-                  child: Icon(
-                    Icons.add,
-                    color: Colors.white,
-                    size: screenWidth * 0.053, // 5.3% of screen width
-                  ),
-                ),
+                child: SvgPicture.asset(AppAssets.addIcon),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   void _showFilterBottomSheet(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     // Get current filter state from bloc using the context that has BlocProvider
     final bloc = context.read<RegularizeRequestBloc>();
     final currentState = bloc.state;
@@ -338,99 +374,118 @@ class _RegularizePageListingState extends State<RegularizePageListing> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (bottomSheetContext) => StatefulBuilder(
-        builder: (bottomSheetContext, setModalState) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          padding: EdgeInsets.all(screenWidth * 0.042),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Filter by Status',
-                style: AppTextStyles.heading4(bottomSheetContext),
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              // Filter options
-              _buildFilterOption(
-                bottomSheetContext,
-                'All',
-                null,
-                _selectedStatusFilter == null,
-                () {
-                  setModalState(() {
-                    _selectedStatusFilter = null;
-                  });
-                },
-              ),
-              _buildFilterOption(
-                bottomSheetContext,
-                'Pending',
-                RegularizeStatus.pending,
-                _selectedStatusFilter == RegularizeStatus.pending,
-                () {
-                  setModalState(() {
-                    _selectedStatusFilter = RegularizeStatus.pending;
-                  });
-                },
-              ),
-              _buildFilterOption(
-                bottomSheetContext,
-                'Approved',
-                RegularizeStatus.approved,
-                _selectedStatusFilter == RegularizeStatus.approved,
-                () {
-                  setModalState(() {
-                    _selectedStatusFilter = RegularizeStatus.approved;
-                  });
-                },
-              ),
-              _buildFilterOption(
-                bottomSheetContext,
-                'Rejected',
-                RegularizeStatus.rejected,
-                _selectedStatusFilter == RegularizeStatus.rejected,
-                () {
-                  setModalState(() {
-                    _selectedStatusFilter = RegularizeStatus.rejected;
-                  });
-                },
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              // Apply button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(bottomSheetContext);
-                    // Use the bloc instance from the outer context
-                    bloc.add(FilterRegularizeRequestsByStatus(_selectedStatusFilter));
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: EdgeInsets.symmetric(
-                      vertical: screenHeight * 0.018,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+      builder:
+          (bottomSheetContext) => StatefulBuilder(
+            builder:
+                (bottomSheetContext, setModalState) => Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
                     ),
                   ),
-                  child: Text(
-                    'Apply Filter',
-                    style: AppTextStyles.buttonMedium(bottomSheetContext),
+                  padding: EdgeInsets.all(screenWidth * 0.042),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Filter by Status',
+                        style: AppTextStyles.heading4(bottomSheetContext),
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      // Filter options
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'All',
+                        null,
+                        _selectedStatusFilter == null,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = null;
+                          });
+                        },
+                      ),
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'Pending',
+                        RegularizeStatus.pending,
+                        _selectedStatusFilter == RegularizeStatus.pending,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = RegularizeStatus.pending;
+                          });
+                        },
+                      ),
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'Approved',
+                        RegularizeStatus.approved,
+                        _selectedStatusFilter == RegularizeStatus.approved,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = RegularizeStatus.approved;
+                          });
+                        },
+                      ),
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'Rejected',
+                        RegularizeStatus.rejected,
+                        _selectedStatusFilter == RegularizeStatus.rejected,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = RegularizeStatus.rejected;
+                          });
+                        },
+                      ),
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'Withdrawn',
+                        RegularizeStatus.withdrawn,
+                        _selectedStatusFilter == RegularizeStatus.withdrawn,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = RegularizeStatus.withdrawn;
+                          });
+                        },
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      // Apply button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(bottomSheetContext);
+                            // Use the bloc instance from the outer context
+                            bloc.add(
+                              FilterRegularizeRequestsByStatus(
+                                _selectedStatusFilter,
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: EdgeInsets.symmetric(
+                              vertical: screenHeight * 0.018,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            'Apply Filter',
+                            style: AppTextStyles.buttonMedium(
+                              bottomSheetContext,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
           ),
-        ),
-      ),
     );
   }
 
@@ -446,13 +501,13 @@ class _RegularizePageListingState extends State<RegularizePageListing> {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(
-          vertical: screenHeight * 0.015,
-        ),
+        padding: EdgeInsets.symmetric(vertical: screenHeight * 0.015),
         child: Row(
           children: [
             Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+              isSelected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
             ),
             SizedBox(width: MediaQuery.of(context).size.width * 0.032),
@@ -474,21 +529,18 @@ class _RegularizePageListingState extends State<RegularizePageListing> {
 class DottedLinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.border
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
+    final paint =
+        Paint()
+          ..color = AppColors.border
+          ..strokeWidth = 1
+          ..style = PaintingStyle.stroke;
 
     const dashWidth = 3.0;
     const dashSpace = 3.0;
     double startX = 0;
 
     while (startX < size.width) {
-      canvas.drawLine(
-        Offset(startX, 0),
-        Offset(startX + dashWidth, 0),
-        paint,
-      );
+      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
       startX += dashWidth + dashSpace;
     }
   }

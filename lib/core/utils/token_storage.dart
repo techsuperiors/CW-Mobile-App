@@ -36,7 +36,31 @@ class TokenStorage {
   /// Clear all app data (SharedPreferences) - used on logout
   static Future<bool> clearAll() async {
     await init();
-    return await _prefs!.clear();
+
+    // Define keys that should be preserved across logouts (app preferences and remember me)
+    final preservedKeys = {
+      AppConstants.savedEmailKey,
+      AppConstants.savedPasswordKey,
+      AppConstants.rememberMeKey,
+      AppConstants.savedAccountsKey,
+      AppConstants.themeKey,
+      AppConstants.languageKey,
+    };
+
+    bool allCleared = true;
+
+    // Iterate through all current keys in SharedPreferences
+    final keys = _prefs!.getKeys();
+    for (String key in keys) {
+      if (!preservedKeys.contains(key)) {
+        final success = await _prefs!.remove(key);
+        if (!success) {
+          allCleared = false;
+        }
+      }
+    }
+
+    return allCleared;
   }
 
   /// Check if token exists
@@ -45,4 +69,3 @@ class TokenStorage {
     return token != null && token.isNotEmpty;
   }
 }
-

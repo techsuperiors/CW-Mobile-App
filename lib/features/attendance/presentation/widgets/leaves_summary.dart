@@ -1,3 +1,4 @@
+import 'package:collectivWork/core/extension/string_extensions.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../../../../core/utils/responsive_utils.dart';
@@ -22,7 +23,7 @@ class LeavesSummary extends StatelessWidget {
   /// Get mapped leave types with colors
   List<Map<String, dynamic>> _getMappedLeaveTypes() {
     if (leaveTypes == null) return [];
-    
+
     return leaveTypes!.leaveTypes.map((type) {
       return {
         'label': type.leaveType,
@@ -32,9 +33,12 @@ class LeavesSummary extends StatelessWidget {
     }).toList();
   }
 
-  int _getTotalLeaves() {
+  double _getTotalLeaves() {
     final mappedTypes = _getMappedLeaveTypes();
-    return mappedTypes.fold<int>(0, (sum, type) => sum + (type['count'] as int));
+    return mappedTypes.fold<double>(
+      0.0,
+      (sum, type) => sum + (type['count'] as double),
+    );
   }
 
   Color _getColorForLeaveType(String leaveType) {
@@ -51,6 +55,17 @@ class LeavesSummary extends StatelessWidget {
       return AppColors.leavePaidHoliday;
     } else if (type.contains('lop') || type.contains('loss')) {
       return AppColors.error;
+    } else if (type.contains('privilege')) {
+      return AppColors.leaveprivilage;
+    } else if (type.contains('comp-off')) {
+      return AppColors.leavecompoff;
+    } else if (type.contains('emergency')) {
+      return AppColors.leaveEmergency;
+    }
+    else if (type.contains('ozi')) {
+      return AppColors.ozicasualLeave;
+    } else if (type.contains('planned')) {
+      return AppColors.serviceBlue;
     }
     // Default color for unknown types
     return AppColors.serviceTeal;
@@ -60,45 +75,37 @@ class LeavesSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.042), // ~4.2% of screen width
+      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.042),
+      // ~4.2% of screen width
       child: Container(
         padding: EdgeInsets.all(screenWidth * 0.053), // ~5.3% of screen width
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.textPrimary.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-            gradient: LinearGradient(
-              begin: Alignment.bottomRight,
-              end: Alignment.topLeft,
-              colors: [
-                AppColors.background,
-                AppColors.background,
-                AppColors.attendanceGradientLight.withOpacity(0.3),
-              ],
-              stops: const [0.0, 0.7, 1.0],
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.textPrimary.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-          ),
+          ],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Title
             Text(
               'Leaves',
-              style: AppTextStyles.heading4(context).copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
+              style: AppTextStyles.heading5(
+                context,
+              ).copyWith(color: AppColors.textSecondary),
             ),
             SizedBox(
-              height: MediaQuery.of(context).size.height * 0.02, // 2% of screen height
+              height:
+                  MediaQuery.of(context).size.height *
+                  0.02, // 2% of screen height
             ),
             // Content: Loading, Error, or Data
             if (isLoading)
@@ -116,9 +123,9 @@ class LeavesSummary extends StatelessWidget {
                     children: [
                       Text(
                         errorMessage!,
-                        style: AppTextStyles.bodyMedium(context).copyWith(
-                          color: AppColors.error,
-                        ),
+                        style: AppTextStyles.bodyMedium(
+                          context,
+                        ).copyWith(color: AppColors.error),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -131,9 +138,9 @@ class LeavesSummary extends StatelessWidget {
                   padding: const EdgeInsets.all(16.0),
                   child: Text(
                     'No leave types available',
-                    style: AppTextStyles.bodyMedium(context).copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                    style: AppTextStyles.bodyMedium(
+                      context,
+                    ).copyWith(color: AppColors.textSecondary),
                   ),
                 ),
               )
@@ -141,6 +148,7 @@ class LeavesSummary extends StatelessWidget {
               // Content: Legend and Chart
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   // Left side: Legend
                   Expanded(
@@ -148,56 +156,67 @@ class LeavesSummary extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: _getMappedLeaveTypes().map((type) {
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: screenHeight * 0.015), // 1.5% of screen height
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: type['color'] as Color,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                '${type['label']} (${(type['count'] as int).toString().padLeft(2, '0')})',
-                                style: AppTextStyles.bodyMedium(context).copyWith(
-                                  color: AppColors.textSecondary,
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: screenHeight * 0.015,
+                          ),
+                          // 1.5% of screen height
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: type['color'] as Color,
+                                  shape: BoxShape.circle,
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  '${(type['label'] as String).capitalizeFirst()} (${_getTotalLeaves() > 0 ? ((type['count'] as double) / _getTotalLeaves() * 100).toStringAsFixed(1) : '0.0'}%)',
+                                  // '${(type['label'] as String).capitalizeFirst()} (${(type['count'] as num).toString().padLeft(2, '0')})',
+                                  style: AppTextStyles.bodySmall(context)
+                                      .copyWith(
+                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
-                ),
-                // Right side: Donut Chart
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        height: MediaQuery.of(context).size.width * 0.40, // 40% of screen width
-                        width: MediaQuery.of(context).size.width * 0.40,
-                        child: CustomPaint(
-                          painter: DonutChartPainter(leaveTypes: _getMappedLeaveTypes()),
+                  // Right side: Donut Chart
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          height:
+                              MediaQuery.of(context).size.width *
+                              0.30, // 40% of screen width
+                          width: MediaQuery.of(context).size.width * 0.32,
+                          child: CustomPaint(
+                            painter: DonutChartPainter(
+                              leaveTypes: _getMappedLeaveTypes(),
+                            ),
+                          ),
                         ),
-                      ),
-                      SizedBox(height: screenHeight * 0.01), // 1% of screen height
-                      // Total Leaves
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
+                        SizedBox(height: screenHeight * 0.01),
+                        // 1% of screen height
+                        // Total Leaves
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
                               _getTotalLeaves().toString(),
                               style: AppTextStyles.heading3(context).copyWith(
                                 fontWeight: FontWeight.bold,
@@ -205,136 +224,39 @@ class LeavesSummary extends StatelessWidget {
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          SizedBox(width: screenWidth * 0.011), // ~1.1% of screen width
-                          Flexible(
-                            child: Text(
-                              'Total Leaves',
-                              style: AppTextStyles.bodySmall(context).copyWith(
-                                color: Colors.grey[600],
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    )/*Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: ResponsiveUtils.responsiveCardPadding(context),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title
-            Text(
-              'Leaves',
-              style: AppTextStyles.heading4(context).copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-            ),
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.02, // 2% of screen height
-            ),
-            // Content: Legend and Chart
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Left side: Legend
-                Expanded(
-                  flex: 1,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: leaveTypes.map((type) {
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: screenHeight * 0.015), // 1.5% of screen height
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: type['color'] as Color,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
+                            SizedBox(width: screenWidth * 0.011),
+                            // ~1.1% of screen width
                             Flexible(
                               child: Text(
-                                '${type['label']} (${(type['count'] as int).toString().padLeft(2, '0')})',
-                                style: AppTextStyles.bodyMedium(context).copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                                'Total Leaves',
+                                style: AppTextStyles.bodySmall(
+                                  context,
+                                ).copyWith(color: Colors.grey[600]),
+                                overflow: TextOverflow.visible,
+                                // allow wrapping
+                                softWrap: true,
                               ),
                             ),
                           ],
                         ),
-                      );
-                    }).toList(),
+                      ],
+                    ),
                   ),
-                ),
-                // Right side: Donut Chart
-                Expanded(
-                  flex: 1,
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        height: MediaQuery.of(context).size.width * 0.40, // 40% of screen width
-                        width: MediaQuery.of(context).size.width * 0.40,
-                        child: CustomPaint(
-                          painter: DonutChartPainter(leaveTypes: leaveTypes),
-                        ),
-                      ),
-                      SizedBox(height: screenHeight * 0.01), // 1% of screen height
-                      // Total Leaves
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            totalLeaves.toString(),
-                            style: AppTextStyles.heading2(context).copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[800],
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Total Leaves',
-                            style: AppTextStyles.bodySmall(context).copyWith(
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+                ],
+              ),
           ],
         ),
       ),
-    )*/;
+    );
   }
 }
 
-/// Custom painter for donut chart
+/// Custom painter for donut chart with white gaps between segments
 class DonutChartPainter extends CustomPainter {
   final List<Map<String, dynamic>> leaveTypes;
+
+  /// Gap between segments in radians
+  static const double _gapAngle = 0.05;
 
   DonutChartPainter({required this.leaveTypes});
 
@@ -342,36 +264,47 @@ class DonutChartPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 10;
-    
-    final total = leaveTypes.fold<int>(0, (sum, type) => sum + (type['count'] as int));
+
+    final total = leaveTypes.fold<double>(
+      0.0,
+      (sum, type) => sum + (type['count'] as double),
+    );
+
+    if (total == 0) return;
+
     var startAngle = -math.pi / 2;
-    
+
     for (final type in leaveTypes) {
-      final value = type['count'] as int;
+      final value = type['count'] as double;
+      if (value == 0) continue; // skip zero-value segments
+
       final color = type['color'] as Color;
-      final sweepAngle = (value / total) * 2 * math.pi;
-      
+
+      // Full proportional sweep minus the gap on each side
+      final fullSweep = (value / total) * 2 * math.pi;
+      final sweepAngle = fullSweep - _gapAngle;
+
       final paint = Paint()
         ..color = color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 20
-        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 13
+        ..strokeCap = StrokeCap
+            .butt // flat ends so gaps stay clean
         ..isAntiAlias = true;
-      
+
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
-        startAngle,
+        startAngle + (_gapAngle / 2), // center the arc within the gap
         sweepAngle,
         false,
         paint,
       );
-      
-      startAngle += sweepAngle;
+
+      startAngle += fullSweep;
     }
   }
 
   @override
-  bool shouldRepaint(DonutChartPainter oldDelegate) => false;
+  bool shouldRepaint(DonutChartPainter oldDelegate) =>
+      oldDelegate.leaveTypes != leaveTypes;
 }
-
-

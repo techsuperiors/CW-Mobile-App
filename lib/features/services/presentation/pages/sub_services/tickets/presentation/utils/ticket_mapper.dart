@@ -4,36 +4,28 @@ import '../../domain/models/ticket_model.dart';
 /// Mapper to convert Ticket entity to TicketModel
 class TicketMapper {
   static TicketModel toTicketModel(Ticket ticket) {
-    // Format date from ISO string to readable format
-    String formatDate(String isoDate) {
-      try {
-        final date = DateTime.parse(isoDate);
-        return '${date.day}/${date.month}/${date.year}';
-      } catch (e) {
-        return isoDate;
-      }
-    }
-
-    // Get category name, fallback to empty string
-    final category = ticket.subcategoryName ?? ticket.categoryName;
-
     return TicketModel(
       ticketId: ticket.id,
       id: ticket.ticketID,
-      title: ticket.subject,
+      title: ticket.subject.length > 30
+          ? '${ticket.subject.substring(0, 30)}...'
+          : ticket.subject,
       fullTitle: ticket.subject,
-      category: category,
-      raisedDate: formatDate(ticket.createdAt),
+      category: ticket.categoryName,
+      raisedDate: ticket.createdAt,
       priority: ticket.priority,
       status: ticket.ticketStatus,
-      description: null,
+      createdAt: DateTime.parse(ticket.createdAt), // ✅ Parse here
       raisedBy: ticket.createdByUser.fullName,
-      raisedByAvatar: ticket.createdByUser.imageUrl,
-      attachments: null,
     );
   }
-
+  // static List<TicketModel> toTicketModelList(List<Ticket> tickets)
+  // {
+  //   return tickets.map((ticket) => toTicketModel(ticket)).toList();
+  // }
   static List<TicketModel> toTicketModelList(List<Ticket> tickets) {
-    return tickets.map((ticket) => toTicketModel(ticket)).toList();
+    final list = tickets.map((e) => toTicketModel(e)).toList();
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
   }
 }

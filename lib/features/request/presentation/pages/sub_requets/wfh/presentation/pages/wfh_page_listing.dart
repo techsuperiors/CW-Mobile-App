@@ -1,15 +1,28 @@
+import 'package:collectivWork/core/widgets/permission_guard.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:intl/intl.dart';
 
+import '../../../../../../../../core/constants/app_assets.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/network/api_client.dart';
+import '../../../../../../../../core/network/network_info.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
+import '../../../../../../../../core/widgets/status_tabbed_section.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../bloc/wfh_request_bloc.dart';
 import '../../bloc/wfh_request_event.dart';
 import '../../bloc/wfh_request_state.dart';
+import '../../data/datasources/wfh_remote_datasource.dart';
+import '../../data/repositories/wfh_repository_impl.dart';
+import '../../domain/usecases/get_wfh_requests.dart';
 import '../../models/wfh_request_model.dart';
 import '../widgets/wfh_request_card.dart';
 import 'wfh_detail_page.dart';
@@ -23,19 +36,33 @@ class WfhPageListing extends StatefulWidget {
   State<WfhPageListing> createState() => _WfhPageListingState();
 }
 
-class _WfhPageListingState extends State<WfhPageListing> {
+class _WfhPageListingState extends State<WfhPageListing>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   WfhStatus? _selectedStatusFilter;
+  late TabController _tabController;
+  static const List<StatusTabDefinition<WfhStatus>> _tabs = [
+    StatusTabDefinition(label: 'All', status: null),
+    StatusTabDefinition(label: 'Pending', status: WfhStatus.pending),
+    StatusTabDefinition(label: 'Approved', status: WfhStatus.approved),
+    StatusTabDefinition(label: 'Rejected', status: WfhStatus.rejected),
+  ];
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: _tabs.length, vsync: this);
+    _tabController.addListener(() {
+      setState(() {});
+    });
     // BlocProvider will load WFH requests automatically in its create method
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.dispose();
+
     super.dispose();
   }
 
@@ -44,11 +71,23 @@ class _WfhPageListingState extends State<WfhPageListing> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
+    final networkInfo = NetworkInfoImpl(Connectivity());
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final remoteDataSource = WfhRemoteDataSourceImpl(apiClient: apiClient);
+    final repository = WfhRepositoryImpl(remoteDataSource: remoteDataSource);
+    final getWfhRequestsUseCase = GetWfhRequestsUseCase(repository);
+
     return BlocProvider(
-      create: (_) => WfhRequestBloc()..add(const LoadWfhRequests()),
+      create:
+          (_) =>
+              WfhRequestBloc(getWfhRequestsUseCase: getWfhRequestsUseCase)
+                ..add(const LoadWfhRequests()),
       child: ResponsiveScaffold(
+        backgroundColor: AppColors.backgroundLight,
+
         appBar: AppBar(
           elevation: 0,
+          forceMaterialTransparency: true,
           backgroundColor: AppColors.background,
           foregroundColor: AppColors.textPrimary,
           leading: GestureDetector(
@@ -65,8 +104,8 @@ class _WfhPageListingState extends State<WfhPageListing> {
                 Flexible(
                   child: Text(
                     'Back',
-                    style: AppTextStyles.bodyLarge(context).copyWith(
-                      fontWeight: FontWeight.w500,
+                    style: AppTextStyles.bodyMedium(context).copyWith(
+                      fontWeight: FontWeight.w400,
                       color: Theme.of(context).colorScheme.primary,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -90,118 +129,186 @@ class _WfhPageListingState extends State<WfhPageListing> {
           onTap: NavigationHelper.getBottomNavHandler(context),
         ),
         body: Builder(
-          builder: (blocContext) => Column(
-            children: [
-              // Search and filter section
-              _buildSearchAndFilterSection(blocContext),
-              // Divider
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.012, // 1.2% of screen width
-                  vertical: screenHeight * 0.01, // 1% of screen height
-                ),
-                child: CustomPaint(
-                  painter: DottedLinePainter(),
-                  size: Size(screenWidth * 0.916, 1), // Account for padding
-                ),
-              ),
-              // WFH requests list
-              Expanded(
-                child: BlocBuilder<WfhRequestBloc, WfhRequestState>(
-                  builder: (context, state) {
-                    if (state is WfhRequestLoading) {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
-                    }
+          builder:
+              (blocContext) => Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  // Search and filter section
+                  _buildSearchAndFilterSection(blocContext),
+                  SizedBox(height: screenHeight * 0.01),
+                  Expanded(
+                    child: BlocBuilder<WfhRequestBloc, WfhRequestState>(
+                      builder: (context, state) {
+                        if (state is WfhRequestLoading) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
 
-                    if (state is WfhRequestError) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              size: screenWidth * 0.15,
-                              color: AppColors.error,
-                            ),
-                            SizedBox(height: screenHeight * 0.02),
-                            Text(
-                              state.message,
-                              style: AppTextStyles.bodyMedium(context),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      );
-                    }
+                        if (state is WfhRequestError) {
+                          return ApiErrorState(
+                            rawMessage: state.message,
+                            onRetry: () {
+                              final bloc = context.read<WfhRequestBloc>();
+                              bloc.add(const LoadWfhRequests());
+                            },
+                          );
+                        }
 
-                    if (state is WfhRequestLoaded) {
-                      if (state.filteredWfhRequests.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.inbox_outlined,
-                                size: screenWidth * 0.15,
-                                color: AppColors.textTertiary,
-                              ),
-                              SizedBox(height: screenHeight * 0.02),
-                              Text(
-                                AppStrings.noData,
-                                style: AppTextStyles.bodyMedium(context).copyWith(
-                                  color: AppColors.textSecondary,
+                        if (state is WfhRequestLoaded) {
+                          return StatusTabbedSection<
+                            WfhStatus,
+                            WfhRequestModel
+                          >(
+                            controller: _tabController,
+                            tabs: _tabs,
+                            items: state.wfhRequests,
+                            searchQuery: state.searchQuery?.toLowerCase() ?? '',
+                            statusSelector: (item) => item.status,
+                            matchesSearch: (item, query) {
+                              if (query.isEmpty) return true;
+                              return (item.subject?.toLowerCase().contains(
+                                        query,
+                                      ) ??
+                                      false) ||
+                                  item.reason.toLowerCase().contains(query);
+                            },
+                            tabColorBuilder: _getTabColor,
+                            emptyBuilder:
+                                (context) => _buildEmpty(
+                                  context,
+                                  screenWidth,
+                                  screenHeight,
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      return ListView.builder(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: screenWidth * 0.012, // 1.2% of screen width
-                          vertical: screenHeight * 0.015, // 1.5% of screen height
-                        ),
-                        itemCount: state.filteredWfhRequests.length,
-                        itemBuilder: (context, index) {
-                          return WfhRequestCard(
-                            wfhRequest: state.filteredWfhRequests[index],
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => WfhDetailPage(
-                                    wfhRequest: state.filteredWfhRequests[index],
-                                  ),
+                            listBuilder: (context, list) {
+                              final grouped = _groupByMonth(list);
+                              return ListView.builder(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: screenHeight * 0.012,
                                 ),
+                                itemCount: grouped.length,
+                                itemBuilder: (context, index) {
+                                  final entry = grouped[index];
+                                  if (entry is String) {
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                        top:
+                                            index == 0
+                                                ? 0
+                                                : screenHeight * 0.014,
+                                        bottom: screenHeight * 0.010,
+                                      ),
+                                      child: Text(
+                                        entry,
+                                        style: AppTextStyles.bodySmall(
+                                          context,
+                                        ).copyWith(
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  final req = entry as WfhRequestModel;
+                                  return WfhRequestCard(
+                                    wfhRequest: req,
+                                    onTap: () async {
+                                      final result = await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => WfhDetailPage(
+                                                wfhRequest: req,
+                                              ),
+                                        ),
+                                      );
+                                      if (result == true && context.mounted) {
+                                        context.read<WfhRequestBloc>().add(
+                                          const LoadWfhRequests(),
+                                        );
+                                      }
+                                    },
+                                  );
+                                },
                               );
                             },
                           );
-                        },
-                      );
-                    }
-
-                    return const SizedBox.shrink();
-                  },
-                ),
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ],
               ),
-              // Divider before bottom nav
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.042,
-                ),
-                child: CustomPaint(
-                  painter: DottedLinePainter(),
-                  size: Size(screenWidth * 0.916, 1), // Account for padding
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
+  }
+
+  /// Returns a flat list of month-header Strings interleaved with WfhRequestModel items
+  List<dynamic> _groupByMonth(List<WfhRequestModel> requests) {
+    final result = <dynamic>[];
+    String? lastMonth;
+
+    for (final req in requests) {
+      // Parse the first date from dateRange (assumes ISO or parseable date on model)
+      // Fallback: use req.startDate if available, otherwise skip header
+      final monthLabel = _monthLabel(req);
+      if (monthLabel != lastMonth) {
+        result.add(monthLabel);
+        lastMonth = monthLabel;
+      }
+      result.add(req);
+    }
+    return result;
+  }
+
+  String _monthLabel(WfhRequestModel req) {
+    try {
+      // Try parsing startDate from model; adjust field name as needed
+      final date = req.appliedDate; // DateTime
+      return DateFormat('MMMM yyyy').format(date);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Widget _buildEmpty(BuildContext context, double w, double h) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.inbox_outlined,
+            size: w * 0.15,
+            color: AppColors.textTertiary,
+          ),
+          SizedBox(height: h * 0.02),
+          Text(
+            AppStrings.noData,
+            style: AppTextStyles.bodyMedium(
+              context,
+            ).copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getTabColor(int index) {
+    switch (index) {
+      case 0:
+        return const Color(0xFFE91E8C); // All → Pink
+      case 1:
+        return const Color(0xFF0086C9); // Pending
+      case 2:
+        return const Color(0xFF12B76A); // Approved
+      case 3:
+        return const Color(0xFFF04438); // Rejected
+      default:
+        return Colors.grey;
+    }
   }
 
   Widget _buildSearchAndFilterSection(BuildContext context) {
@@ -209,109 +316,97 @@ class _WfhPageListingState extends State<WfhPageListing> {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: screenWidth * 0.012, // 1.2% of screen width
-        vertical: screenHeight * 0.015, // 1.5% of screen height
-      ),
+      padding: EdgeInsets.zero,
       child: Row(
         children: [
           // Search bar
           Expanded(
             child: Container(
-              height: screenHeight * 0.055, // 5.5% of screen height
+              height: screenHeight * 0.050,
               decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.border,
-                  width: 1,
-                ),
+                color: const Color(0xFFF2F2F2), // light grey background
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: TextField(
                 controller: _searchController,
+
+                textAlignVertical: TextAlignVertical.center,
+                style: AppTextStyles.bodyMedium(context),
                 decoration: InputDecoration(
                   hintText: AppStrings.search,
-                  hintStyle: AppTextStyles.bodySmall(context).copyWith(
-                    color: AppColors.textTertiary,
-                  ),
+                  hintStyle: AppTextStyles.bodyMedium(
+                    context,
+                  ).copyWith(color: AppColors.textTertiary),
+
                   prefixIcon: Padding(
-                    padding: EdgeInsets.all(screenWidth * 0.032),
-                    child: Icon(
-                      Icons.search,
-                      size: screenWidth * 0.048, // 4.8% of screen width
-                      color: AppColors.textSecondary,
+                    padding: EdgeInsets.all(screenWidth * 0.03),
+                    child: SvgPicture.asset(
+                      AppAssets.searchIcon,
+                      width: screenWidth * 0.045,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.grey,
+                        BlendMode.srcIn,
+                      ),
                     ),
                   ),
-                  border: InputBorder.none,
+
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8), // 👈 curved border
+                    borderSide: BorderSide.none,
+                  ),
+
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+
                   contentPadding: EdgeInsets.symmetric(
-                    horizontal: screenWidth * 0.032, // 3.2% of screen width
-                    vertical: screenHeight * 0.012, // 1.2% of screen height
+                    vertical: screenHeight * 0.010,
                   ),
                 ),
-                style: AppTextStyles.bodyMedium(context),
+
                 onChanged: (value) {
                   context.read<WfhRequestBloc>().add(SearchWfhRequests(value));
                 },
               ),
             ),
           ),
-          SizedBox(width: screenWidth * 0.021), // 2.1% of screen width
-          // Filter icon button (square with rounded corners)
-          Container(
-            width: screenHeight * 0.055, // 5.5% of screen height
-            height: screenHeight * 0.055,
-            decoration: BoxDecoration(
-              color: AppColors.backgroundLight,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppColors.border,
-                width: 1,
-              ),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  _showFilterBottomSheet(context);
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Center(
-                  child: Icon(
-                    Icons.filter_alt, // Funnel/filter icon
-                    size: screenWidth * 0.048, // 4.8% of screen width
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SizedBox(width: screenWidth * 0.021), // 2.1% of screen width
+          SizedBox(width: screenWidth * 0.042), // 4.2% of screen width
           // Add button (green circular button with plus) - opens form page
-          Container(
-            width: screenHeight * 0.055, // 5.5% of screen height
-            height: screenHeight * 0.055,
-            decoration: BoxDecoration(
-              color: AppColors.success,
-              shape: BoxShape.circle,
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ApplyWfhPage(),
-                    ),
-                  );
-                },
-                customBorder: const CircleBorder(),
-                child: Center(
-                  child: Icon(
-                    Icons.add,
-                    color: Colors.white,
-                    size: screenWidth * 0.053, // 5.3% of screen width
-                  ),
+          PermissionGuard(
+            requiredPermission: "Attendance:WFH Request:Write",
+            child: SizedBox(
+              height: screenHeight * 0.050, // 5.0% of screen height
+
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ApplyWfhPage(),
+                      ),
+                    );
+                    if (result == true && context.mounted) {
+                      context.read<WfhRequestBloc>().add(
+                        const LoadWfhRequests(),
+                      );
+                    }
+                  },
+                  child: SvgPicture.asset(AppAssets.addIcon),
                 ),
               ),
             ),
@@ -324,113 +419,115 @@ class _WfhPageListingState extends State<WfhPageListing> {
   void _showFilterBottomSheet(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
-    // Get current filter state from bloc using the context that has BlocProvider
-    final bloc = context.read<WfhRequestBloc>();
-    final currentState = bloc.state;
-    WfhStatus? currentFilter;
-    if (currentState is WfhRequestLoaded) {
-      currentFilter = currentState.statusFilter;
-      // Sync local state with bloc state
-      _selectedStatusFilter = currentFilter;
-    }
+
+    // Use the current tab index as the selected filter state
+    _selectedStatusFilter = _tabs[_tabController.index].status;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (bottomSheetContext) => StatefulBuilder(
-        builder: (bottomSheetContext, setModalState) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          padding: EdgeInsets.all(screenWidth * 0.042),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Filter by Status',
-                style: AppTextStyles.heading4(bottomSheetContext),
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              // Filter options
-              _buildFilterOption(
-                bottomSheetContext,
-                'All',
-                null,
-                _selectedStatusFilter == null,
-                () {
-                  setModalState(() {
-                    _selectedStatusFilter = null;
-                  });
-                },
-              ),
-              _buildFilterOption(
-                bottomSheetContext,
-                'Pending',
-                WfhStatus.pending,
-                _selectedStatusFilter == WfhStatus.pending,
-                () {
-                  setModalState(() {
-                    _selectedStatusFilter = WfhStatus.pending;
-                  });
-                },
-              ),
-              _buildFilterOption(
-                bottomSheetContext,
-                'Approved',
-                WfhStatus.approved,
-                _selectedStatusFilter == WfhStatus.approved,
-                () {
-                  setModalState(() {
-                    _selectedStatusFilter = WfhStatus.approved;
-                  });
-                },
-              ),
-              _buildFilterOption(
-                bottomSheetContext,
-                'Rejected',
-                WfhStatus.rejected,
-                _selectedStatusFilter == WfhStatus.rejected,
-                () {
-                  setModalState(() {
-                    _selectedStatusFilter = WfhStatus.rejected;
-                  });
-                },
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              // Apply button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(bottomSheetContext);
-                    // Use the bloc instance from the outer context
-                    bloc.add(FilterWfhRequestsByStatus(_selectedStatusFilter));
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: EdgeInsets.symmetric(
-                      vertical: screenHeight * 0.018,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+      builder:
+          (bottomSheetContext) => StatefulBuilder(
+            builder:
+                (bottomSheetContext, setModalState) => Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
                     ),
                   ),
-                  child: Text(
-                    'Apply Filter',
-                    style: AppTextStyles.buttonMedium(bottomSheetContext),
+                  padding: EdgeInsets.all(screenWidth * 0.042),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Filter by Status',
+                        style: AppTextStyles.heading4(bottomSheetContext),
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      // Filter options
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'All',
+                        null,
+                        _selectedStatusFilter == null,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = null;
+                          });
+                        },
+                      ),
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'Pending',
+                        WfhStatus.pending,
+                        _selectedStatusFilter == WfhStatus.pending,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = WfhStatus.pending;
+                          });
+                        },
+                      ),
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'Approved',
+                        WfhStatus.approved,
+                        _selectedStatusFilter == WfhStatus.approved,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = WfhStatus.approved;
+                          });
+                        },
+                      ),
+                      _buildFilterOption(
+                        bottomSheetContext,
+                        'Rejected',
+                        WfhStatus.rejected,
+                        _selectedStatusFilter == WfhStatus.rejected,
+                        () {
+                          setModalState(() {
+                            _selectedStatusFilter = WfhStatus.rejected;
+                          });
+                        },
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      // Apply button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(bottomSheetContext);
+                            // Navigate to the tab selected in the bottom sheet
+                            final index = _tabs.indexWhere(
+                              (tab) => tab.status == _selectedStatusFilter,
+                            );
+                            if (index != -1) {
+                              _tabController.animateTo(index);
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: EdgeInsets.symmetric(
+                              vertical: screenHeight * 0.018,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            'Apply Filter',
+                            style: AppTextStyles.buttonMedium(
+                              bottomSheetContext,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
           ),
-        ),
-      ),
     );
   }
 
@@ -446,13 +543,13 @@ class _WfhPageListingState extends State<WfhPageListing> {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(
-          vertical: screenHeight * 0.015,
-        ),
+        padding: EdgeInsets.symmetric(vertical: screenHeight * 0.015),
         child: Row(
           children: [
             Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+              isSelected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
             ),
             SizedBox(width: MediaQuery.of(context).size.width * 0.032),
@@ -474,21 +571,18 @@ class _WfhPageListingState extends State<WfhPageListing> {
 class DottedLinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.border
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
+    final paint =
+        Paint()
+          ..color = AppColors.border
+          ..strokeWidth = 1
+          ..style = PaintingStyle.stroke;
 
     const dashWidth = 3.0;
     const dashSpace = 3.0;
     double startX = 0;
 
     while (startX < size.width) {
-      canvas.drawLine(
-        Offset(startX, 0),
-        Offset(startX + dashWidth, 0),
-        paint,
-      );
+      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
       startX += dashWidth + dashSpace;
     }
   }

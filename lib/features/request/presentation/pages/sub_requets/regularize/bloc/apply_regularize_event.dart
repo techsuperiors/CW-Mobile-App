@@ -51,3 +51,34 @@ class ApplyRegularize extends ApplyRegularizeEvent {
         statusUpdatedBy,
       ];
 }
+
+class UpdateRegularize extends ApplyRegularizeEvent {
+  final int id;
+  final String requestDate;
+  final String requestFor;
+  final String checkIn;
+  final String checkOut;
+  final int statusUpdatedBy;
+  final String description;
+
+  const UpdateRegularize({
+    required this.id,
+    required this.requestDate,
+    required this.requestFor,
+    required this.checkIn,
+    required this.checkOut,
+    required this.statusUpdatedBy,
+    required this.description,
+  });
+
+  @override
+  List<Object> get props => [
+        id,
+        requestDate,
+        requestFor,
+        checkIn,
+        checkOut,
+        statusUpdatedBy,
+        description,
+      ];
+}

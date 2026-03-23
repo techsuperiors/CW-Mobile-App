@@ -15,6 +15,9 @@ class AppTextField extends StatelessWidget {
   final int? maxLines;
   final bool enabled;
   final void Function(String)? onChanged;
+  final FocusNode? focusNode;
+  final VoidCallback? onTap;
+  final Color? bgcolor;
 
   const AppTextField({
     super.key,
@@ -29,6 +32,9 @@ class AppTextField extends StatelessWidget {
     this.maxLines = 1,
     this.enabled = true,
     this.onChanged,
+    this.focusNode,
+    this.onTap,
+    this.bgcolor,
   });
 
   @override
@@ -39,7 +45,9 @@ class AppTextField extends StatelessWidget {
         if (label != null) ...[
           Text(
             label!,
-            style: AppTextStyles.labelLarge(context),
+            style: AppTextStyles.labelLarge(context).copyWith(
+              color: AppColors.textHeading
+            ),
           ),
           SizedBox(height: AppTextStyles.getSpacing(context, mobile: 8.0)),
         ],
@@ -51,15 +59,18 @@ class AppTextField extends StatelessWidget {
           maxLines: maxLines,
           enabled: enabled,
           onChanged: onChanged,
+          focusNode: focusNode,
+          onTap: onTap,
           decoration: InputDecoration(
+
             hintText: hint,
             hintStyle: TextStyle(
-              color: AppColors.textSecondary
+              color: AppColors.textSecondary,fontWeight: FontWeight.w400
             ),
             prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
             suffixIcon: suffixIcon,
             filled: true,
-            fillColor: AppColors.background,
+            fillColor: bgcolor??AppColors.background,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.border),
@@ -76,11 +87,10 @@ class AppTextField extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.error),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
         ),
       ],
     );
   }
 }
-

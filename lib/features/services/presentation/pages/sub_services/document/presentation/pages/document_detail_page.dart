@@ -104,8 +104,8 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> with SingleTick
               Flexible(
                 child: Text(
                   AppStrings.document,
-                  style: AppTextStyles.bodyLarge(context).copyWith(
-                    fontWeight: FontWeight.w500,
+                  style: AppTextStyles.bodyMedium(context).copyWith(
+                    fontWeight: FontWeight.w400,
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   overflow: TextOverflow.ellipsis,

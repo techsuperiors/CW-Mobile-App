@@ -1,7 +1,10 @@
+import 'package:collectivWork/core/widgets/permission_guard.dart';
+import 'package:collectivWork/features/approval/presentation/pages/approval_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../cubit/home_page_cubit.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/app_drawer.dart';
@@ -17,7 +20,7 @@ import '../../../request/presentation/pages/request_bottom_sheet.dart';
 /// Home page with bottom navigation
 class HomePage extends StatefulWidget {
   final int? initialTabIndex;
-  
+
   const HomePage({super.key, this.initialTabIndex});
 
   @override
@@ -25,17 +28,14 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  late int _currentIndex;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late final DashboardBloc _dashboardBloc;
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialTabIndex ?? 2; // Default to Attendance/Home tab
-
     final networkInfo = NetworkInfoImpl(Connectivity());
-
     _dashboardBloc = DashboardBloc(
       getDashboardStats: GetDashboardStats(
         DashboardRepositoryImpl(
@@ -44,19 +44,22 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+
+    _pages = [
+      const ServicesPage(),
+      PermissionGuard(
+        requiredPermission: "Home:Post:Read",
+        child: const PlaceholderPage(title: AppStrings.posts),
+      ),
+      AttendancePage(onOpenDrawer: _openDrawer),
+      const PlaceholderPage(title: AppStrings.request),
+      const PlaceholderPage(title: AppStrings.approval),
+    ];
   }
 
   void _openDrawer() {
     _scaffoldKey.currentState?.openDrawer();
   }
-
-  List<Widget> _buildPages() => [
-    const ServicesPage(), // Services (index 0)
-    const PlaceholderPage(title: AppStrings.posts), // Posts (index 1)
-    AttendancePage(onOpenDrawer: _openDrawer), // Home (index 2)
-    const PlaceholderPage(title: AppStrings.request), // Request (index 3)
-    const PlaceholderPage(title: AppStrings.approval), // Approval (index 4)
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -65,23 +68,37 @@ class _HomePageState extends State<HomePage> {
       child: Scaffold(
         key: _scaffoldKey,
         drawer: const AppDrawer(),
-        body: _buildPages()[_currentIndex],
-        bottomNavigationBar: BottomNavBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            // Show bottom sheet for Request button (index 3)
-            if (index == 3) {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => const RequestBottomSheet(),
-              );
-            } else {
-              setState(() {
-                _currentIndex = index;
-              });
-            }
+        body: BlocBuilder<HomePageCubit, int>(
+          builder: (context, currentIndex) {
+            return IndexedStack(index: currentIndex, children: _pages);
+          },
+        ),
+        bottomNavigationBar: BlocBuilder<HomePageCubit, int>(
+          builder: (context, currentIndex) {
+            return BottomNavBar(
+              currentIndex: currentIndex,
+              onTap: (index) {
+                if (index == 3) {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => const RequestBottomSheet(),
+                  );
+                } else {
+                  if (index == 4) {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => const ApprovalBottomSheet(),
+                    );
+                  } else {
+                    context.read<HomePageCubit>().switchTab(index);
+                  }
+                }
+              },
+            );
           },
         ),
       ),
@@ -90,6 +107,7 @@ class _HomePageState extends State<HomePage> {
 }
 
 /// Placeholder page for features not yet implemented
+
 class PlaceholderPage extends StatelessWidget {
   final String title;
 
@@ -118,14 +136,10 @@ class PlaceholderPage extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             AppStrings.comingSoon,
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textTertiary,
-            ),
+            style: TextStyle(fontSize: 14, color: AppColors.textTertiary),
           ),
         ],
       ),
     );
   }
 }
-

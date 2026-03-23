@@ -70,17 +70,29 @@ class TicketApiModel {
   });
 
   factory TicketApiModel.fromJson(Map<String, dynamic> json) {
+    int? parseNullableInt(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value);
+      if (value is Map) {
+        final id = value['id'];
+        if (id is int) return id;
+        if (id is String) return int.tryParse(id);
+      }
+      return null;
+    }
+
     return TicketApiModel(
       id: (json['id'] as int?) ?? 0,
       ticketID: json['ticketID'] as String? ?? '',
       priority: json['priority'] as String? ?? '',
       subject: json['subject'] as String? ?? '',
       ticketStatus: json['ticket_status'] as String? ?? '',
-      ticketCategoryId: (json['ticket_category_id'] as int?) ?? 0,
-      ticketSubCategoryId: json['ticket_subCategory_id'] as int?,
-      pinnedBy: json['pinned_by'] as int?,
+      ticketCategoryId: parseNullableInt(json['ticket_category_id']) ?? 0,
+      ticketSubCategoryId: parseNullableInt(json['ticket_subCategory_id']),
+      pinnedBy: parseNullableInt(json['pinned_by']),
       createdBy: (json['created_by'] as int?) ?? 0,
-      raisedFor: json['raised_for'] as int?,
+      raisedFor: parseNullableInt(json['raised_for']),
       createdAt: json['created_at'] as String? ?? '',
       updatedAt: json['updated_at'] as String? ?? '',
       createdByUser: TicketCreatedByModel.fromJson(
@@ -98,18 +110,17 @@ class TicketListApiResponse {
   final String? message;
   final List<TicketApiModel>? data;
 
-  TicketListApiResponse({
-    required this.success,
-    this.message,
-    this.data,
-  });
+  TicketListApiResponse({required this.success, this.message, this.data});
 
   factory TicketListApiResponse.fromJson(Map<String, dynamic> json) {
     List<TicketApiModel> tickets = [];
     if (json['data'] != null && json['data'] is List) {
-      tickets = (json['data'] as List)
-          .map((item) => TicketApiModel.fromJson(item as Map<String, dynamic>))
-          .toList();
+      tickets =
+          (json['data'] as List)
+              .map(
+                (item) => TicketApiModel.fromJson(item as Map<String, dynamic>),
+              )
+              .toList();
     }
 
     return TicketListApiResponse(
@@ -144,7 +155,9 @@ class TicketStatsModel {
 
     return TicketStatsModel(
       open: parseCount(json['open'] ?? json['Open'] ?? 0),
-      inProgress: parseCount(json['In-Progress'] ?? json['in-progress'] ?? json['inProgress'] ?? 0),
+      inProgress: parseCount(
+        json['In-Progress'] ?? json['in-progress'] ?? json['inProgress'] ?? 0,
+      ),
       resolved: parseCount(json['Resolved'] ?? json['resolved'] ?? 0),
       escalated: parseCount(json['Escalated'] ?? json['escalated'] ?? 0),
     );
@@ -157,11 +170,7 @@ class TicketStatsApiResponse {
   final String? message;
   final TicketStatsModel? data;
 
-  TicketStatsApiResponse({
-    required this.success,
-    this.message,
-    this.data,
-  });
+  TicketStatsApiResponse({required this.success, this.message, this.data});
 
   factory TicketStatsApiResponse.fromJson(Map<String, dynamic> json) {
     TicketStatsModel? statsData;
@@ -309,9 +318,8 @@ class TicketCategoryModel {
       id: (json['id'] as int?) ?? 0,
       categoryName: json['category_name'] as String? ?? '',
       followers: json['followers'] as List<dynamic>? ?? [],
-      assignee: (json['assignee'] as List<dynamic>?)
-              ?.map((e) => e as int)
-              .toList() ??
+      assignee:
+          (json['assignee'] as List<dynamic>?)?.map((e) => e as int).toList() ??
           [],
       hasSubCategories: json['has_SubCategories'] as bool? ?? false,
     );
@@ -404,25 +412,37 @@ class TicketDetailsModel {
     // Parse documents
     List<TicketDocumentModel> documents = [];
     if (json['documents'] != null && json['documents'] is List) {
-      documents = (json['documents'] as List)
-          .map((item) => TicketDocumentModel.fromJson(item as Map<String, dynamic>))
-          .toList();
+      documents =
+          (json['documents'] as List)
+              .map(
+                (item) =>
+                    TicketDocumentModel.fromJson(item as Map<String, dynamic>),
+              )
+              .toList();
     }
 
     // Parse activity
     List<TicketActivityModel> activity = [];
     if (json['activity'] != null && json['activity'] is List) {
-      activity = (json['activity'] as List)
-          .map((item) => TicketActivityModel.fromJson(item as Map<String, dynamic>))
-          .toList();
+      activity =
+          (json['activity'] as List)
+              .map(
+                (item) =>
+                    TicketActivityModel.fromJson(item as Map<String, dynamic>),
+              )
+              .toList();
     }
 
     // Parse followers
     List<TicketFollowerModel> followers = [];
     if (json['followers'] != null && json['followers'] is List) {
-      followers = (json['followers'] as List)
-          .map((item) => TicketFollowerModel.fromJson(item as Map<String, dynamic>))
-          .toList();
+      followers =
+          (json['followers'] as List)
+              .map(
+                (item) =>
+                    TicketFollowerModel.fromJson(item as Map<String, dynamic>),
+              )
+              .toList();
     }
 
     return TicketDetailsModel(
@@ -437,20 +457,32 @@ class TicketDetailsModel {
       ticketCategoryId: (json['ticket_category_id'] as int?) ?? 0,
       ticketSubCategoryId: json['ticket_subCategory_id'] as int?,
       ticketID: json['ticketID'] as String? ?? '',
-      raisedFor: json['raised_for'] != null
-          ? TicketUserModel.fromJson(json['raised_for'] as Map<String, dynamic>)
-          : null,
+      raisedFor:
+          json['raised_for'] != null
+              ? TicketUserModel.fromJson(
+                json['raised_for'] as Map<String, dynamic>,
+              )
+              : null,
       createdBy: (json['created_by'] as int?) ?? 0,
       createdAt: json['created_at'] as String? ?? '',
-      assigneeTicket: json['assigneeTicket'] != null
-          ? TicketUserModel.fromJson(json['assigneeTicket'] as Map<String, dynamic>)
-          : null,
-      createdByUser: json['createdBy'] != null
-          ? TicketUserModel.fromJson(json['createdBy'] as Map<String, dynamic>)
-          : null,
-      ticketCategory: json['TicketCategory'] != null
-          ? TicketCategoryModel.fromJson(json['TicketCategory'] as Map<String, dynamic>)
-          : null,
+      assigneeTicket:
+          json['assigneeTicket'] != null
+              ? TicketUserModel.fromJson(
+                json['assigneeTicket'] as Map<String, dynamic>,
+              )
+              : null,
+      createdByUser:
+          json['createdBy'] != null
+              ? TicketUserModel.fromJson(
+                json['createdBy'] as Map<String, dynamic>,
+              )
+              : null,
+      ticketCategory:
+          json['TicketCategory'] != null
+              ? TicketCategoryModel.fromJson(
+                json['TicketCategory'] as Map<String, dynamic>,
+              )
+              : null,
       ticketSubCategory: json['TicketSubCategory'],
       followers: followers,
     );
@@ -463,11 +495,7 @@ class TicketDetailsApiResponse {
   final String? message;
   final TicketDetailsModel? data;
 
-  TicketDetailsApiResponse({
-    required this.success,
-    this.message,
-    this.data,
-  });
+  TicketDetailsApiResponse({required this.success, this.message, this.data});
 
   factory TicketDetailsApiResponse.fromJson(Map<String, dynamic> json) {
     TicketDetailsModel? detailsData;
@@ -490,16 +518,44 @@ class TicketFileUploadRequest {
   final int clientId;
   final int ticketId;
 
-  TicketFileUploadRequest({
-    required this.clientId,
-    required this.ticketId,
+  TicketFileUploadRequest({required this.clientId, required this.ticketId});
+
+  Map<String, dynamic> toJson() {
+    return {'client_id': clientId, 'ticket_id': ticketId};
+  }
+}
+
+class TicketFileDeleteRequest {
+  final int supportDocumentId;
+  final String fileId;
+
+  TicketFileDeleteRequest({
+    required this.supportDocumentId,
+    required this.fileId,
   });
 
   Map<String, dynamic> toJson() {
     return {
-      'client_id': clientId,
-      'ticket_id': ticketId,
+      'support_document_id': supportDocumentId,
+      'file_id': fileId,
     };
+  }
+}
+
+/// Uploaded File Model - represents a single file in the upload response
+class UploadedFileModel {
+  final String id;
+  final String url;
+  final String name;
+
+  UploadedFileModel({required this.id, required this.url, required this.name});
+
+  factory UploadedFileModel.fromJson(Map<String, dynamic> json) {
+    return UploadedFileModel(
+      id: json['id'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+    );
   }
 }
 
@@ -507,26 +563,48 @@ class TicketFileUploadRequest {
 class TicketFileUploadResponse {
   final bool success;
   final String? message;
-  final TicketStatsModel? data;
+  final List<UploadedFileModel> fileData;
 
   TicketFileUploadResponse({
     required this.success,
     this.message,
-    this.data,
+    required this.fileData,
   });
 
   factory TicketFileUploadResponse.fromJson(Map<String, dynamic> json) {
-    TicketStatsModel? statsData;
-    if (json['data'] != null && json['data'] is Map) {
-      statsData = TicketStatsModel.fromJson(
-        json['data'] as Map<String, dynamic>,
-      );
+    List<UploadedFileModel> files = [];
+    final rawList = json['file_data'];
+    if (rawList != null && rawList is List) {
+      files =
+          rawList
+              .map(
+                (item) =>
+                    UploadedFileModel.fromJson(item as Map<String, dynamic>),
+              )
+              .toList();
     }
 
     return TicketFileUploadResponse(
       success: json['success'] as bool? ?? false,
       message: json['message'] as String?,
-      data: statsData,
+      fileData: files,
+    );
+  }
+}
+
+class TicketFileDeleteResponse {
+  final bool success;
+  final String? message;
+
+  TicketFileDeleteResponse({
+    required this.success,
+    this.message,
+  });
+
+  factory TicketFileDeleteResponse.fromJson(Map<String, dynamic> json) {
+    return TicketFileDeleteResponse(
+      success: json['success'] as bool? ?? false,
+      message: json['message'] as String?,
     );
   }
 }

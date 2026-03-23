@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:intl/intl.dart';
+import 'package:dio/dio.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/constants/app_urls.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/utils/data_encoder.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
+import '../../../../../../../../core/network/api_client.dart';
+import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../../core/error/exceptions.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../../../../../../../core/widgets/common/app_text_field.dart';
+import '../../../../../../../authentication/data/datasources/auth_local_datasource.dart';
 import '../../models/wfh_request_model.dart';
 
 /// Apply WFH form page
@@ -23,38 +33,32 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _subjectController;
   late final TextEditingController _descriptionController;
-  
-  String? _selectedWfhDuration;
+
+  String? _selectedWfhDuration = 'Single Day WFH';
   DateTime? _fromDate;
   String _fromHalfDay = 'First Half';
   DateTime? _toDate;
   String _toHalfDay = 'Second Half';
-  String? _requestTo = 'Riya Rawat';
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialize controllers
     _subjectController = TextEditingController();
     _descriptionController = TextEditingController();
-    
-    // If editing, pre-fill the form
+
     if (widget.wfhRequest != null) {
       _initializeFormFromWfhRequest(widget.wfhRequest!);
     }
   }
 
   void _initializeFormFromWfhRequest(WfhRequestModel wfhRequest) {
-    // Pre-fill dates
     _fromDate = wfhRequest.fromDate;
     _toDate = wfhRequest.toDate;
-    
-    // Determine WFH duration
-    _selectedWfhDuration = wfhRequest.toDate == null ? 'Single Day WFH' : 'Multiple Day WFH';
-    
-    // Pre-fill description
+    _selectedWfhDuration =
+        wfhRequest.toDate == null ? 'Single Day WFH' : 'Multiple Day WFH';
     _descriptionController.text = wfhRequest.reason;
-    _subjectController.text = wfhRequest.reason; // Use reason as subject
+    _subjectController.text = wfhRequest.subject ?? wfhRequest.reason;
   }
 
   @override
@@ -65,10 +69,11 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
   }
 
   Future<void> _selectDate(BuildContext context, bool isFromDate) async {
-    final DateTime initialDate = isFromDate
-        ? (_fromDate ?? DateTime.now())
-        : (_toDate ?? _fromDate ?? DateTime.now());
-    
+    final DateTime initialDate =
+        isFromDate
+            ? (_fromDate ?? DateTime.now())
+            : (_toDate ?? _fromDate ?? DateTime.now());
+
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
@@ -99,23 +104,278 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
     }
   }
 
+  /// Convert half day display name to API format.
+  String _halfDayToApi(String halfDay) {
+    return halfDay == 'First Half' ? 'first_half' : 'second_half';
+  }
+
+  /// Submit WFH request to API.
+  // Future<void> _submitWfhRequest() async {
+  //   if (!_formKey.currentState!.validate()) return;
+  //
+  //   if (_fromDate == null) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: const Text('Please select a date'),
+  //         backgroundColor: AppColors.error,
+  //       ),
+  //     );
+  //     return;
+  //   }
+  //
+  //   if (_descriptionController.text.trim().isEmpty) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: const Text('Please enter a description'),
+  //         backgroundColor: AppColors.error,
+  //       ),
+  //     );
+  //     return;
+  //   }
+  //
+  //   setState(() => _isSubmitting = true);
+  //
+  //   try {
+  //     final networkInfo = NetworkInfoImpl(Connectivity());
+  //     final dio = Dio();
+  //     final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+  //
+  //     if (!await networkInfo.isConnected) {
+  //       _showError('No internet connection');
+  //       return;
+  //     }
+  //
+  //     // Get user_id from JWT token stored in SharedPreferences
+  //     final prefs = await SharedPreferences.getInstance();
+  //     int? userId;
+  //
+  //     // Decode JWT token to extract user_id
+  //     final token = prefs.getString('auth_token');
+  //     if (token != null) {
+  //       try {
+  //         final parts = token.split('.');
+  //         if (parts.length == 3) {
+  //           String jwtPayload = parts[1];
+  //           while (jwtPayload.length % 4 != 0) {
+  //             jwtPayload += '=';
+  //           }
+  //           final decoded = utf8.decode(base64Url.decode(jwtPayload));
+  //           final payloadMap = jsonDecode(decoded) as Map<String, dynamic>;
+  //           userId = payloadMap['user_id'] as int?;
+  //         }
+  //       } catch (_) {}
+  //     }
+  //
+  //     // Fallback: try from cached user
+  //     if (userId == null) {
+  //       try {
+  //         final authLocal = AuthLocalDataSourceImpl(prefs);
+  //         final user = await authLocal.getCachedUser();
+  //         if (user != null) {
+  //           userId = int.tryParse(user.id);
+  //         }
+  //       } catch (_) {}
+  //     }
+  //
+  //     // Determine request type
+  //     final isSingleDay =
+  //         _selectedWfhDuration == 'Single Day WFH' || _toDate == null;
+  //     final requestType = isSingleDay ? 'single' : 'multiple';
+  //
+  //     // Build payload — all fields are required by the API
+  //     final dateFormat = DateFormat('yyyy-MM-dd');
+  //     final payload = {
+  //       'subject': _subjectController.text.trim(),
+  //       'request_for': 46,
+  //       'request_type': requestType,
+  //       'description': _descriptionController.text.trim(),
+  //       'start_date': dateFormat.format(_fromDate!),
+  //       'end_date': dateFormat.format(_toDate ?? _fromDate!),
+  //       'start_half': _halfDayToApi(_fromHalfDay),
+  //       'end_half': _halfDayToApi(_toHalfDay),
+  //       'user_id': userId,
+  //     };
+  //
+  //     debugPrint('WFH payload: $payload');
+  //
+  //     // Encode payload using encodeData (same pattern as apply_leave, auth, etc.)
+  //     final encodedData = encodeData(payload);
+  //     debugPrint('WFH encoded payload: $encodedData');
+  //
+  //     final response = await apiClient.post(
+  //       AppUrls.wfhRequestRaise,
+  //       data: {'payload': encodedData},
+  //       options: Options(headers: {'Content-Type': 'application/json'}),
+  //     );
+  //
+  //     debugPrint('WFH response: ${response.statusCode} - ${response.data}');
+  //
+  //     final responseData = response.data as Map<String, dynamic>;
+  //
+  //     if (responseData['success'] == true) {
+  //       if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           SnackBar(
+  //             content: const Text('WFH request submitted successfully!'),
+  //             backgroundColor: AppColors.success,
+  //           ),
+  //         );
+  //         Navigator.of(context).pop(true); // Return true to indicate success
+  //       }
+  //     } else {
+  //       _showError(
+  //         responseData['message'] as String? ?? 'Failed to submit WFH request',
+  //       );
+  //     }
+  //   } on ServerException catch (e) {
+  //     _showError(e.message);
+  //   } catch (e) {
+  //     _showError('Failed to submit: ${e.toString()}');
+  //   } finally {
+  //     if (mounted) {
+  //       setState(() => _isSubmitting = false);
+  //     }
+  //   }
+  // }
+
+  Future<void> _submitWfhRequest() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_fromDate == null) {
+      _showError('Please select a date');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final networkInfo = NetworkInfoImpl(Connectivity());
+      final dio = Dio();
+      final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+
+      if (!await networkInfo.isConnected) {
+        _showError('No internet connection');
+        return;
+      }
+
+      // 1. Get User ID (Same logic as you have)
+      final prefs = await SharedPreferences.getInstance();
+      int? userId;
+      final token = prefs.getString('auth_token');
+      if (token != null) {
+        try {
+          final parts = token.split('.');
+          if (parts.length == 3) {
+            String jwtPayload = parts[1];
+            while (jwtPayload.length % 4 != 0) jwtPayload += '=';
+            final decoded = utf8.decode(base64Url.decode(jwtPayload));
+            final payloadMap = jsonDecode(decoded) as Map<String, dynamic>;
+            userId = payloadMap['user_id'] as int?;
+          }
+        } catch (_) {}
+      }
+
+      // 2. Condition-based Payload Construction
+      final isSingleDay = _selectedWfhDuration == 'Single Day WFH';
+      final requestType = isSingleDay ? 'single' : 'multiple';
+      final dateFormat = DateFormat('yyyy-MM-dd');
+
+      // Base fields (Common for both)
+      Map<String, dynamic> payload = {
+        'subject': _subjectController.text.trim(),
+        'request_type': requestType,
+        'description': _descriptionController.text.trim(),
+        'user_id': userId,
+        'start_date': dateFormat.format(_fromDate!),
+        'end_date': dateFormat.format(_toDate ?? _fromDate!),
+      };
+
+      // Conditional fields based on decoded payloads
+      if (isSingleDay) {
+        // Single Day: requires wfh_request_date
+        payload['wfh_request_date'] = _fromDate!.toUtc().toIso8601String();
+      } else {
+        // Multiple Days: requires request_date, to_request_date, and half-day info
+        payload['wfh_request_date'] = _fromDate!.toUtc().toIso8601String();
+        payload['wfh_to_request_date'] = (_toDate ?? _fromDate!).toUtc().toIso8601String();
+        payload['start_half'] = _halfDayToApi(_fromHalfDay);
+        payload['end_half'] = _halfDayToApi(_toHalfDay);
+      }
+
+      debugPrint('WFH final payload: $payload');
+
+      // 3. Encode and Post
+      final encodedData = encodeData(payload);
+      final response = await apiClient.post(
+        AppUrls.wfhRequestRaise,
+        data: {'payload': encodedData},
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      final responseData = response.data as Map<String, dynamic>;
+
+      if (responseData['success'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: const Text('WFH request submitted successfully!'), backgroundColor: AppColors.success),
+          );
+          Navigator.of(context).pop(true);
+        }
+      } else {
+        _showError(responseData['message'] ?? 'Failed to submit WFH request');
+      }
+    }
+    catch (e) {
+      String errorMessage = 'An unexpected error occurred';
+
+      // Check if it's your custom ServerException
+      if (e is ServerException) {
+        // Agar aapki class mein 'message' field hai toh:
+        errorMessage = e.message ?? 'Server Error';
+      }
+      // Agar Dio directly error throw kar raha hai
+      else if (e is DioException) {
+        if (e.response?.data != null && e.response?.data['message'] != null) {
+          errorMessage = e.response?.data['message'];
+        } else {
+          errorMessage = e.message ?? 'Network Error';
+        }
+      } else {
+        errorMessage = e.toString();
+      }
+
+      _showError(errorMessage);
+    }
+
+    finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+  void _showError(String message) {
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: AppColors.error),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
     return ResponsiveScaffold(
+      backgroundColor: AppColors.backgroundMedium,
       appBar: AppBar(
         elevation: 0,
+        leadingWidth: 110,
+        forceMaterialTransparency: true,
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.textPrimary,
         leading: GestureDetector(
           onTap: () => Navigator.of(context).pop(),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(width: screenWidth * 0.048),
               Icon(
                 Icons.arrow_back_ios,
                 color: Theme.of(context).colorScheme.primary,
@@ -123,9 +383,9 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
               ),
               Flexible(
                 child: Text(
-                  AppStrings.attendance,
-                  style: AppTextStyles.bodyLarge(context).copyWith(
-                    fontWeight: FontWeight.w500,
+                  'Back',
+                  style: AppTextStyles.bodyMedium(context).copyWith(
+                    fontWeight: FontWeight.w400,
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -134,13 +394,11 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
             ],
           ),
         ),
-        leadingWidth: 110,
         title: Text(
-          AppStrings.wfh,
-          style: AppTextStyles.heading4(context).copyWith(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
+          widget.wfhRequest != null ? 'Edit WFH Request' : AppStrings.wfh,
+          style: AppTextStyles.bodyMedium(
+            context,
+          ).copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
         ),
         centerTitle: true,
       ),
@@ -159,54 +417,38 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: EdgeInsets.all(screenWidth * 0.03),
-                    decoration: BoxDecoration(
-                      color: AppColors.attendanceTeal.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.home, // House icon for WFH
-                      color: AppColors.attendanceTeal,
-                      size: screenWidth * 0.06,
-                    ),
-                  ),
-                  SizedBox(height: screenHeight * 0.01),
-                  Text(
-                    widget.wfhRequest != null ? 'Edit WFH Request' : AppStrings.wfh,
-                    style: AppTextStyles.heading3(context).copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
+                  // Container(
+                  //   padding: EdgeInsets.all(screenWidth * 0.03),
+                  //   decoration: BoxDecoration(
+                  //     color: AppColors.attendanceTeal.withOpacity(0.1),
+                  //     borderRadius: BorderRadius.circular(12),
+                  //   ),
+                  //   child: Icon(
+                  //     Icons.home,
+                  //     color: AppColors.attendanceTeal,
+                  //     size: screenWidth * 0.06,
+                  //   ),
+                  // ),
+                  // SizedBox(height: screenHeight * 0.01),
+                  // Text(
+                  //   widget.wfhRequest != null
+                  //       ? 'Edit WFH Request'
+                  //       : AppStrings.wfh,
+                  //   style: AppTextStyles.heading3(context).copyWith(
+                  //     fontWeight: FontWeight.w700,
+                  //     color: AppColors.textPrimary,
+                  //   ),
+                  // ),
                   SizedBox(height: screenHeight * 0.005),
-                  Text(
-                    'Lorem Ipsum is simply dummy text of the printing and typesetting industry.',
-                    style: AppTextStyles.bodySmall(context).copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
                 ],
               ),
-              SizedBox(height: screenHeight * 0.03),
+              SizedBox(height: screenHeight * 0.01),
               // Subject
               AppTextField(
                 label: 'Subject',
                 hint: 'Enter Subject',
                 controller: _subjectController,
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              // Request To
-              _buildDropdownField(
-                context,
-                label: 'Request To',
-                value: _requestTo,
-                items: ['Riya Rawat', 'Manager 1', 'Manager 2'],
-                onChanged: (value) {
-                  setState(() {
-                    _requestTo = value;
-                  });
-                },
+                // bgcolor: AppColors.backgroundMedium,
               ),
               SizedBox(height: screenHeight * 0.02),
               // WFH Duration
@@ -222,114 +464,134 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
                   });
                 },
               ),
-              SizedBox(height: screenHeight * 0.02),
-              // From
-              Text(
-                'From',
-                style: AppTextStyles.labelLarge(context),
-              ),
-              SizedBox(height: screenHeight * 0.01),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 1,
-                    child: _buildDateField(
-                      context,
-                      value: _fromDate != null
+              // Show date fields based on WFH Duration selection
+              if (_selectedWfhDuration == 'Single Day WFH') ...[
+                SizedBox(height: screenHeight * 0.02),
+                Text('Date', style: AppTextStyles.labelLarge(context)),
+                SizedBox(height: screenHeight * 0.01),
+                _buildDateField(
+                  context,
+                  value:
+                      _fromDate != null
                           ? DateFormat('dd MMM yyyy').format(_fromDate!)
                           : null,
-                      hint: 'Select Date',
-                      onTap: () => _selectDate(context, true),
+                  hint: 'Select Date',
+                  onTap: () => _selectDate(context, true),
+                ),
+              ] else if (_selectedWfhDuration == 'Multiple Day WFH') ...[
+                SizedBox(height: screenHeight * 0.02),
+                // From
+                Text('From', style: AppTextStyles.labelLarge(context)),
+                SizedBox(height: screenHeight * 0.01),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: _buildDateField(
+                        context,
+                        value:
+                            _fromDate != null
+                                ? DateFormat('dd MMM yyyy').format(_fromDate!)
+                                : null,
+                        hint: 'Select Date',
+                        onTap: () => _selectDate(context, true),
+                      ),
                     ),
-                  ),
-                  SizedBox(width: screenWidth * 0.02),
-                  Expanded(
-                    flex: 1,
-                    child: _buildDropdownField(
-                      context,
-                      hint: 'Select Half',
-                      value: _fromHalfDay,
-                      items: ['First Half', 'Second Half'],
-                      onChanged: (value) {
-                        setState(() {
-                          _fromHalfDay = value ?? 'First Half';
-                        });
-                      },
+                    SizedBox(width: screenWidth * 0.02),
+                    Expanded(
+                      flex: 1,
+                      child: _buildDropdownField(
+                        context,
+                        hint: 'Select Half',
+                        value: _fromHalfDay,
+                        items: ['First Half', 'Second Half'],
+                        onChanged: (value) {
+                          setState(() {
+                            _fromHalfDay = value ?? 'First Half';
+                          });
+                        },
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              // To
-              Text(
-                'To',
-                style: AppTextStyles.labelLarge(context),
-              ),
-              SizedBox(height: screenHeight * 0.01),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 1,
-                    child: _buildDateField(
-                      context,
-                      value: _toDate != null
-                          ? DateFormat('dd MMM yyyy').format(_toDate!)
-                          : null,
-                      hint: 'Select Date',
-                      onTap: () => _selectDate(context, false),
+                  ],
+                ),
+                SizedBox(height: screenHeight * 0.02),
+                // To
+                Text('To', style: AppTextStyles.labelLarge(context)),
+                SizedBox(height: screenHeight * 0.01),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: _buildDateField(
+                        context,
+                        value:
+                            _toDate != null
+                                ? DateFormat('dd MMM yyyy').format(_toDate!)
+                                : null,
+                        hint: 'Select Date',
+                        onTap: () => _selectDate(context, false),
+                      ),
                     ),
-                  ),
-                  SizedBox(width: screenWidth * 0.02),
-                  Expanded(
-                    flex: 1,
-                    child: _buildDropdownField(
-                      context,
-                      hint: 'Select Half',
-                      value: _toHalfDay,
-                      items: ['First Half', 'Second Half'],
-                      onChanged: (value) {
-                        setState(() {
-                          _toHalfDay = value ?? 'Second Half';
-                        });
-                      },
+                    SizedBox(width: screenWidth * 0.02),
+                    Expanded(
+                      flex: 1,
+                      child: _buildDropdownField(
+                        context,
+                        hint: 'Select Half',
+                        value: _toHalfDay,
+                        items: ['First Half', 'Second Half'],
+                        onChanged: (value) {
+                          setState(() {
+                            _toHalfDay = value ?? 'Second Half';
+                          });
+                        },
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
               SizedBox(height: screenHeight * 0.02),
               // Description
               AppTextField(
                 label: 'Description',
                 hint: 'Enter Description',
                 controller: _descriptionController,
-                maxLines: 4,
+                maxLines: 2,
               ),
               SizedBox(height: screenHeight * 0.03),
               // Submit Button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      // Handle submit
-                      Navigator.of(context).pop();
-                    }
-                  },
+                  onPressed: _isSubmitting ? null : _submitWfhRequest,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.attendanceTeal,
                     foregroundColor: AppColors.textWhite,
-                    padding: EdgeInsets.symmetric(vertical: screenHeight * 0.018),
+                    padding: EdgeInsets.symmetric(
+                      vertical: screenHeight * 0.018,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     elevation: 0,
                   ),
-                  child: Text(
-                    widget.wfhRequest != null ? 'Update' : 'Submit',
-                    style: AppTextStyles.buttonLarge(context).copyWith(
-                      color: AppColors.textWhite,
-                    ),
-                  ),
+                  child:
+                      _isSubmitting
+                          ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.textWhite,
+                            ),
+                          )
+                          : Text(
+                            widget.wfhRequest != null ? 'Update' : 'Submit',
+                            style: AppTextStyles.buttonLarge(context).copyWith(
+                              color: AppColors.textWhite,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                 ),
               ),
               SizedBox(height: screenHeight * 0.015),
@@ -337,21 +599,23 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
+                  onPressed:
+                      _isSubmitting ? null : () => Navigator.of(context).pop(),
                   style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: screenHeight * 0.018),
+                    padding: EdgeInsets.symmetric(
+                      vertical: screenHeight * 0.018,
+                    ),
                     side: BorderSide(color: AppColors.border),
+                    backgroundColor: AppColors.textWhite,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   child: Text(
                     AppStrings.cancel,
-                    style: AppTextStyles.buttonLarge(context).copyWith(
-                      color: AppColors.textPrimary,
-                    ),
+                    style: AppTextStyles.buttonLarge(
+                      context,
+                    ).copyWith(color: AppColors.textPrimary),
                   ),
                 ),
               ),
@@ -365,7 +629,7 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
 
   Widget _buildDropdownField(
     BuildContext context, {
-      String? label,
+    String? label,
     required String? value,
     String? hint,
     required List<String> items,
@@ -378,10 +642,7 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (label != null) ...[
-          Text(
-            label,
-            style: AppTextStyles.labelLarge(context),
-          ),
+          Text(label, style: AppTextStyles.labelLarge(context)),
           SizedBox(height: screenHeight * 0.01),
         ],
         Container(
@@ -390,25 +651,30 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.border),
           ),
+          padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
+
           child: DropdownButtonFormField<String>(
             value: value,
+            isExpanded: true,
+            borderRadius: BorderRadius.circular(12),
+
             decoration: InputDecoration(
               hintText: hint,
               border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(
-                horizontal: screenWidth * 0.04,
+                horizontal: screenWidth * 0.01,
                 vertical: screenHeight * 0.018,
               ),
             ),
-            items: items.map((String item) {
-              return DropdownMenuItem<String>(
-                value: item,
-                child: Text(
-                  item,
-                  style: AppTextStyles.bodyMedium(context),
-                ),
-              );
-            }).toList(),
+            items:
+                items.map((String item) {
+                  return DropdownMenuItem<String>(
+                    value: item,
+                    child: Text(item, style: AppTextStyles.bodyMedium(context)),
+                  );
+                }).toList(),
             onChanged: onChanged,
             icon: Icon(
               Icons.keyboard_arrow_down,
@@ -447,7 +713,10 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
             Text(
               value ?? hint,
               style: AppTextStyles.bodyMedium(context).copyWith(
-                color: value != null ? AppColors.textPrimary : AppColors.textSecondary,
+                color:
+                    value != null
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
               ),
             ),
             Icon(

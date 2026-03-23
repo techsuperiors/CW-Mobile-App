@@ -5,11 +5,12 @@ import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
-import '../data/policies_data.dart';
+import '../../domain/models/policy_model.dart';
+import '../data/policies_remote_data.dart';
 import '../widgets/policy_card.dart';
 
 /// Policies page showing list of policies
-class PoliciesPage extends StatelessWidget {
+class PoliciesPage extends StatefulWidget {
   final int? serviceId;
 
   const PoliciesPage({
@@ -18,11 +19,30 @@ class PoliciesPage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final policies = PoliciesData.getPolicies();
+  State<PoliciesPage> createState() => _PoliciesPageState();
+}
 
+class _PoliciesPageState extends State<PoliciesPage> {
+  late Future<List<PolicyModel>> _policiesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _policiesFuture = PoliciesRemoteData.getPolicies();
+  }
+
+  Future<void> _reloadPolicies() async {
+    setState(() {
+      _policiesFuture = PoliciesRemoteData.getPolicies();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return ResponsiveScaffold(
+      backgroundColor: AppColors.backgroundMedium,
       appBar: AppBar(
+        forceMaterialTransparency: true,
         elevation: 0,
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.textPrimary,
@@ -39,9 +59,9 @@ class PoliciesPage extends StatelessWidget {
               ),
               Flexible(
                 child: Text(
-                  AppStrings.services,
-                  style: AppTextStyles.bodyLarge(context).copyWith(
-                    fontWeight: FontWeight.w500,
+                  "Back",
+                  style: AppTextStyles.bodyMedium(context).copyWith(
+                    fontWeight: FontWeight.w400,
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -64,21 +84,75 @@ class PoliciesPage extends StatelessWidget {
         currentIndex: 0, // Services is active
         onTap: NavigationHelper.getBottomNavHandler(context),
       ),
-      body: ListView.builder(
-        padding: EdgeInsets.symmetric(
-          horizontal: MediaQuery.of(context).size.width * 0.01,
-        ),
-        itemCount: policies.length,
-        itemBuilder: (context, index) {
-          final screenHeight = MediaQuery.of(context).size.height;
-          final spacing = screenHeight < 600 ? 12.0 : (screenHeight < 700 ? 14.0 : 16.0);
-          return Padding(
-            padding: EdgeInsets.only(bottom: spacing),
-            child: PolicyCard(policy: policies[index]),
+      body: FutureBuilder<List<PolicyModel>>(
+        future: _policiesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: AppColors.error,
+                      size: MediaQuery.of(context).size.width * 0.12,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      snapshot.error.toString(),
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.bodyMedium(context),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _reloadPolicies,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          final policies = snapshot.data ?? const [];
+          if (policies.isEmpty) {
+            return Center(
+              child: Text(
+                'No policies available',
+                style: AppTextStyles.bodyMedium(context).copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: _reloadPolicies,
+            child: ListView.builder(
+              padding: EdgeInsets.symmetric(
+                horizontal: MediaQuery.of(context).size.width * 0.01,
+                vertical: 8,
+              ),
+              itemCount: policies.length,
+              itemBuilder: (context, index) {
+                final screenHeight = MediaQuery.of(context).size.height;
+                final spacing =
+                    screenHeight < 600 ? 12.0 : (screenHeight < 700 ? 14.0 : 16.0);
+                return Padding(
+                  padding: EdgeInsets.only(bottom: spacing),
+                  child: PolicyCard(policy: policies[index]),
+                );
+              },
+            ),
           );
         },
       ),
     );
   }
 }
-

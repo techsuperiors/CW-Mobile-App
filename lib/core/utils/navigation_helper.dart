@@ -1,30 +1,35 @@
 import 'package:flutter/material.dart';
+import '../../features/approval/presentation/pages/approval_bottom_sheet.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/request/presentation/pages/request_bottom_sheet.dart';
+import '../../features/home/presentation/cubit/home_page_cubit.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 /// Helper class for navigation with bottom nav bar support
 class NavigationHelper {
-  /// Navigate to HomePage and switch to a specific tab
-  /// This should be used by all bottom nav bars across the app
+  /// Navigates to the [HomePage] and switches to the specified tab
+  /// without recreating the [HomePage] instance.
+  ///
+  /// This method should be used across the entire app whenever
+  /// bottom navigation tab switching is required.
+  ///
+  /// Unlike [Navigator.pushAndRemoveUntil], this approach:
+  /// - Preserves the existing [HomePage] state (no reload)
+  /// - Keeps [IndexedStack] pages alive in memory
+  /// - Prevents unnecessary API calls on navigation
+  ///
+  /// [context] - Must have access to [HomePageCubit] in the widget tree
+  /// [tabIndex] - The index of the tab to switch to (0-4)
   static void navigateToHomeTab(BuildContext context, int tabIndex) {
-    final navigator = Navigator.of(context);
-    
-    // Check if we're already on HomePage
-    final currentRoute = ModalRoute.of(context);
-    if (currentRoute?.settings.name == '/home') {
-      // We're on HomePage, just update the tab
-      // This will be handled by HomePage's state management
-      return;
-    }
+    // Pop all pushed routes (e.g. ApplyLeave, Listings, Details)
+    // until we reach the root route where HomePage lives.
+    // This does NOT destroy HomePage — it just clears the route stack above it.
+    Navigator.of(context).popUntil((route) => route.isFirst);
 
-    // Pop all routes and navigate to HomePage with specific tab
-    navigator.pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (context) => HomePage(initialTabIndex: tabIndex),
-        settings: const RouteSettings(name: '/home'),
-      ),
-      (route) => false,
-    );
+    // Emit the new tab index via HomePageCubit.
+    // HomePage's IndexedStack listens to this and switches
+    // the visible page without rebuilding or reloading any data.
+    context.read<HomePageCubit>().switchTab(tabIndex);
   }
 
   /// Get bottom nav bar handler for any page
@@ -41,7 +46,16 @@ class NavigationHelper {
           builder: (context) => const RequestBottomSheet(),
         );
       } else {
-        navigateToHomeTab(context, index);
+        if (index == 4) {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => const ApprovalBottomSheet(),
+          );
+        } else {
+          navigateToHomeTab(context, index);
+        }
       }
     };
   }

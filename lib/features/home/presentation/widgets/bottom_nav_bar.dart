@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../../../core/constants/module_permissions.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_assets.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../user/presentation/bloc/user_profile_bloc.dart';
+import '../../../user/presentation/bloc/user_profile_state.dart';
 
 /// Bottom navigation bar
 class BottomNavBar extends StatelessWidget {
@@ -21,75 +24,83 @@ class BottomNavBar extends StatelessWidget {
     const activeColor = Color(0xFF009688);
     // Grey color for inactive items
     const inactiveColor = Color(0xFF757575);
-    
-    return SafeArea(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
+
+    return BlocBuilder<UserProfileBloc, UserProfileState>(
+      builder: (context, state) {
+        final permissions =
+            state is UserProfileLoaded
+                ? (state.profile.role?.permissions ?? const <String>[])
+                : const <String>[];
+        final showApproval = ModulePermissions.anyApprovalAccess.any(
+          permissions.contains,
+        );
+
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, -4),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              // Services (index 0 in new order)
-              _buildNavItem(
-                index: 0,
-                icon: AppAssets.iconServices,
-                isSvgIcon: true,
-                label: AppStrings.services,
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(
+                    index: 0,
+                    icon: AppAssets.iconServices,
+                    isSvgIcon: true,
+                    label: AppStrings.services,
+                    activeColor: activeColor,
+                    inactiveColor: inactiveColor,
+                  ),
+                  _buildNavItem(
+                    index: 1,
+                    icon: AppAssets.iconPosts,
+                    isSvgIcon: true,
+                    label: AppStrings.posts,
+                    activeColor: activeColor,
+                    inactiveColor: inactiveColor,
+                  ),
+                  _buildNavItem(
+                    index: 2,
+                    icon: AppAssets.iconHome,
+                    isSvgIcon: true,
+                    label: AppStrings.home,
+                    activeColor: activeColor,
+                    inactiveColor: inactiveColor,
+                  ),
+                  _buildNavItem(
+                    index: 3,
+                    icon: AppAssets.iconRequest,
+                    isSvgIcon: true,
+                    label: AppStrings.request,
+                    activeColor: activeColor,
+                    inactiveColor: inactiveColor,
+                  ),
+                  if (showApproval)
+                    _buildNavItem(
+                      index: 4,
+                      icon: AppAssets.iconApproval,
+                      isSvgIcon: true,
+                      label: AppStrings.approval,
+                      activeColor: activeColor,
+                      inactiveColor: inactiveColor,
+                    ),
+                ],
               ),
-              // Posts (index 1 in new order)
-              _buildNavItem(
-                index: 1,
-                icon: AppAssets.iconPosts,
-                isSvgIcon: true,
-                label: AppStrings.posts,
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-              ),
-              // Home (index 2 in new order)
-              _buildNavItem(
-                index: 2,
-                icon: AppAssets.iconHome,
-                isSvgIcon: true,
-                label: AppStrings.home,
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-              ),
-              // Request (index 3 in new order)
-              _buildNavItem(
-                index: 3,
-                icon: AppAssets.iconRequest,
-                isSvgIcon: true,
-                label: AppStrings.request,
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-              ),
-              // Approval (index 4 in new order)
-              _buildNavItem(
-                index: 4,
-                icon: AppAssets.iconApproval,
-                isSvgIcon: true,
-                label: AppStrings.approval,
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -146,4 +157,3 @@ class BottomNavBar extends StatelessWidget {
     );
   }
 }
-

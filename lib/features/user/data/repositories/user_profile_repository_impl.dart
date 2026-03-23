@@ -6,7 +6,15 @@ import '../../../../core/network/network_info.dart';
 import '../../domain/entities/user_profile.dart';
 import '../../domain/repositories/user_profile_repository.dart';
 import '../datasources/user_profile_remote_datasource.dart';
-import '../models/user_profile_model.dart' hide UserInfo, ReportingManagerInfo, ReportingHrInfo, UserDepartmentInfo, UserDesignationInfo, ClientInfo;
+import '../models/user_profile_model.dart'
+    hide
+        UserInfo,
+        ReportingManagerInfo,
+        ReportingHrInfo,
+        UserDepartmentInfo,
+        UserDesignationInfo,
+        ClientInfo,
+        RoleInfo;
 
 /// User Profile repository implementation
 class UserProfileRepositoryImpl implements UserProfileRepository {
@@ -23,10 +31,10 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
     if (await networkInfo.isConnected) {
       try {
         final profileModel = await remoteDataSource.getUserProfile();
-        
+
         // Convert model to entity
         final profile = _mapModelToEntity(profileModel);
-        
+
         return Right(profile);
       } on ServerException catch (e) {
         return Left(ServerFailure(e.message));
@@ -83,43 +91,54 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
         workMode: model.user.workMode,
         maritalStatus: model.user.maritalStatus,
       ),
-      reportingManagerInfo: model.reportingManagerInfo != null
-          ? ReportingManagerInfo(
-              firstName: model.reportingManagerInfo!.firstName,
-              lastName: model.reportingManagerInfo!.lastName,
-              middleName: model.reportingManagerInfo!.middleName,
-              email: model.reportingManagerInfo!.email,
-              imageUrl: model.reportingManagerInfo!.imageUrl,
-              profileColor: model.reportingManagerInfo!.profileColor,
-            )
-          : null,
-      reportingHrInfo: model.reportingHrInfo != null
-          ? ReportingHrInfo(
-              firstName: model.reportingHrInfo!.firstName,
-              lastName: model.reportingHrInfo!.lastName,
-              middleName: model.reportingHrInfo!.middleName,
-              email: model.reportingHrInfo!.email,
-              imageUrl: model.reportingHrInfo!.imageUrl,
-              profileColor: model.reportingHrInfo!.profileColor,
-            )
-          : null,
-      userDepartment: model.userDepartment != null
-          ? UserDepartmentInfo(
-              departmentName: model.userDepartment!.departmentName,
-            )
-          : null,
-      userDesignation: model.userDesignation != null
-          ? UserDesignationInfo(
-              designationName: model.userDesignation!.designationName,
-            )
-          : null,
-      client: model.client != null
-          ? ClientInfo(
-              id: model.client!.id,
-              clientName: model.client!.clientName,
-            )
-          : null,
+      reportingManagerInfo:
+          model.reportingManagerInfo != null
+              ? ReportingManagerInfo(
+                firstName: model.reportingManagerInfo!.firstName,
+                lastName: model.reportingManagerInfo!.lastName,
+                middleName: model.reportingManagerInfo!.middleName,
+                email: model.reportingManagerInfo!.email,
+                imageUrl: model.reportingManagerInfo!.imageUrl,
+                profileColor: model.reportingManagerInfo!.profileColor,
+              )
+              : null,
+      reportingHrInfo:
+          model.reportingHrInfo != null
+              ? ReportingHrInfo(
+                firstName: model.reportingHrInfo!.firstName,
+                lastName: model.reportingHrInfo!.lastName,
+                middleName: model.reportingHrInfo!.middleName,
+                email: model.reportingHrInfo!.email,
+                imageUrl: model.reportingHrInfo!.imageUrl,
+                profileColor: model.reportingHrInfo!.profileColor,
+              )
+              : null,
+      userDepartment:
+          model.userDepartment != null
+              ? UserDepartmentInfo(
+                departmentName: model.userDepartment!.departmentName,
+              )
+              : null,
+      userDesignation:
+          model.userDesignation != null
+              ? UserDesignationInfo(
+                designationName: model.userDesignation!.designationName,
+              )
+              : null,
+      client:
+          model.client != null
+              ? ClientInfo(
+                id: model.client!.id,
+                clientName: model.client!.clientName,
+              )
+              : null,
+      role:
+          model.role != null
+              ? RoleInfo(
+                roleName: model.role!.roleName,
+                permissions: model.role!.permissions,
+              )
+              : null,
     );
   }
 }
-

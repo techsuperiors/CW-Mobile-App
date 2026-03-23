@@ -72,7 +72,7 @@ class TicketSummaryCard extends StatelessWidget {
           // Mini chart (simplified bar chart)
           SizedBox(
             width: screenWidth * 0.12,
-            height: screenWidth * 0.08,
+            height: screenHeight * 0.03,
             child: CustomPaint(
               painter: MiniBarChartPainter(
                 color: summary.color,

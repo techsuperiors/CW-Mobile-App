@@ -1,5 +1,42 @@
 /// Utility functions for time parsing and calculations
 class TimeUtils {
+  static bool isActivePunchSession({
+    String? status,
+    String? entries,
+    String? punchType,
+    String? punchIn,
+    String? punchOut,
+  }) {
+    final normalizedStatus = status?.toLowerCase().trim();
+    final normalizedEntries = entries?.toLowerCase().trim();
+    final normalizedPunchType = punchType?.toLowerCase().trim();
+
+    // Ignore system-generated weekend/holiday rows that do not represent
+    // a real user punch session.
+    if ((normalizedStatus == 'weekend' || normalizedStatus == 'holiday') &&
+        (normalizedEntries == 'system' ||
+            normalizedPunchType == null ||
+            normalizedPunchType.isEmpty)) {
+      return false;
+    }
+
+    final hasPunchIn = punchIn != null && punchIn.isNotEmpty && punchIn != '-';
+    if (!hasPunchIn) return false;
+
+    final hasPunchOut =
+        punchOut != null && punchOut.isNotEmpty && punchOut != '-';
+
+    if (!hasPunchOut) return true;
+
+    try {
+      final inTime = DateTime.parse(punchIn);
+      final outTime = DateTime.parse(punchOut);
+      return inTime.isAfter(outTime);
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Parse time string to hours (double)
   /// Supports formats: "HH:MM", "H:MM", "MM" (minutes), "H" (hours)
   /// Returns hours as double (e.g., 7.5 for 7 hours 30 minutes)
@@ -20,11 +57,10 @@ class TimeUtils {
       }
 
       // Try parsing as minutes (integer)
-      final minutes = int.tryParse(timeString.trim());
-      if (minutes != null) {
-        return minutes / 60.0;
+      final seconds = int.tryParse(timeString.trim());
+      if (seconds != null) {
+        return seconds / 3600.0;
       }
-
       // Try parsing as hours (double)
       final hours = double.tryParse(timeString.trim());
       if (hours != null) {
@@ -50,7 +86,7 @@ class TimeUtils {
       final punchInDateTime = DateTime.parse(punchInTime);
       final now = DateTime.now();
       final difference = now.difference(punchInDateTime);
-      return difference.inMinutes / 60.0;
+      return difference.inSeconds / 3600.0;
     } catch (e) {
       return 0.0;
     }
@@ -59,54 +95,48 @@ class TimeUtils {
   /// Get worked hours from attendance details
   /// If punched in but not out, calculates from punch in time to now
   /// If punched out, uses totalTime
-  static double getWorkedHours({
-    String? totalTime,
-    String? punchIn,
-    String? punchOut,
-    String? punchInIp,
-  }) {
-    // Check if punched out
-    final isPunchedOut = punchOut != null && 
-        punchOut.isNotEmpty && 
-        punchOut != '-';
-    
-    // Check if punched in - use punchIn as primary indicator (user has punch-in time, no punch-out)
-    // punchInIp is optional - API may use punch_in_IP or punch_in_ip
-    final hasPunchInIp = punchInIp != null && 
-        punchInIp.isNotEmpty && 
-        punchInIp != '-';
-    final hasPunchIn = punchIn != null && 
-        punchIn.isNotEmpty && 
-        punchIn != '-';
-    final isPunchedIn = (hasPunchInIp || hasPunchIn) && !isPunchedOut;
+  static double getWorkedHours(
+      {
+        String? totalTime,
+        String? status,
+        String? entries,
+        String? punchType,
+        String? punchIn,
+        String? punchOut,
+        String? punchInIp,
+      })
+  {
+    final hasPunchOut = punchOut != null && punchOut.isNotEmpty && punchOut != '-';
 
-    // If punched out, use totalTime (if available)
-    if (isPunchedOut) {
-      final totalHours = parseTimeToHours(totalTime);
-      // If totalTime is available and valid, use it
-      if (totalHours > 0) {
-        return totalHours;
-      }
-      // Otherwise, calculate from punch in to punch out
-      if (punchIn != null && punchIn.isNotEmpty && punchIn != '-') {
-        try {
-          final punchInDateTime = DateTime.parse(punchIn);
-          final punchOutDateTime = DateTime.parse(punchOut);
-          final difference = punchOutDateTime.difference(punchInDateTime);
-          return difference.inMinutes / 60.0;
-        } catch (e) {
-          return 0.0;
-        }
-      }
-      return 0.0;
-    }
+    final hasPunchIn = punchIn != null && punchIn.isNotEmpty && punchIn != '-';
+    final isPunchedIn = isActivePunchSession(
+      status: status,
+      entries: entries,
+      punchType: punchType,
+      punchIn: punchIn,
+      punchOut: punchOut,
+    );
 
-    // If punched in but not out, calculate from punch in time to now
-    if (isPunchedIn && punchIn != null && punchIn.isNotEmpty && punchIn != '-') {
+    if (isPunchedIn && hasPunchIn) {
+      // Live calculation from punch in to now
       return calculateWorkedHoursFromPunchIn(punchIn);
     }
 
-    // Fallback to totalTime if available
+    if (!isPunchedIn && hasPunchOut) {
+      // Prefer totalTime (now correctly parsed as seconds)
+      final totalHours = parseTimeToHours(totalTime);
+      if (totalHours > 0) return totalHours;
+
+      // Fallback: calculate from punchIn to punchOut
+      if (hasPunchIn) {
+        try {
+          final inTime = DateTime.parse(punchIn);
+          final outTime = DateTime.parse(punchOut);
+          return outTime.difference(inTime).inSeconds / 3600.0;
+        } catch (_) {}
+      }
+    }
+
     return parseTimeToHours(totalTime);
   }
 }

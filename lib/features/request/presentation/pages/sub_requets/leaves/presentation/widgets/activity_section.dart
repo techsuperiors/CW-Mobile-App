@@ -87,13 +87,7 @@ class ActivitySection extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Description
-                  Text(
-                    'Loren ipsum is simply dummy text of the printing and typesetting industry.',
-                    style: AppTextStyles.bodySmall(context).copyWith(
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                    ),
-                  ),
+
                   SizedBox(height: screenHeight * 0.025),
                   // Activity items
                   _buildActivityItem(

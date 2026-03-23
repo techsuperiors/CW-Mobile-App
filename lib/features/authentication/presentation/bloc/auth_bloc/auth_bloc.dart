@@ -10,7 +10,6 @@ import '../../../../../core/utils/credentials_storage.dart';
 import '../../../../user/domain/usecases/get_user_profile_usecase.dart';
 import '../../../../user/presentation/bloc/user_profile_bloc.dart';
 import '../../../../user/presentation/bloc/user_profile_event.dart';
-import '../../../../user/presentation/bloc/user_profile_state.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
@@ -36,30 +35,30 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(const AuthLoading());
     try {
-      final user = await authRepository.login(
-        event.email,
-        event.password,
-      );
-      
+      final user = await authRepository.login(event.email, event.password);
+
       // Handle remember me functionality
       if (event.rememberMe) {
-        await CredentialsStorage.saveCredentials(event.email, event.password);
+        await CredentialsStorage.saveRememberedAccount(
+          event.email,
+          event.password,
+        );
       } else {
-        await CredentialsStorage.clearCredentials();
+        await CredentialsStorage.removeAccount(event.email);
       }
-      
+
       // Ensure token is saved before fetching profile
       // Token should already be saved in authRepository.login(), but we verify
       // Add a small delay to ensure token is fully persisted
       await Future.delayed(const Duration(milliseconds: 100));
-      
+
       final token = TokenStorage.getToken();
       if (token == null || token.isEmpty) {
         debugPrint('Warning: Token not found after login');
       } else {
         debugPrint('Token retrieved successfully, length: ${token.length}');
       }
-      
+
       // Fetch user profile after successful login with auth token
       // The token will be automatically added to the request header by ApiClient
       if (getUserProfileUseCase != null && token != null && token.isNotEmpty) {
@@ -82,8 +81,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
               debugPrint('Name: ${profile.user.fullName}');
               debugPrint('Email: ${profile.user.email}');
               debugPrint('Employee ID: ${profile.user.employeeID}');
-              debugPrint('Designation: ${profile.userDesignation?.designationName ?? 'N/A'}');
-              debugPrint('Department: ${profile.userDepartment?.departmentName ?? 'N/A'}');
+              debugPrint(
+                'Designation: ${profile.userDesignation?.designationName ?? 'N/A'}',
+              );
+              debugPrint(
+                'Department: ${profile.userDepartment?.departmentName ?? 'N/A'}',
+              );
+              debugPrint('Client Name: ${profile.client?.clientName ?? 'N/A'}');
+              debugPrint('Role: ${profile.role?.roleName ?? 'N/A'}');
+              debugPrint(
+                'Permissions Count: ${profile.role?.permissions?.length ?? 0}',
+              );
+              debugPrint('Employment Status: ${profile.employmentStatus}');
+              debugPrint('In Probation: ${profile.inProbation}');
+              debugPrint('CTC: ${profile.ctc ?? 'N/A'}');
             },
           );
         } catch (e) {
@@ -96,7 +107,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       } else {
         debugPrint('Warning: Token is empty, cannot fetch user profile');
       }
-      
+
       emit(AuthAuthenticated(user));
     } on AppException catch (e) {
       final failure = ErrorHandler.handleException(e);
@@ -121,7 +132,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         }
         emit(const AuthUnauthenticated());
       } else {
-        emit(AuthError(const ServerFailure('Logout failed. Please try again.')));
+        emit(
+          AuthError(const ServerFailure('Logout failed. Please try again.')),
+        );
       }
     } on AppException catch (e) {
       final failure = ErrorHandler.handleException(e);
@@ -139,7 +152,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       // Check if token exists
       final hasToken = TokenStorage.hasToken();
-      
+
       if (hasToken) {
         // Token exists, user is authenticated
         // Create minimal user object (token exists but no user data from API)
@@ -152,18 +165,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           createdAt: null,
         );
         emit(AuthAuthenticated(user));
-        
+
         // Load user profile if available
         if (getUserProfileUseCase != null && userProfileBloc != null) {
           try {
             final profileResult = await getUserProfileUseCase!();
             profileResult.fold(
               (failure) {
-                debugPrint('Failed to load user profile on auth check: ${failure.message}');
+                debugPrint(
+                  'Failed to load user profile on auth check: ${failure.message}',
+                );
               },
               (profile) {
                 userProfileBloc!.add(SetUserProfile(profile));
-                debugPrint('User profile loaded on auth check: ${profile.user.fullName}');
+                debugPrint(
+                  'User profile loaded on auth check: ${profile.user.fullName}',
+                );
               },
             );
           } catch (e) {
@@ -180,4 +197,3 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 }
-

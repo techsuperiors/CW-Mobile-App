@@ -31,14 +31,15 @@ class AgreementMapper {
       id: agreement.id,
       agreementName: agreement.agreementName,
       employeeName: agreement.agreementAssignedTo.fullName,
-      employeeAvatar: AppAssets.placeholderAvatar,
+      employeeAvatar: agreement.agreementAssignedTo.imageUrl ?? AppAssets.placeholderAvatar,
       agreementType: agreement.category,
       assignedBy: agreement.agreementAssignedBy.fullName,
-      assignedByAvatar: AppAssets.placeholderAvatar,
+      assignedByAvatar: agreement.agreementAssignedBy.imageUrl?? AppAssets.placeholderAvatar,
       expiryDate: formattedExpiryDate.isNotEmpty ? formattedExpiryDate : 'N/A',
       status: agreement.agreementStatus,
       content: agreement.agreementContent,
       signatureUrl: agreement.signatureUrl,
+      documentUrl: agreement.documentUrl,
     );
   }
 

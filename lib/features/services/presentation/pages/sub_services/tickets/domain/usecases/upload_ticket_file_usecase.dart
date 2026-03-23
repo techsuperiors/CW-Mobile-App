@@ -9,7 +9,7 @@ class UploadTicketFileUseCase {
 
   UploadTicketFileUseCase(this.repository);
 
-  Future<Either<Failure, TicketStats>> call(
+  Future<Either<Failure, List<UploadedFile>>> call(
     int clientId,
     int ticketId,
     String filePath,

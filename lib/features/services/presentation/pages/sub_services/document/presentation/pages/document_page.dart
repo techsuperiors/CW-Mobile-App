@@ -68,8 +68,8 @@ class _DocumentPageState extends State<DocumentPage> with SingleTickerProviderSt
               Flexible(
                 child: Text(
                   AppStrings.services,
-                  style: AppTextStyles.bodyLarge(context).copyWith(
-                    fontWeight: FontWeight.w500,
+                  style: AppTextStyles.bodyMedium(context).copyWith(
+                    fontWeight: FontWeight.w400,
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   overflow: TextOverflow.ellipsis,

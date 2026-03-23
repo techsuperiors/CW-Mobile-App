@@ -8,147 +8,139 @@ class WfhRequestCard extends StatelessWidget {
   final WfhRequestModel wfhRequest;
   final VoidCallback? onTap;
 
-  const WfhRequestCard({
-    super.key,
-    required this.wfhRequest,
-    this.onTap,
-  });
+  const WfhRequestCard({super.key, required this.wfhRequest, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-
-    // Get status color
     final statusColor = _getStatusColor(wfhRequest.status);
+    final isPending = wfhRequest.status == WfhStatus.pending;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        margin: EdgeInsets.only(
-          bottom: screenHeight * 0.012, // 1.2% of screen height
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: AppColors.border,
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-              spreadRadius: 0,
-            ),
-          ],
-        ),
-        clipBehavior: Clip.none,
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Colored left border
-              Container(
-                width: screenWidth * 0.032, // 3.2% of screen width
-                decoration: BoxDecoration(
-                  color: statusColor, // Use status color (blue for pending, green for approved, red for rejected)
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
-                  ),
-                ),
-              ),
-              // Content
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: screenWidth * 0.022, // 2.2% of screen width
-                    vertical: screenHeight * 0.018, // 1.8% of screen height
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // WFH details
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // No. of Days
-                            Text(
-                              'No. of Days ${wfhRequest.numberOfDays.toString().padLeft(2, '0')}',
-                              style: AppTextStyles.bodyMedium(context).copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            SizedBox(height: screenHeight * 0.006), // 0.6% of screen height
-                            // Date range with calendar icon
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today,
-                                  size: screenWidth * 0.032, // 3.2% of screen width
-                                  color: statusColor, // Use status color for calendar icon
-                                ),
-                                SizedBox(width: screenWidth * 0.016), // 1.6% of screen width
-                                Flexible(
-                                  child: Text(
-                                    wfhRequest.dateRange,
-                                    style: AppTextStyles.bodySmall(context).copyWith(
-                                      fontWeight: FontWeight.w400,
-                                      color: statusColor, // Use status color for date text
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: screenHeight * 0.006), // 0.6% of screen height
-                            // Reason
-                            Text(
-                              wfhRequest.reason,
-                              style: AppTextStyles.bodySmall(context).copyWith(
-                                fontWeight: FontWeight.w400,
-                                color: AppColors.textSecondary,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(width: screenWidth * 0.021), // 2.1% of screen width
-                      // Status badge (white text on colored background)
-                      Container(
-                        constraints: BoxConstraints(
-                          maxWidth: screenWidth * 0.25, // Prevent overflow
-                        ),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: screenWidth * 0.027, // 2.7% of screen width
-                          vertical: screenHeight * 0.008, // 0.8% of screen height
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          wfhRequest.status.displayName,
-                          style: AppTextStyles.bodySmall(context).copyWith(
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+        margin: EdgeInsets.only(bottom: screenHeight * 0.010),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: isPending
+                ? null
+                : Border.all(color: AppColors.border, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
             ],
+          ),
+          clipBehavior: Clip.hardEdge,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Colored left accent bar
+                Container(
+                  width: screenWidth * 0.018,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(8),
+                      bottomLeft: Radius.circular(8),
+                    ),
+                  ),
+                ),
+                // Content
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: screenWidth * 0.034,
+                      vertical: screenHeight * 0.014,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left: title + date + duration
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Subject / Title
+                              Text(
+                                wfhRequest.subject ?? '',
+                                style: AppTextStyles.bodyMedium(context).copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              SizedBox(height: screenHeight * 0.006),
+                              // Date range row
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.calendar_today_outlined,
+                                    size: screenWidth * 0.038,
+                                    color: statusColor,
+                                  ),
+                                  SizedBox(width: screenWidth * 0.014),
+                                  Flexible(
+                                    child: Text(
+                                      wfhRequest.dateRange,
+                                      style: AppTextStyles.bodySmall(context).copyWith(
+                                        fontWeight: FontWeight.w500,
+                                        color: statusColor,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: screenHeight * 0.005),
+                              // Duration
+                              Text(
+                                'Duration : ${wfhRequest.numberOfDays} ${wfhRequest.numberOfDays == 1 ? 'day' : 'days'}',
+                                style: AppTextStyles.bodySmall(context).copyWith(
+                                  fontWeight: FontWeight.w400,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: screenWidth * 0.02),
+                        Container(
+                          constraints: BoxConstraints(maxWidth: screenWidth * 0.26),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: screenWidth * 0.030,
+                            vertical: screenHeight * 0.002,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            wfhRequest.status.displayName,
+                            style: AppTextStyles.bodySmall(context).copyWith(
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+
+                        // Status badge
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -158,11 +150,14 @@ class WfhRequestCard extends StatelessWidget {
   Color _getStatusColor(WfhStatus status) {
     switch (status) {
       case WfhStatus.pending:
-        return const Color(0xFF2196F3); // Blue
+        return const Color(0xFF0086C9);
       case WfhStatus.approved:
-        return const Color(0xFF4CAF50); // Green
+        return const Color(0xFF12B76A);
       case WfhStatus.rejected:
-        return const Color(0xFFE53935); // Red
+        return const Color(0xFFF04438);
+      case WfhStatus.withdrawn:
+        return const Color(0xFF9E9E9E);
     }
   }
 }
+

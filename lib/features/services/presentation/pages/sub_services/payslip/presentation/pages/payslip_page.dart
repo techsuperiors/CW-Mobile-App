@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
-import '../data/payslip_data.dart';
+import '../bloc/payslip_bloc.dart';
+import '../bloc/payslip_event.dart';
+import '../bloc/payslip_state.dart';
 import '../widgets/payslip_card.dart';
 
 /// Payslip page showing grid of monthly payslips
-class PayslipPage extends StatelessWidget {
+class PayslipPage extends StatefulWidget {
   final int? serviceId;
 
   const PayslipPage({
@@ -18,10 +21,28 @@ class PayslipPage extends StatelessWidget {
   });
 
   @override
+  State<PayslipPage> createState() => _PayslipPageState();
+}
+
+class _PayslipPageState extends State<PayslipPage> {
+  String selectedYear = DateTime.now().year.toString();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPayslips();
+  }
+
+  void _fetchPayslips() {
+    context.read<PayslipBloc>().add(FetchPayslipsEvent(year: selectedYear));
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final payslips = PayslipData.getPayslips();
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final currentYear = DateTime.now().year;
+    final years = List.generate(5, (index) => (currentYear - index).toString());
 
     return ResponsiveScaffold(
       appBar: AppBar(
@@ -37,13 +58,13 @@ class PayslipPage extends StatelessWidget {
               Icon(
                 Icons.arrow_back_ios,
                 color: Theme.of(context).colorScheme.primary,
-                size: screenWidth * 0.048, // ~4.8% of screen width
+                size: screenWidth * 0.048,
               ),
               Flexible(
                 child: Text(
-                  AppStrings.services,
-                  style: AppTextStyles.bodyLarge(context).copyWith(
-                    fontWeight: FontWeight.w500,
+                  "Back",
+                  style: AppTextStyles.bodyMedium(context).copyWith(
+                    fontWeight: FontWeight.w400,
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -61,32 +82,124 @@ class PayslipPage extends StatelessWidget {
           ),
         ),
         centerTitle: true,
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Filter by year',
+            initialValue: selectedYear,
+            icon: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                color: AppColors.backgroundLight,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.filter_list_rounded,
+                    size: screenWidth * 0.045,
+                    color: AppColors.textPrimary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    selectedYear,
+                    style: AppTextStyles.bodySmall(context).copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            onSelected: (value) {
+              if (value == selectedYear) return;
+              setState(() {
+                selectedYear = value;
+              });
+              _fetchPayslips();
+            },
+            itemBuilder:
+                (context) =>
+                    years
+                        .map(
+                          (year) => PopupMenuItem<String>(
+                            value: year,
+                            child: Text(year),
+                          ),
+                        )
+                        .toList(),
+          ),
+        ],
       ),
       bottomNavigationBar: BottomNavBar(
-        currentIndex: 0, // Services is active
+        currentIndex: 0,
         onTap: NavigationHelper.getBottomNavHandler(context),
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(
-          horizontal: screenWidth * 0.01,
-          vertical: screenHeight * 0.02,
-        ),
-        child: GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: screenWidth * 0.01,
-            mainAxisSpacing: screenHeight * 0.02,
-            childAspectRatio: 0.75, // Adjust based on card dimensions
-          ),
-          itemCount: payslips.length,
-          itemBuilder: (context, index) {
-            return PayslipCard(payslip: payslips[index]);
-          },
-        ),
+      body: BlocBuilder<PayslipBloc, PayslipState>(
+        builder: (context, state) {
+          if (state is PayslipLoading || state is PayslipInitial) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is PayslipError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    state.message,
+                    style: AppTextStyles.bodyMedium(
+                      context,
+                    ).copyWith(color: AppColors.error),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _fetchPayslips,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          } else if (state is PayslipLoaded) {
+            final payslips = state.payslips;
+
+            if (payslips.isEmpty) {
+              return Center(
+                child: Text(
+                  'No payslips found for $selectedYear',
+                  style: AppTextStyles.bodyLarge(
+                    context,
+                  ).copyWith(color: AppColors.textSecondary),
+                ),
+              );
+            }
+
+            return RefreshIndicator(
+              onRefresh: () async {
+                _fetchPayslips();
+              },
+              child: GridView.builder(
+                padding: EdgeInsets.symmetric(
+                  horizontal: screenWidth * 0.03,
+                  vertical: screenHeight * 0.02,
+                ),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: screenWidth * 0.03,
+                  mainAxisSpacing: screenHeight * 0.02,
+                  childAspectRatio: 0.85,
+                ),
+                itemCount: payslips.length,
+                itemBuilder: (context, index) {
+                  return PayslipCard(payslip: payslips[index]);
+                },
+              ),
+            );
+          }
+          return const SizedBox();
+        },
       ),
     );
   }
 }
-

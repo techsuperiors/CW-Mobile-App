@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:flutter/material.dart';
-
 /// Service model for services page
 class ServiceModel {
   final String id;
@@ -11,6 +9,8 @@ class ServiceModel {
   final IconData? iconData; // Material icon (optional)
   final Color iconColor;
   final Color backgroundColor;
+  final String? requiredPermission;
+  final List<String>? anyOfPermissions;
 
   const ServiceModel({
     required this.id,
@@ -20,6 +20,8 @@ class ServiceModel {
     this.iconData,
     required this.iconColor,
     required this.backgroundColor,
+    this.requiredPermission,
+    this.anyOfPermissions,
   });
 
   /// Create a copy with updated values
@@ -31,6 +33,8 @@ class ServiceModel {
     IconData? iconData,
     Color? iconColor,
     Color? backgroundColor,
+    String? requiredPermission,
+    List<String>? anyOfPermissions,
   }) {
     return ServiceModel(
       id: id ?? this.id,
@@ -40,6 +44,8 @@ class ServiceModel {
       iconData: iconData ?? this.iconData,
       iconColor: iconColor ?? this.iconColor,
       backgroundColor: backgroundColor ?? this.backgroundColor,
+      requiredPermission: requiredPermission ?? this.requiredPermission,
+      anyOfPermissions: anyOfPermissions ?? this.anyOfPermissions,
     );
   }
 

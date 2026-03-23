@@ -6,6 +6,8 @@ class UpcomingEvent {
   final String date;
   final String formattedDate;
   final String iconName;
+  final String? imageUrl;
+  final String? profileColor;
 
   UpcomingEvent({
     this.id,
@@ -14,6 +16,8 @@ class UpcomingEvent {
     required this.date,
     required this.formattedDate,
     required this.iconName,
+    this.imageUrl,
+    this.profileColor
   });
 }
 

@@ -1,462 +1,651 @@
+import 'package:collectivWork/core/constants/app_assets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/common/app_section_header.dart';
+import '../../../calendar/domain/entities/calendar_day_entity.dart';
 
-/// Attendance calendar widget
+/// Colour-coded circular attendance calendar.
 class AttendanceCalendar extends StatefulWidget {
-  const AttendanceCalendar({super.key});
+  final List<CalendarDayEntity> calendarDays;
+  final Function(DateTime newMonth)? onMonthChanged;
+  final bool isLoading;
+
+  const AttendanceCalendar({
+    super.key,
+    this.calendarDays = const [],
+    this.onMonthChanged,
+    this.isLoading = false,
+  });
 
   @override
   State<AttendanceCalendar> createState() => _AttendanceCalendarState();
 }
 
 class _AttendanceCalendarState extends State<AttendanceCalendar> {
-  DateTime _currentDate = DateTime(2025, 12, 1); // Start with December 2025
-  DateTime? _selectedDate;
+  late DateTime _currentDate;
+
+  static const _headers = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+  @override
+  void initState() {
+    super.initState();
+    _currentDate = DateTime(DateTime.now().year, DateTime.now().month);
+  }
 
   void _previousMonth() {
     setState(() {
       _currentDate = DateTime(_currentDate.year, _currentDate.month - 1);
     });
+    widget.onMonthChanged?.call(_currentDate);
   }
 
   void _nextMonth() {
     setState(() {
       _currentDate = DateTime(_currentDate.year, _currentDate.month + 1);
     });
+    widget.onMonthChanged?.call(_currentDate);
   }
 
-  void _selectDate(DateTime date) {
-    setState(() {
-      _selectedDate = date;
-    });
+  String _dateKey(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  CalendarDayEntity? _findDay(DateTime date) {
+    final key = _dateKey(date);
+    try {
+      return widget.calendarDays.firstWhere((d) => d.date == key);
+    } catch (_) {
+      return null;
+    }
   }
 
-  String _getMonthName(DateTime date) {
-    return DateFormat('MMMM').format(date);
+  bool _isCurrentMonth(DateTime d) =>
+      d.year == _currentDate.year && d.month == _currentDate.month;
+
+  bool _isToday(DateTime d) {
+    final now = DateTime.now();
+    return d.year == now.year && d.month == now.month && d.day == now.day;
   }
 
-  List<DateTime?> _getCalendarDays() {
-    final firstDayOfMonth = DateTime(_currentDate.year, _currentDate.month, 1);
-    final lastDayOfMonth = DateTime(_currentDate.year, _currentDate.month + 1, 0);
-    
-    // Get the weekday of the first day (0 = Sunday, 6 = Saturday)
-    final firstDayWeekday = firstDayOfMonth.weekday % 7;
-    
-    final days = <DateTime?>[];
-    
-    // Add days from previous month
-    final previousMonth = DateTime(_currentDate.year, _currentDate.month - 1);
-    final lastDayOfPreviousMonth = DateTime(_currentDate.year, _currentDate.month, 0);
-    for (int i = firstDayWeekday - 1; i >= 0; i--) {
-      days.add(DateTime(previousMonth.year, previousMonth.month, lastDayOfPreviousMonth.day - i));
-    }
-    
-    // Add all days of the current month
-    for (int day = 1; day <= lastDayOfMonth.day; day++) {
-      days.add(DateTime(_currentDate.year, _currentDate.month, day));
-    }
-    
-    // Add days from next month to fill the grid (6 rows x 7 columns = 42 cells)
-    final remainingCells = 42 - days.length;
-    for (int day = 1; day <= remainingCells; day++) {
-      days.add(DateTime(_currentDate.year, _currentDate.month + 1, day));
-    }
-    
-    return days;
-  }
+  bool _isWeekend(DateTime d) => d.weekday == 6 || d.weekday == 7;
 
-  bool _isCurrentMonth(DateTime date) {
-    return date.year == _currentDate.year && date.month == _currentDate.month;
-  }
+  List<DateTime?> _buildGrid() {
+    final first = DateTime(_currentDate.year, _currentDate.month, 1);
+    final last = DateTime(_currentDate.year, _currentDate.month + 1, 0);
+    final startOffset = first.weekday % 7; // 0 = Sunday
 
-  bool _isWeekend(DateTime date) {
-    final weekday = date.weekday % 7;
-    return weekday == 0 || weekday == 6; // Sunday or Saturday
-  }
-
-  // Mock data for date states - in real app, this would come from API
-  DateState _getDateState(DateTime date) {
-    if (!_isCurrentMonth(date)) {
-      return DateState.adjacentMonth;
+    final grid = <DateTime?>[];
+    for (int i = 0; i < startOffset; i++) {
+      grid.add(first.subtract(Duration(days: startOffset - i)));
     }
-    
-    if (_isWeekend(date)) {
-      return DateState.weekendUnavailable;
+    for (int d = 1; d <= last.day; d++) {
+      grid.add(DateTime(_currentDate.year, _currentDate.month, d));
     }
-    
-    // Mock special dates - replace with actual data
-    final day = date.day;
-    if ([2, 5, 6, 9, 19, 20, 21, 22, 23].contains(day)) {
-      return DateState.green;
-    } else if ([7, 8, 16].contains(day)) {
-      return DateState.red;
-    } else if ([12, 13, 14, 15].contains(day)) {
-      return DateState.blue;
-    }
-    
-    return DateState.available;
-  }
-
-  Widget _buildDateCell(BuildContext context, DateTime date, DateState state, bool isCurrentMonth) {
-    final mediaQuery = MediaQuery.of(context);
-    final screenWidth = mediaQuery.size.width;
-    final cellSize = (screenWidth * 0.10).clamp(32.0, 42.0); // 10% of screen width, clamped
-
-    Color backgroundColor;
-    Color textColor;
-    bool showStripes = false;
-
-    switch (state) {
-      case DateState.adjacentMonth:
-        backgroundColor = AppColors.background;
-        textColor = AppColors.textSecondary;
-        break;
-      case DateState.weekendUnavailable:
-        backgroundColor = AppColors.backgroundLight;
-        textColor = AppColors.textSecondary;
-        showStripes = true;
-        break;
-      case DateState.available:
-        backgroundColor = AppColors.background;
-        textColor = AppColors.textPrimary;
-        break;
-      case DateState.green:
-        backgroundColor = AppColors.success;
-        textColor = AppColors.textWhite;
-        break;
-      case DateState.red:
-        backgroundColor = AppColors.error;
-        textColor = AppColors.textWhite;
-        break;
-      case DateState.blue:
-        backgroundColor = AppColors.primary;
-        textColor = AppColors.textWhite;
-        break;
-    }
-
-    return Container(
-      width: cellSize,
-      height: cellSize,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: backgroundColor,
-      ),
-      child: CustomPaint(
-        painter: showStripes ? StripedBackgroundPainter() : null,
-        child: Center(
-          child: Text(
-            '${date.day}',
-            style: AppTextStyles.bodyMedium(context).copyWith(
-              color: textColor,
-            ),
-          ),
+    while (grid.length < 35) {
+      grid.add(
+        DateTime(
+          _currentDate.year,
+          _currentDate.month + 1,
+          grid.length - last.day - startOffset + 1,
         ),
-      ),
+      );
+    }
+    return grid;
+  }
+
+  // ─── Style logic ─────────────────────────────────────────────────────────────
+
+  _DayStyle _getStyle(DateTime date) {
+    final isCurrent = _isCurrentMonth(date);
+    final isToday = _isToday(date);
+
+    if (!isCurrent) {
+      return _DayStyle(
+        circleColor: AppColors.border.withOpacity(0.35),
+        textColor: AppColors.textSecondary.withOpacity(0.45),
+        showCircle: true,
+        label: null,
+        isHoliday: false,
+        isWeekend: false,
+        isLate: false,
+      );
+    }
+
+    final day = _findDay(date);
+    final isWeekoff = _isWeekend(date) || day?.isWeekoff == true;
+
+    if (isWeekoff) {
+      // Override 1: Holiday on a weekoff day
+      if (day?.isHoliday == true) {
+        return _DayStyle(
+          circleColor: const Color(0xFFFF6B6B),
+          textColor: Colors.white,
+          showCircle: true,
+          label: null,
+          isHoliday: true,
+          holidayName: day?.holidayName,
+          isWeekend: false,
+          isLate: false,
+        );
+      }
+      // Override 2: User came in on weekoff (Present)
+      if (day?.status == 'Present') {
+        return _DayStyle(
+          circleColor: const Color(0xFF0B7F7F),
+          textColor: Colors.white,
+          showCircle: true,
+          label: day!.isLateEntry ? 'Late' : null,
+          isHoliday: false,
+          isWeekend: false,
+          isLate: day.isLateEntry,
+        );
+      }
+      // Override 3: WFH on weekoff
+      if (day?.status == 'WFH') {
+        return _DayStyle(
+          circleColor: const Color(0xFF27AE60),
+          textColor: Colors.white,
+          showCircle: true,
+          label: 'WFH',
+          isHoliday: false,
+          isWeekend: false,
+          isLate: day!.isLateEntry,
+        );
+      }
+      // Default weekoff: diagonal stripes
+      return _DayStyle(
+        circleColor: Colors.transparent,
+        textColor: AppColors.textSecondary,
+        showCircle: false,
+        label: null,
+        isHoliday: false,
+        isWeekend: true,
+        // triggers stripe painter
+        isLate: false,
+      );
+    }
+
+    // ── Regular weekday ──────────────────────────────────────────────────────
+
+    // Today with no API data
+    if (isToday && day == null) {
+      return _DayStyle(
+        circleColor: const Color(0xFFFFCA28),
+        textColor: Colors.white,
+        showCircle: true,
+        label: null,
+        isHoliday: false,
+        isWeekend: false,
+        isLate: false,
+      );
+    }
+
+    if (day == null) {
+      // No data at all — gray circle
+      return _DayStyle(
+        circleColor:
+            isToday
+                ? const Color(0xFFFFCA28)
+                : AppColors.border.withOpacity(0.35),
+        textColor: isToday ? Colors.white : AppColors.textSecondary,
+        showCircle: true,
+        label: null,
+        isHoliday: false,
+        isWeekend: false,
+        isLate: false,
+      );
+    }
+
+    // PRIORITY 1: Holiday (show even if isFuture=true — the API marks future holidays too)
+    if (day.isHoliday) {
+      return _DayStyle(
+        circleColor: const Color(0xFFFF6B6B),
+        textColor: Colors.white,
+        showCircle: true,
+        label: null,
+        isHoliday: true,
+        holidayName: day.holidayName,
+        isWeekend: false,
+        isLate: false,
+      );
+    }
+
+    final todayColor = isToday ? const Color(0xFFFFCA28) : null;
+
+    // PRIORITY 2: Status (show even if isFuture=true — covers pre-planned WFH/Leave)
+    switch (day.status) {
+      case 'Present':
+        return _DayStyle(
+          circleColor: todayColor ?? const Color(0xFF0B7F7F),
+          textColor: Colors.white,
+          showCircle: true,
+          label: day.isLateEntry ? 'Late' : null,
+          isHoliday: false,
+          isWeekend: false,
+          isLate: day.isLateEntry,
+        );
+      case 'WFH':
+        return _DayStyle(
+          circleColor: todayColor ?? const Color(0xFF27AE60),
+          textColor: Colors.white,
+          showCircle: true,
+          label: 'WFH',
+          isHoliday: false,
+          isWeekend: false,
+          isLate: day.isLateEntry,
+        );
+      case 'Leave':
+        return _DayStyle(
+          circleColor: todayColor ?? const Color(0xFFFF8C00),
+          textColor: Colors.white,
+          showCircle: true,
+          label: day.leaveType ?? 'Leave',
+          isHoliday: false,
+          isWeekend: false,
+          isLate: false,
+        );
+      case 'Absent':
+        return _DayStyle(
+          circleColor: todayColor ?? const Color(0xFFE74C3C),
+          textColor: Colors.white,
+          showCircle: true,
+          label: null,
+          isHoliday: false,
+          isWeekend: false,
+          isLate: false,
+        );
+      case 'Holiday':
+        return _DayStyle(
+          circleColor: const Color(0xFFFF6B6B),
+          textColor: Colors.white,
+          showCircle: true,
+          label: null,
+          isHoliday: true,
+          holidayName: day.holidayName,
+          isWeekend: false,
+          isLate: false,
+        );
+    }
+
+    // PRIORITY 3: isFuture with no meaningful status — gray
+    return _DayStyle(
+      circleColor:
+          isToday
+              ? const Color(0xFFFFCA28)
+              : AppColors.border.withOpacity(0.35),
+      textColor: isToday ? Colors.white : AppColors.textSecondary,
+      showCircle: true,
+      label: null,
+      isHoliday: false,
+      isWeekend: false,
+      isLate: false,
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final calendarDays = _getCalendarDays();
+  // ─── Cell builder ─────────────────────────────────────────────────────────────
 
-    final screenWidth = MediaQuery.of(context).size.width;
-    
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.042), // ~4.2% of screen width
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildCell(
+    BuildContext context,
+    DateTime? date,
+    double cellW,
+    double cellH,
+  ) {
+    if (date == null) return SizedBox(width: cellW, height: cellH);
+
+    final style = _getStyle(date);
+    // Circle is 75% of cell width, capped for readability
+    final circleD = (cellW * 0.75).clamp(28.0, 46.0);
+    final fontSize = (circleD * 0.36).clamp(9.0, 15.0);
+    final labelFontSize = (circleD * 0.25).clamp(7.0, 10.0);
+
+    return SizedBox(
+      width: cellW,
+      height: cellH,
+      child: Stack(
         children: [
-          AppSectionHeader(title: AppStrings.calendar),
-          SizedBox(
-            height: MediaQuery.of(context).size.height * 0.02, // 2% of screen height
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.border,
-                width: 1,
-                style: BorderStyle.solid,
-              ),
+          // Weekend stripe background
+          if (style.isWeekend)
+            Positioned.fill(
+              child: ClipRect(child: CustomPaint(painter: _StripePainter())),
             ),
-            child: CustomPaint(
-              painter: DottedBorderPainter(),
-              child: Padding(
-                padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04), // 4% of screen width
-                child: Column(
-                  children: [
-                    // Month header - Previous month, Current month, Next month with arrows
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Left arrow
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: Icon(
-                            Icons.chevron_left,
-                            color: AppColors.textPrimary,
-                            size: MediaQuery.of(context).size.width * 0.05, // 5% of screen width
-                          ),
-                          onPressed: _previousMonth,
-                        ),
-                        // Month display: Previous | Current | Next
-                        Expanded(
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final availableWidth = constraints.maxWidth;
-                              final screenWidth = MediaQuery.of(context).size.width;
-                              
-                              // Calculate responsive font sizes based on available width
-                              final baseFontSize = (availableWidth * 0.08).clamp(10.0, 14.0);
-                              final currentMonthFontSize = (availableWidth * 0.09).clamp(12.0, 16.0);
-                              final spacing = (availableWidth * 0.02).clamp(4.0, 8.0);
-                              
-                              return Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Previous month
-                                  Flexible(
-                                    child: Text(
-                                      _getMonthName(DateTime(_currentDate.year, _currentDate.month - 1)),
-                                      style: AppTextStyles.bodySmall(context).copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                  SizedBox(width: spacing),
-                                  // Current month
-                                  Flexible(
-                                    child: Text(
-                                      _getMonthName(_currentDate),
-                                      style: AppTextStyles.bodyMedium(context).copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                  SizedBox(width: spacing),
-                                  // Next month
-                                  Flexible(
-                                    child: Text(
-                                      _getMonthName(DateTime(_currentDate.year, _currentDate.month + 1)),
-                                      style: AppTextStyles.bodySmall(context).copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                        // Right arrow
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: Icon(
-                            Icons.chevron_right,
-                            color: AppColors.textPrimary,
-                            size: MediaQuery.of(context).size.width * 0.05, // 5% of screen width
-                          ),
-                          onPressed: _nextMonth,
-                        ),
-                      ],
-                    ),
-                    SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.02, // 2% of screen height
-                    ),
-                    // Days of week
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        AppStrings.sun,
-                        AppStrings.mon,
-                        AppStrings.tue,
-                        AppStrings.wed,
-                        AppStrings.thu,
-                        AppStrings.fri,
-                        AppStrings.sat,
-                      ]
-                          .asMap()
-                          .entries
-                          .map((entry) {
-                            final index = entry.key;
-                            final day = entry.value;
-                            final isWeekend = index == 0 || index == 6; // SUN or SAT
-                            return Expanded(
-                              child: Center(
-                                child: Text(
-                                  day,
-                                  style: AppTextStyles.bodySmall(context).copyWith(
-                                    fontWeight: FontWeight.w500,
-                                    color: isWeekend
-                                        ? AppColors.error
-                                        : AppColors.textPrimary,
-                                  ),
-                                ),
+
+          // Circle + label, centered
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Circle
+                Container(
+                  width: circleD,
+                  height: circleD,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color:
+                        style.showCircle
+                            ? style.isHoliday
+                                ? AppColors.error.withOpacity(0.6)
+                                : style.circleColor
+                            : Colors.transparent,
+                  ),
+                  child: Center(
+                    child:
+                        style.isHoliday
+                            ? Text(
+                              '🎉',
+                              style: TextStyle(fontSize: circleD * 0.42),
+                            )
+                            : Text(
+                              '${date.day}',
+                              style: TextStyle(
+                                fontSize: fontSize,
+                                fontWeight: FontWeight.w600,
+                                color: style.textColor,
                               ),
-                            );
-                          })
-                          .toList(),
+                            ),
+                  ),
+                ),
+
+                // Label pill (WFH / Leave type / Late) below circle **imp don't remove this
+                /*
+                if (style.label != null)
+                  Container(
+                    margin: const EdgeInsets.only(top: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 3,
+                      vertical: 1,
                     ),
-                    SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.015, // 1.5% of screen height
+                    decoration: BoxDecoration(
+                      color: _labelBg(style.label!),
+                      borderRadius: BorderRadius.circular(3),
                     ),
-                    // Calendar grid
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 7,
-                        childAspectRatio: 1,
-                        mainAxisSpacing: MediaQuery.of(context).size.width * 0.01, // 1% of screen width
-                        crossAxisSpacing: MediaQuery.of(context).size.width * 0.01,
+                    child: Text(
+                      style.label!,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: labelFontSize,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.1,
                       ),
-                      itemCount: calendarDays.length,
-                      itemBuilder: (context, index) {
-                        final date = calendarDays[index];
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
 
-                        if (date == null) {
-                          return const SizedBox.shrink();
-                        }
+                */
+              ],
+            ),
+          ),
 
-                        final dateState = _getDateState(date);
-                        final isCurrentMonth = _isCurrentMonth(date);
-
-                        return GestureDetector(
-                          onTap: () {
-                            if (dateState != DateState.weekendUnavailable) {
-                              _selectDate(date);
-                            }
-                          },
-                          child: Center(
-                            child: _buildDateCell(context, date, dateState, isCurrentMonth),
-                          ),
-                        );
-                      },
+          // Late-entry clock badge (top-left)
+          if (style.isLate && !style.isHoliday)
+            Positioned(
+              top: cellH * 0.04,
+              left: cellW * 0.08,
+              child: Container(
+                padding: const EdgeInsets.all(1),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 2,
                     ),
                   ],
                 ),
+                child: SvgPicture.asset(AppAssets.iconaLatePunchIn),
+                // Icon(
+                //   Icons.access_time_rounded,
+                //   size: circleD * 0.22,
+                //   color: AppColors.warning,
+                // ),
               ),
             ),
-          ),
         ],
       ),
     );
   }
+
+  // ─── Build ────────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final grid = _buildGrid();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Use available width so it's fully responsive on any screen
+        final availableW = constraints.maxWidth;
+        final avaialbeH = constraints.maxHeight;
+        final cellW = availableW / 8;
+        // Cell height slightly taller than wide to accommodate label pill
+        final cellH = cellW * 1.18;
+        return Container(
+          decoration: BoxDecoration(
+            color: AppColors.background, // 👈 your background
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: EdgeInsets.all(8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(height: availableW * 0.03),
+
+              // Month navigation — shows: < Feb 2026 | March 2026 | Apr 2026 >
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  SizedBox(width: availableW * 0.008),
+
+                  // ← Prev arrow + prev month name
+                  GestureDetector(
+                    onTap: _previousMonth,
+                    child: Icon(
+                      Icons.chevron_left,
+                      color: AppColors.calendararrow,
+                      size: availableW * 0.08,
+                    ),
+                  ),
+                  Text(
+                    DateFormat('MMM yyyy').format(
+                      DateTime(_currentDate.year, _currentDate.month - 1),
+                    ),
+                    style: TextStyle(
+                      fontSize: (availableW * 0.030).clamp(10, 13),
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  // Current month (center, bold)
+                  Text(
+                    DateFormat('MMMM yyyy').format(_currentDate),
+                    style: AppTextStyles.bodyMedium(context).copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+
+                  Text(
+                    DateFormat('MMM yyyy').format(
+                      DateTime(_currentDate.year, _currentDate.month + 1),
+                    ),
+                    style: TextStyle(
+                      fontSize: (availableW * 0.030).clamp(10, 13),
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  // Next month name + → arrow
+                  GestureDetector(
+                    onTap: _nextMonth,
+                    child: Icon(
+                      Icons.chevron_right,
+                      color: AppColors.calendararrow,
+                      size: availableW * 0.08,
+                    ),
+                  ),
+                  SizedBox(width: availableW * 0.008),
+                ],
+              ),
+
+              SizedBox(height: availableW * 0.03),
+
+              // Day-of-week headers
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children:
+                    _headers.map((h) {
+                      return SizedBox(
+                        width: cellW,
+                        child: Center(
+                          child: Text(
+                            h,
+                            style: TextStyle(
+                              fontSize: (cellW * 0.22).clamp(8, 12),
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+              ),
+
+              SizedBox(height: availableW * 0.03),
+
+              // Calendar grid
+              if (widget.isLoading)
+                SizedBox(
+                  height: cellH * 5,
+                  child: const Center(child: CircularProgressIndicator()),
+                )
+              else
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: List.generate(grid.length ~/ 7, (row) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: List.generate(7, (col) {
+                        return _buildCell(
+                          context,
+                          grid[row * 7 + col],
+                          cellW,
+                          cellH,
+                        );
+                      }),
+                    );
+                  }),
+                ),
+
+              SizedBox(height: availableW * 0.03),
+
+              // Legend
+              Wrap(
+                spacing: availableW * 0.04,
+                runSpacing: 4,
+                children: [
+                  _legend('Present', const Color(0xFF0B7F7F)),
+                  _legend('WFH', const Color(0xFF27AE60)),
+                  _legend('Leave', const Color(0xFFFF8C00)),
+                  _legend('Absent', const Color(0xFFE74C3C)),
+                ],
+              ),
+              SizedBox(height: availableW * 0.04),
+              Wrap(
+                spacing: availableW * 0.04,
+                runSpacing: 4,
+                children: [
+                  _legend('Holiday', const Color(0xFFFF6B6B)),
+                  _legend(
+                    'Late',
+                    const Color(0xFFFF6B6B),
+                    AppAssets.iconaLatePunchIn,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _legend(String label, Color color, [String? iconpath]) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (iconpath != null)
+          SvgPicture.asset(iconpath)
+        else
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-enum DateState {
-  adjacentMonth,
-  weekendUnavailable,
-  available,
-  green,
-  red,
-  blue,
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+class _DayStyle {
+  final Color circleColor;
+  final Color textColor;
+  final bool showCircle;
+  final String? label;
+  final bool isHoliday;
+  final String? holidayName;
+  final bool isWeekend;
+  final bool isLate;
+
+  const _DayStyle({
+    required this.circleColor,
+    required this.textColor,
+    required this.showCircle,
+    required this.label,
+    required this.isHoliday,
+    this.holidayName,
+    required this.isWeekend,
+    required this.isLate,
+  });
 }
 
-/// Custom painter for striped background (diagonal stripes)
-class StripedBackgroundPainter extends CustomPainter {
+class _StripePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.textTertiary.withOpacity(0.3)
-      ..strokeWidth = 0.8
-      ..style = PaintingStyle.stroke;
-
-    // Draw diagonal stripes from top-left to bottom-right
-    const stripeSpacing = 4.0;
-    final diagonalLength = size.width * 1.414; // sqrt(2) for 45-degree angle
-    
-    // Start from top-left, draw lines going down-right
-    for (double i = -diagonalLength; i < diagonalLength * 2; i += stripeSpacing) {
+    final paint =
+        Paint()
+          ..color = Colors.grey.withOpacity(0.13)
+          ..strokeWidth = 1.5
+          ..style = PaintingStyle.stroke;
+    const spacing = 6.0;
+    final total = size.width + size.height;
+    for (double i = -total; i < total; i += spacing) {
       canvas.drawLine(
         Offset(i, 0),
-        Offset(i + diagonalLength, diagonalLength),
+        Offset(i + size.height, size.height),
         paint,
       );
     }
   }
 
   @override
-  bool shouldRepaint(StripedBackgroundPainter oldDelegate) => false;
+  bool shouldRepaint(_StripePainter old) => false;
 }
-
-/// Custom painter for dotted border
-class DottedBorderPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.border
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke;
-
-    final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(0, 0, size.width, size.height),
-          const Radius.circular(12),
-        ),
-      );
-
-    // Create a dashed path effect
-    final dashPath = _dashPath(path, dashArray: CircularIntervalList<double>([5.0, 5.0]));
-
-    canvas.drawPath(dashPath, paint);
-  }
-
-  Path _dashPath(Path path, {required CircularIntervalList<double> dashArray}) {
-    final dashPath = Path();
-    final pathMetrics = path.computeMetrics();
-
-    for (final pathMetric in pathMetrics) {
-      var distance = 0.0;
-      while (distance < pathMetric.length) {
-        final length = dashArray.next;
-        dashPath.addPath(
-          pathMetric.extractPath(distance, distance + length),
-          Offset.zero,
-        );
-        distance += length;
-        if (distance < pathMetric.length) {
-          distance += dashArray.next;
-        }
-      }
-    }
-
-    return dashPath;
-  }
-
-  @override
-  bool shouldRepaint(DottedBorderPainter oldDelegate) => false;
-}
-
-/// Helper class for circular interval list
-class CircularIntervalList<T> {
-  final List<T> _list;
-  int _index = 0;
-
-  CircularIntervalList(this._list);
-
-  T get next {
-    if (_index >= _list.length) {
-      _index = 0;
-    }
-    return _list[_index++];
-  }
-}
-

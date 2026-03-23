@@ -47,7 +47,7 @@ class ShiftDayTimingModel {
 
   factory ShiftDayTimingModel.fromJson(Map<String, dynamic> json) {
     // Helper function to safely parse String fields that might be int or String
-    String _parseString(dynamic value) {
+    String parseString(dynamic value) {
       if (value == null) return '';
       if (value is String) return value;
       if (value is int) return value.toString();
@@ -56,12 +56,12 @@ class ShiftDayTimingModel {
     }
 
     return ShiftDayTimingModel(
-      day: _parseString(json['day']),
-      punchIn: _parseString(json['punch_in']),
-      punchOut: _parseString(json['punch_out']),
-      breakTime: _parseString(json['break_time']),
-      grossHours: _parseString(json['gross_hours']),
-      effectiveHours: _parseString(json['effective_hours']),
+      day: parseString(json['day']),
+      punchIn: parseString(json['punch_in']),
+      punchOut: parseString(json['punch_out']),
+      breakTime: parseString(json['break_time']),
+      grossHours: parseString(json['gross_hours']),
+      effectiveHours: parseString(json['effective_hours']),
     );
   }
 
@@ -93,14 +93,16 @@ class WeeklyOffDayModel {
 
   factory WeeklyOffDayModel.fromJson(Map<String, dynamic> json) {
     List<String> occurrences = [];
-    if (json['weekly_occurrence'] != null && json['weekly_occurrence'] is List) {
-      occurrences = (json['weekly_occurrence'] as List)
-          .map((item) => item.toString())
-          .toList();
+    if (json['weekly_occurrence'] != null &&
+        json['weekly_occurrence'] is List) {
+      occurrences =
+          (json['weekly_occurrence'] as List)
+              .map((item) => item.toString())
+              .toList();
     }
 
     // Helper function to safely parse String fields that might be int or String
-    String _parseString(dynamic value) {
+    String parseString(dynamic value) {
       if (value == null) return '';
       if (value is String) return value;
       if (value is int) return value.toString();
@@ -109,8 +111,8 @@ class WeeklyOffDayModel {
     }
 
     return WeeklyOffDayModel(
-      day: _parseString(json['day']),
-      offType: _parseString(json['off_type']),
+      day: parseString(json['day']),
+      offType: parseString(json['off_type']),
       selectedDay: json['selected_day'] as bool? ?? false,
       weeklyOccurrence: occurrences,
     );
@@ -141,16 +143,24 @@ class ShiftModel {
   factory ShiftModel.fromJson(Map<String, dynamic> json) {
     List<ShiftDayTimingModel> dayTimings = [];
     if (json['shift_day_timing'] != null && json['shift_day_timing'] is List) {
-      dayTimings = (json['shift_day_timing'] as List)
-          .map((item) => ShiftDayTimingModel.fromJson(item as Map<String, dynamic>))
-          .toList();
+      dayTimings =
+          (json['shift_day_timing'] as List)
+              .map(
+                (item) =>
+                    ShiftDayTimingModel.fromJson(item as Map<String, dynamic>),
+              )
+              .toList();
     }
 
     List<WeeklyOffDayModel> offDays = [];
     if (json['weekly_off_days'] != null && json['weekly_off_days'] is List) {
-      offDays = (json['weekly_off_days'] as List)
-          .map((item) => WeeklyOffDayModel.fromJson(item as Map<String, dynamic>))
-          .toList();
+      offDays =
+          (json['weekly_off_days'] as List)
+              .map(
+                (item) =>
+                    WeeklyOffDayModel.fromJson(item as Map<String, dynamic>),
+              )
+              .toList();
     }
 
     return ShiftModel(
@@ -258,13 +268,16 @@ class AttendanceDetailsModel {
   factory AttendanceDetailsModel.fromJson(Map<String, dynamic> json) {
     List<ActivityModel>? activities;
     if (json['activity'] != null && json['activity'] is List) {
-      activities = (json['activity'] as List)
-          .map((item) => ActivityModel.fromJson(item as Map<String, dynamic>))
-          .toList();
+      activities =
+          (json['activity'] as List)
+              .map(
+                (item) => ActivityModel.fromJson(item as Map<String, dynamic>),
+              )
+              .toList();
     }
 
     // Helper function to convert int or String to String?
-    String? _parseTimeValue(dynamic value) {
+    String? parseTimeValue(dynamic value) {
       if (value == null) return null;
       if (value is String) return value;
       if (value is int) return value.toString();
@@ -272,7 +285,7 @@ class AttendanceDetailsModel {
     }
 
     // Helper function to safely parse String? fields that might be int or String
-    String? _parseStringValue(dynamic value) {
+    String? parseStringValue(dynamic value) {
       if (value == null) return null;
       if (value is String) return value;
       if (value is int) return value.toString();
@@ -291,9 +304,7 @@ class AttendanceDetailsModel {
     // Parse Shift object
     ShiftModel? shiftModel;
     if (json['Shift'] != null && json['Shift'] is Map) {
-      shiftModel = ShiftModel.fromJson(
-        json['Shift'] as Map<String, dynamic>,
-      );
+      shiftModel = ShiftModel.fromJson(json['Shift'] as Map<String, dynamic>);
     }
 
     // Parse gross_hours and effective_hours (can be int or double)
@@ -309,37 +320,38 @@ class AttendanceDetailsModel {
       id: json['id'] as int?,
       clientId: json['client_id'] as int?,
       userId: json['user_id'] as int?,
-      date: _parseStringValue(json['date']),
-      punchIn: _parseStringValue(json['punch_in']),
-      punchOut: _parseStringValue(json['punch_out']),
-      totalTime: _parseTimeValue(json['total_time']),
-      breakTime: _parseTimeValue(json['break_time']),
+      date: parseStringValue(json['date']),
+      punchIn: parseStringValue(json['punch_in']),
+      punchOut: parseStringValue(json['punch_out']),
+      totalTime: parseTimeValue(json['total_time']),
+      breakTime: parseTimeValue(json['break_time']),
       overTime: overTimeModel,
-      punchInIp: _parseStringValue(json['punch_in_IP']) ??
-          _parseStringValue(json['punch_in_ip']),
-      punchOutIp: _parseStringValue(json['punch_out_IP']),
-      punchInLocation: _parseStringValue(json['punch_in_location']),
-      punchOutLocation: _parseStringValue(json['punch_out_location']),
-      entries: _parseStringValue(json['entries']),
+      punchInIp:
+          parseStringValue(json['punch_in_IP']) ??
+          parseStringValue(json['punch_in_ip']),
+      punchOutIp: parseStringValue(json['punch_out_IP']),
+      punchInLocation: parseStringValue(json['punch_in_location']),
+      punchOutLocation: parseStringValue(json['punch_out_location']),
+      entries: parseStringValue(json['entries']),
       isLateEntries: json['is_late_entries'] as bool?,
-      shiftType: _parseStringValue(json['shift_type']),
+      shiftType: parseStringValue(json['shift_type']),
       shiftId: json['shift_id'] as int?,
-      punchType: _parseStringValue(json['punch_type']),
-      status: _parseStringValue(json['status']),
-      incompleteHours: _parseStringValue(json['incomplete_hours']),
+      punchType: parseStringValue(json['punch_type']),
+      status: parseStringValue(json['status']),
+      incompleteHours: parseStringValue(json['incomplete_hours']),
       firstHalf: json['first_half'] as bool?,
       secondHalf: json['second_half'] as bool?,
-      leaveType: _parseStringValue(json['leave_type']),
-      deductDays: _parseStringValue(json['deduct_days']),
+      leaveType: parseStringValue(json['leave_type']),
+      deductDays: parseStringValue(json['deduct_days']),
       regularizeId: json['regularize_id'] as int?,
-      remark: _parseStringValue(json['remark']),
-      approvalStatus: _parseStringValue(json['approval_status']),
+      remark: parseStringValue(json['remark']),
+      approvalStatus: parseStringValue(json['approval_status']),
       isProcessed: json['is_processed'] as bool?,
       activity: activities,
-      createdBy: _parseStringValue(json['created_by']),
-      createdAt: _parseStringValue(json['created_at']),
+      createdBy: parseStringValue(json['created_by']),
+      createdAt: parseStringValue(json['created_at']),
       updatedBy: json['updated_by'] as int?,
-      updatedAt: _parseStringValue(json['updated_at']),
+      updatedAt: parseStringValue(json['updated_at']),
       shift: shiftModel,
       onDuty: json['onDuty'] as bool?,
       wfhShowPunch: json['wfhShowPunch'] as bool?,
@@ -416,7 +428,7 @@ class ActivityModel {
 
   factory ActivityModel.fromJson(Map<String, dynamic> json) {
     // Helper function to safely parse String? fields that might be int or String
-    String? _parseStringValue(dynamic value) {
+    String? parseStringValue(dynamic value) {
       if (value == null) return null;
       if (value is String) return value;
       if (value is int) return value.toString();
@@ -425,17 +437,17 @@ class ActivityModel {
     }
 
     return ActivityModel(
-      action: _parseStringValue(json['action']),
-      activityType: _parseStringValue(json['activity_type']),
-      activityBy: _parseStringValue(json['activity_by']),
-      createdAt: _parseStringValue(json['created_at']),
-      time: _parseStringValue(json['time']),
-      penaltyMessage: _parseStringValue(json['penaltyMessage']),
+      action: parseStringValue(json['action']),
+      activityType: parseStringValue(json['activity_type']),
+      activityBy: parseStringValue(json['activity_by']),
+      createdAt: parseStringValue(json['created_at']),
+      time: parseStringValue(json['time']),
+      penaltyMessage: parseStringValue(json['penaltyMessage']),
       paidDays: json['paidDays'] as int?,
       unPaidDays: json['unPaidDays'] as int?,
-      ip: _parseStringValue(json['ip']),
-      location: _parseStringValue(json['location']),
-      mode: _parseStringValue(json['mode']),
+      ip: parseStringValue(json['ip']),
+      location: parseStringValue(json['location']),
+      mode: parseStringValue(json['mode']),
     );
   }
 }
@@ -446,11 +458,7 @@ class AttendanceDetailsResponse {
   final String? message;
   final AttendanceDetailsModel? data;
 
-  AttendanceDetailsResponse({
-    required this.success,
-    this.message,
-    this.data,
-  });
+  AttendanceDetailsResponse({required this.success, this.message, this.data});
 
   factory AttendanceDetailsResponse.fromJson(Map<String, dynamic> json) {
     AttendanceDetailsModel? attendanceData;
@@ -467,4 +475,3 @@ class AttendanceDetailsResponse {
     );
   }
 }
-

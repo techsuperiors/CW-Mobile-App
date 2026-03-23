@@ -1,3 +1,4 @@
+import 'package:collectivWork/core/widgets/permission_guard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -34,7 +35,8 @@ class TicketsPage extends StatefulWidget {
   State<TicketsPage> createState() => _TicketsPageState();
 }
 
-class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStateMixin {
+class _TicketsPageState extends State<TicketsPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late TicketBloc _ticketBloc;
   int _currentTabIndex = 0;
@@ -124,71 +126,73 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
     return BlocProvider.value(
       value: _ticketBloc,
       child: ResponsiveScaffold(
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        leading: GestureDetector(
-          onTap: () => Navigator.of(context).pop(),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.arrow_back_ios,
-                color: Theme.of(context).colorScheme.primary,
-                size: screenWidth * 0.048,
-              ),
-              Flexible(
-                child: Text(
-                  AppStrings.services,
-                  style: AppTextStyles.bodyLarge(context).copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+        backgroundColor: AppColors.backgroundMedium,
+        appBar: AppBar(
+          elevation: 0,
+          forceMaterialTransparency: true,
+          backgroundColor: AppColors.background,
+          foregroundColor: AppColors.textPrimary,
+          leading: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.arrow_back_ios,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: screenWidth * 0.048,
                 ),
-              ),
-            ],
+                Flexible(
+                  child: Text(
+                    "Back",
+                    style: AppTextStyles.bodyMedium(context).copyWith(
+                      fontWeight: FontWeight.w400,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          leadingWidth: 110,
+          title: Text(
+            AppStrings.tickets,
+            style: AppTextStyles.heading4(context).copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          centerTitle: true,
+          bottom: TabBar(
+            controller: _tabController,
+            indicatorColor: AppColors.success,
+            indicatorWeight: 3,
+            labelColor: AppColors.textPrimary,
+            unselectedLabelColor: AppColors.textSecondary,
+            labelStyle: AppTextStyles.bodyMedium(
+              context,
+            ).copyWith(fontWeight: FontWeight.w600),
+            unselectedLabelStyle: AppTextStyles.bodyMedium(context),
+            tabs: const [Tab(text: 'My Ticket'), Tab(text: 'Assigned Ticket')],
           ),
         ),
-        leadingWidth: 110,
-        title: Text(
-          AppStrings.tickets,
-          style: AppTextStyles.heading4(context).copyWith(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 0, // Services is active
+          onTap: NavigationHelper.getBottomNavHandler(context),
         ),
-        centerTitle: true,
-        bottom: TabBar(
+        body: TabBarView(
           controller: _tabController,
-          indicatorColor: AppColors.success,
-          indicatorWeight: 3,
-          labelColor: AppColors.textPrimary,
-          unselectedLabelColor: AppColors.textSecondary,
-          labelStyle: AppTextStyles.bodyMedium(context).copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-          unselectedLabelStyle: AppTextStyles.bodyMedium(context),
-          tabs: const [
-            Tab(text: 'My Ticket'),
-            Tab(text: 'Assigned Ticket'),
+          children: [
+            PermissionGuard(
+                requiredPermission: "Ticket Management:My Tickets:Read",
+                child: _buildMyTicketsTab(context)),
+            _buildAssignedTicketsTab(context),
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: 0, // Services is active
-        onTap: NavigationHelper.getBottomNavHandler(context),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildMyTicketsTab(context),
-          _buildAssignedTicketsTab(context),
-        ],
-      ),
-    ));
+    );
   }
 
   /// Convert ticket stats to summary cards
@@ -276,7 +280,8 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
             return true;
           }
           // If state shows wrong tab data, rebuild to show loader
-          if (current is TicketDataLoaded && current.requestType != 'my_ticket') {
+          if (current is TicketDataLoaded &&
+              current.requestType != 'my_ticket') {
             return true;
           }
           if (current is TicketLoaded && current.requestType != 'my_ticket') {
@@ -290,23 +295,21 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
       builder: (context, state) {
         // Check if state is for wrong tab - if so, show loader
         // The _loadTicketsForCurrentTab() should have already triggered reload
-        if (state is TicketDataLoaded && state.requestType != 'my_ticket' && _currentTabIndex == 0) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+        if (state is TicketDataLoaded &&
+            state.requestType != 'my_ticket' &&
+            _currentTabIndex == 0) {
+          return const Center(child: CircularProgressIndicator());
         }
-        
-        if (state is TicketLoaded && state.requestType != 'my_ticket' && _currentTabIndex == 0) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+
+        if (state is TicketLoaded &&
+            state.requestType != 'my_ticket' &&
+            _currentTabIndex == 0) {
+          return const Center(child: CircularProgressIndicator());
         }
 
         // Show loader while loading
         if (state is TicketLoading) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (state is TicketError) {
@@ -314,17 +317,13 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: AppColors.error,
-                ),
+                Icon(Icons.error_outline, size: 64, color: AppColors.error),
                 const SizedBox(height: 16),
                 Text(
                   state.message,
-                  style: AppTextStyles.bodyMedium(context).copyWith(
-                    color: AppColors.error,
-                  ),
+                  style: AppTextStyles.bodyMedium(
+                    context,
+                  ).copyWith(color: AppColors.error),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
@@ -342,13 +341,13 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
 
         List<TicketModel> tickets = [];
         TicketStats? stats;
-        
+
         // Handle combined state (both ticket list and stats) - preferred state
         if (state is TicketDataLoaded && state.requestType == 'my_ticket') {
           tickets = TicketMapper.toTicketModelList(state.ticketList.tickets);
           _ticketStats = state.stats;
           stats = state.stats;
-        } 
+        }
         // Handle separate states (for tab switching or partial updates)
         else if (state is TicketLoaded && state.requestType == 'my_ticket') {
           tickets = TicketMapper.toTicketModelList(state.ticketList.tickets);
@@ -358,7 +357,7 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
         else if (state is TicketStatsLoaded) {
           _ticketStats = state.stats;
           stats = state.stats;
-        } 
+        }
         // Initial state or loading - use cached data if available
         else {
           stats = _ticketStats; // Use cached stats
@@ -367,18 +366,22 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
         final summaries = _statsToSummaries(stats);
 
         return SingleChildScrollView(
-          padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.042),
+          padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.002),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Summary Cards
-              ...summaries.map((summary) => Padding(
-                    padding: EdgeInsets.only(bottom: screenHeight * 0.015),
-                    child: TicketSummaryCard(summary: summary),
-                  )),
+              ...summaries.map(
+                (summary) => Padding(
+                  padding: EdgeInsets.only(bottom: screenHeight * 0.015),
+                  child: TicketSummaryCard(summary: summary),
+                ),
+              ),
               SizedBox(height: screenHeight * 0.02),
               // Priority Tickets Chart
-              PriorityTicketsChart(tickets: tickets),
+              PermissionGuard(
+                  requiredPermission: "Ticket Management:Ticket Dashboard:Read",
+                  child: PriorityTicketsChart(tickets: tickets)),
               SizedBox(height: screenHeight * 0.02),
               // Ticket List
               if (tickets.isEmpty)
@@ -387,17 +390,17 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
                     padding: EdgeInsets.all(screenHeight * 0.05),
                     child: Text(
                       'No tickets found',
-                      style: AppTextStyles.bodyMedium(context).copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                      style: AppTextStyles.bodyMedium(
+                        context,
+                      ).copyWith(color: AppColors.textSecondary),
                     ),
                   ),
                 )
               else
-                ...tickets.map((ticket) => TicketCard(
-                      ticket: ticket,
-                      onRefresh: _refreshCurrentTab,
-                    )),
+                ...tickets.map(
+                  (ticket) =>
+                      TicketCard(ticket: ticket, onRefresh: _refreshCurrentTab),
+                ),
             ],
           ),
         );
@@ -423,9 +426,7 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
       builder: (context, state) {
         // Show loader while loading assigned tickets
         if (state is TicketLoading) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (state is TicketError && _currentTabIndex == 1) {
@@ -433,17 +434,13 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: AppColors.error,
-                ),
+                Icon(Icons.error_outline, size: 64, color: AppColors.error),
                 const SizedBox(height: 16),
                 Text(
                   state.message,
-                  style: AppTextStyles.bodyMedium(context).copyWith(
-                    color: AppColors.error,
-                  ),
+                  style: AppTextStyles.bodyMedium(
+                    context,
+                  ).copyWith(color: AppColors.error),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
@@ -459,13 +456,15 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
         }
 
         List<TicketModel> tickets = [];
-        
+
         // Handle combined state (shouldn't happen for assigned, but handle it)
-        if (state is TicketDataLoaded && state.requestType == 'assigned_ticket') {
+        if (state is TicketDataLoaded &&
+            state.requestType == 'assigned_ticket') {
           tickets = TicketMapper.toTicketModelList(state.ticketList.tickets);
         }
         // Handle separate ticket list state
-        else if (state is TicketLoaded && state.requestType == 'assigned_ticket') {
+        else if (state is TicketLoaded &&
+            state.requestType == 'assigned_ticket') {
           tickets = TicketMapper.toTicketModelList(state.ticketList.tickets);
         }
 
@@ -482,17 +481,17 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
                     padding: EdgeInsets.all(screenHeight * 0.05),
                     child: Text(
                       'No assigned tickets found',
-                      style: AppTextStyles.bodyMedium(context).copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                      style: AppTextStyles.bodyMedium(
+                        context,
+                      ).copyWith(color: AppColors.textSecondary),
                     ),
                   ),
                 )
               else
-                ...tickets.map((ticket) => TicketCard(
-                      ticket: ticket,
-                      onRefresh: _refreshCurrentTab,
-                    )),
+                ...tickets.map(
+                  (ticket) =>
+                      TicketCard(ticket: ticket, onRefresh: _refreshCurrentTab),
+                ),
             ],
           ),
         );
@@ -500,4 +499,3 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
     );
   }
 }
-

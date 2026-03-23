@@ -1,14 +1,15 @@
 /// Leave Type Entity
 class LeaveType {
   final String leaveType;
-  final int count;
+  final double count;
   final String leaveCode;
-  final int? consumedLeaves;
-  final int? totalLeaves;
-  final int? annualQuota;
-  final int? allocatedQuota;
-  final int? remainingLeaves;
-  final int? currentMonthLop;
+  final double? consumedLeaves;
+  final double? totalLeaves;
+  final double? annualQuota;
+  final double? allocatedQuota;
+  final double? allocatedLeave; // Accrued So Far
+  final double? remainingLeaves;
+  final double? currentMonthLop;
 
   LeaveType({
     required this.leaveType,
@@ -18,6 +19,7 @@ class LeaveType {
     this.totalLeaves,
     this.annualQuota,
     this.allocatedQuota,
+    this.allocatedLeave,
     this.remainingLeaves,
     this.currentMonthLop,
   });
@@ -28,13 +30,9 @@ class LeaveTypes {
   final List<LeaveType> leaveTypes;
   final bool lossOffPay;
 
-  LeaveTypes({
-    required this.leaveTypes,
-    required this.lossOffPay,
-  });
+  LeaveTypes({required this.leaveTypes, required this.lossOffPay});
 
-  int get totalLeaves {
-    return leaveTypes.fold<int>(0, (sum, type) => sum + type.count);
+  double get totalLeaves {
+    return leaveTypes.fold<double>(0, (sum, type) => sum + type.count);
   }
 }
-

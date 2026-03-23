@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import '../../../../core/constants/app_assets.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -11,13 +13,17 @@ class UpcomingEventWidget {
   final String eventType;
   final String personName;
   final String date;
-  final IconData celebratoryIcon;
+  final String celebratoryIcon;
+  final String? imageUrl; // add this
+  final String? profileColor; // add this
 
   const UpcomingEventWidget({
     required this.eventType,
     required this.personName,
     required this.date,
     required this.celebratoryIcon,
+    this.imageUrl, // add this
+    this.profileColor, // add this
   });
 }
 
@@ -37,44 +43,52 @@ class UpcomingEvents extends StatelessWidget {
   });
 
   /// Convert entities to widget models
-  List<UpcomingEventWidget> _convertToWidgetEvents(List<domain.UpcomingEvent> eventEntities) {
+  List<UpcomingEventWidget> _convertToWidgetEvents(
+    List<domain.UpcomingEvent> eventEntities,
+  ) {
     return eventEntities.map((entity) {
       return UpcomingEventWidget(
         eventType: entity.eventType,
         personName: entity.personName,
         date: entity.formattedDate,
-        celebratoryIcon: _getIconFromName(entity.iconName),
+        celebratoryIcon: _getSVGFromName(entity.iconName),
+        imageUrl: entity.imageUrl,
+        // add this
+        profileColor: entity.profileColor, // add this
       );
     }).toList();
   }
 
-  IconData _getIconFromName(String iconName) {
+  String _getSVGFromName(String iconName) {
     switch (iconName.toLowerCase()) {
       case 'cake':
-        return Icons.cake;
-      case 'card_giftcard':
-      case 'gift':
-        return Icons.card_giftcard;
-      case 'celebration':
-        return Icons.celebration;
-      case 'event':
+        return AppAssets.iconbirthday;
+      case 'anniversary':
+        return AppAssets.iconanniversary;
+      case 'birthday':
+        return AppAssets.iconbirthday;
       default:
-        return Icons.event;
+        return AppAssets.iconanniversary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.042), // ~4.2% of screen width
+      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.042),
+      // ~4.2% of screen width
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          SizedBox(height: screenHeight * 0.02),
           AppSectionHeader(title: AppStrings.upcomingEvents),
           SizedBox(
-            height: MediaQuery.of(context).size.height * 0.02, // 2% of screen height
+            height:
+                MediaQuery.of(context).size.height *
+                0.02, // 2% of screen height
           ),
           if (isLoading)
             const Center(
@@ -91,9 +105,9 @@ class UpcomingEvents extends StatelessWidget {
                   children: [
                     Text(
                       errorMessage!,
-                      style: AppTextStyles.bodyMedium(context).copyWith(
-                        color: AppColors.error,
-                      ),
+                      style: AppTextStyles.bodyMedium(
+                        context,
+                      ).copyWith(color: AppColors.error),
                       textAlign: TextAlign.center,
                     ),
                     if (onRefresh != null) ...[
@@ -109,21 +123,25 @@ class UpcomingEvents extends StatelessWidget {
             )
           else if (_convertToWidgetEvents(events).isEmpty)
             Container(
-              height: MediaQuery.of(context).size.height * 0.25, // Fixed height for consistency
+              height:
+                  MediaQuery.of(context).size.height *
+                  0.25, // Fixed height for consistency
               alignment: Alignment.center,
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
                   'No upcoming events',
-                  style: AppTextStyles.bodyMedium(context).copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                  style: AppTextStyles.bodyMedium(
+                    context,
+                  ).copyWith(color: AppColors.textSecondary),
                 ),
               ),
             )
           else
             Container(
-              height: MediaQuery.of(context).size.height * 0.3, // Fixed height to show 2-3 events
+              height:
+                  MediaQuery.of(context).size.height *
+                  0.28, // Fixed height to show 2-3 events
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -132,9 +150,12 @@ class UpcomingEvents extends StatelessWidget {
                 scrollDirection: Axis.vertical,
                 physics: const BouncingScrollPhysics(),
                 itemCount: _convertToWidgetEvents(events).length,
-                separatorBuilder: (context, index) => SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.015, // 1.5% of screen height
-                ),
+                separatorBuilder:
+                    (context, index) => SizedBox(
+                      height:
+                          MediaQuery.of(context).size.height *
+                          0.015, // 1.5% of screen height
+                    ),
                 itemBuilder: (context, index) {
                   final widgetEvents = _convertToWidgetEvents(events);
                   return _buildEventCard(context, widgetEvents[index]);
@@ -151,33 +172,37 @@ class UpcomingEvents extends StatelessWidget {
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;
     final screenHeight = mediaQuery.size.height;
-    final smallerDimension = screenWidth < screenHeight ? screenWidth : screenHeight;
-    
+    final smallerDimension =
+        screenWidth < screenHeight ? screenWidth : screenHeight;
+
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.backgroundLight,
+        color: AppColors.attendanceAlmostWhite,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: tealColor,
-          width: 1,
-        ),
+        border: Border.all(color: tealColor, width: 1),
       ),
       padding: EdgeInsets.all(screenWidth * 0.04), // 4% of screen width
       child: Row(
         children: [
           // User icon in square with rounded corners
           Container(
-            width: smallerDimension * 0.133, // ~13.3% of smaller dimension
+            width: smallerDimension * 0.133,
             height: smallerDimension * 0.133,
             decoration: BoxDecoration(
-              color: AppColors.backgroundLight,
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              Icons.person,
-              color: AppColors.textSecondary,
-              size: smallerDimension * 0.067, // ~6.7% of smaller dimension
-            ),
+            clipBehavior: Clip.antiAlias,
+            child:
+                event.imageUrl != null && event.imageUrl!.isNotEmpty
+                    ? Image.network(
+                      event.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder:
+                          (context, error, stackTrace) =>
+                              _buildInitialsAvatar(event, smallerDimension),
+                    )
+                    : _buildInitialsAvatar(event, smallerDimension),
           ),
           SizedBox(
             width: screenWidth * 0.03, // 3% of screen width
@@ -191,8 +216,8 @@ class UpcomingEvents extends StatelessWidget {
                 // Event type in teal
                 Text(
                   event.eventType,
-                  style: AppTextStyles.bodyMedium(context).copyWith(
-                    fontWeight: FontWeight.w500,
+                  style: AppTextStyles.bodySmall(context).copyWith(
+                    fontWeight: FontWeight.w400,
                     color: tealColor,
                     height: 1.3,
                   ),
@@ -206,7 +231,7 @@ class UpcomingEvents extends StatelessWidget {
                   event.personName,
                   style: AppTextStyles.bodyLarge(context).copyWith(
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: AppColors.textSecondary,
                     height: 1.3,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -220,7 +245,8 @@ class UpcomingEvents extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.access_time,
-                      size: smallerDimension * 0.039, // ~3.9% of smaller dimension
+                      size: smallerDimension * 0.039,
+                      // ~3.9% of smaller dimension
                       color: tealColor,
                     ),
                     SizedBox(
@@ -229,10 +255,9 @@ class UpcomingEvents extends StatelessWidget {
                     Flexible(
                       child: Text(
                         event.date,
-                        style: AppTextStyles.bodyMedium(context).copyWith(
-                          color: AppColors.textPrimary,
-                          height: 1.4,
-                        ),
+                        style: AppTextStyles.bodySmall(
+                          context,
+                        ).copyWith(color: AppColors.textSecondary, height: 1.4),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -245,22 +270,25 @@ class UpcomingEvents extends StatelessWidget {
             width: screenWidth * 0.03, // 3% of screen width
           ),
           // Celebratory icon in circular teal background
-          Container(
-            width: smallerDimension * 0.111, // ~11.1% of smaller dimension
-            height: smallerDimension * 0.111,
-            decoration: BoxDecoration(
-              color: tealColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              event.celebratoryIcon,
-              size: smallerDimension * 0.056, // ~5.6% of smaller dimension
-              color: AppColors.attendanceTealDark,
-            ),
+          SvgPicture.asset(
+            event.celebratoryIcon,
+            // size: smallerDimension * 0.056, // ~5.6% of smaller dimension
+            color: AppColors.attendanceTealDark,
           ),
         ],
       ),
     );
   }
-}
 
+  Widget _buildInitialsAvatar(UpcomingEventWidget event, double size) {
+    return Center(
+      child: Icon(Icons.person, color: AppColors.iconprofilecolor, size: 36),
+      // SvgPicture.asset(
+      //   AppAssets.profileavatar,
+      //   width: size * 0.133,
+      //   height: size * 0.133,
+      //   fit: BoxFit.contain,
+      // ),
+    );
+  }
+}

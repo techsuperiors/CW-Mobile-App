@@ -40,7 +40,9 @@ class TicketBloc extends Bloc<TicketEvent, TicketState> {
         emit(TicketError(failure.message));
       },
       (ticketList) {
-        emit(TicketLoaded(ticketList: ticketList, requestType: event.requestType));
+        emit(
+          TicketLoaded(ticketList: ticketList, requestType: event.requestType),
+        );
       },
     );
   }
@@ -56,7 +58,9 @@ class TicketBloc extends Bloc<TicketEvent, TicketState> {
         emit(TicketError(failure.message));
       },
       (ticketList) {
-        emit(TicketLoaded(ticketList: ticketList, requestType: event.requestType));
+        emit(
+          TicketLoaded(ticketList: ticketList, requestType: event.requestType),
+        );
       },
     );
   }
@@ -101,11 +105,13 @@ class TicketBloc extends Bloc<TicketEvent, TicketState> {
           },
           (stats) {
             // Both APIs succeeded, emit combined state
-            emit(TicketDataLoaded(
-              ticketList: ticketList,
-              requestType: event.requestType,
-              stats: stats,
-            ));
+            emit(
+              TicketDataLoaded(
+                ticketList: ticketList,
+                requestType: event.requestType,
+                stats: stats,
+              ),
+            );
           },
         );
       },
@@ -146,8 +152,8 @@ class TicketBloc extends Bloc<TicketEvent, TicketState> {
       (failure) {
         emit(TicketFileUploadError(failure.message));
       },
-      (stats) {
-        emit(TicketFileUploaded(stats: stats));
+      (uploadedFiles) {
+        emit(TicketFileUploaded(uploadedFiles: uploadedFiles));
       },
     );
   }

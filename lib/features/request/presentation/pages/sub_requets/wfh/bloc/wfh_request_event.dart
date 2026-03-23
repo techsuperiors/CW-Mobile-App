@@ -15,6 +15,21 @@ class LoadWfhRequests extends WfhRequestEvent {
   const LoadWfhRequests();
 }
 
+class LoadTeamWfhRequests extends WfhRequestEvent {
+  final int page;
+  final int limit;
+  final String requestType;
+
+  const LoadTeamWfhRequests({
+    this.page = 1,
+    this.limit = 50,
+    this.requestType = 'All',
+  });
+
+  @override
+  List<Object> get props => [page, limit, requestType];
+}
+
 /// Search WFH requests event
 class SearchWfhRequests extends WfhRequestEvent {
   final String query;

@@ -1,3 +1,11 @@
+/// Safely converts dynamic (int or double from JSON) to double?
+double? _toDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  return null;
+}
+
 /// Safely converts dynamic (int or double from JSON) to int?
 int? _toInt(dynamic value) {
   if (value == null) return null;
@@ -9,16 +17,16 @@ int? _toInt(dynamic value) {
 /// Leave Type Configuration Model
 class LeaveTypeConfigModel {
   final String? leaveType;
-  final int? annualQuota;
-  final int? assignedQuota;
-  final int? remainingLeaves;
-  final int? allocatedLeave;
+  final double? annualQuota;
+  final double? assignedQuota;
+  final double? remainingLeaves;
+  final double? allocatedLeave;
   final String? leaveCode;
   final String? distributeType;
   final String? leaveTypeCategory;
   final List<String>? gender;
   final List<String>? maritalStatus;
-  final int? consumedLeaves;
+  final double? consumedLeaves;
   final String? distributionType;
   final String? leaveCategory;
   final List<dynamic>? reasonList;
@@ -26,8 +34,8 @@ class LeaveTypeConfigModel {
   final String? mandatoryRaiseDays;
   final String? status;
   final Map<String, dynamic>? rules;
-  final int? totalLeaves;
-  final int? currentMonthLop;
+  final double? totalLeaves;
+  final double? currentMonthLop;
 
   LeaveTypeConfigModel({
     this.leaveType,
@@ -55,10 +63,10 @@ class LeaveTypeConfigModel {
   factory LeaveTypeConfigModel.fromJson(Map<String, dynamic> json) {
     return LeaveTypeConfigModel(
       leaveType: json['leave_type'] as String?,
-      annualQuota: _toInt(json['annual_quota']),
-      assignedQuota: _toInt(json['assigned_quota']),
-      remainingLeaves: _toInt(json['remaining_leaves']),
-      allocatedLeave: _toInt(json['allocated_leave']),
+      annualQuota: _toDouble(json['annual_quota']),
+      assignedQuota: _toDouble(json['assigned_quota']),
+      remainingLeaves: _toDouble(json['remaining_leaves']),
+      allocatedLeave: _toDouble(json['allocated_leave']),
       leaveCode: json['leave_code'] as String?,
       distributeType: json['distributeType'] as String?,
       leaveTypeCategory: json['leaveType'] as String?,
@@ -68,7 +76,7 @@ class LeaveTypeConfigModel {
       maritalStatus: json['marital_status'] != null
           ? (json['marital_status'] as List).map((e) => e.toString()).toList()
           : null,
-      consumedLeaves: _toInt(json['consumed_leaves']),
+      consumedLeaves: _toDouble(json['consumed_leaves']),
       distributionType: json['distribution_type'] as String?,
       leaveCategory: json['leave_category'] as String?,
       reasonList: json['reason_list'] as List<dynamic>?,
@@ -76,13 +84,13 @@ class LeaveTypeConfigModel {
       mandatoryRaiseDays: json['mandatory_raise_days'] as String?,
       status: json['status'] as String?,
       rules: json['rules'] as Map<String, dynamic>?,
-      totalLeaves: _toInt(json['total_leaves']),
-      currentMonthLop: _toInt(json['current_month_lop']),
+      totalLeaves: _toDouble(json['total_leaves']),
+      currentMonthLop: _toDouble(json['current_month_lop']),
     );
   }
 
   /// Get the count to display (remaining leaves or allocated leave)
-  int get displayCount {
+  double get displayCount {
     if (remainingLeaves != null) {
       return remainingLeaves!;
     } else if (allocatedLeave != null) {
@@ -118,7 +126,10 @@ class LeaveTypesResponseModel {
     List<LeaveTypeConfigModel> leaveConfig = [];
     if (json['leave_config'] != null && json['leave_config'] is List) {
       leaveConfig = (json['leave_config'] as List)
-          .map((item) => LeaveTypeConfigModel.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) =>
+                LeaveTypeConfigModel.fromJson(item as Map<String, dynamic>),
+          )
           .toList();
     }
 
@@ -139,20 +150,17 @@ class LeaveTypesApiResponse {
   final String? message;
   final LeaveTypesResponseModel? data;
 
-  LeaveTypesApiResponse({
-    required this.success,
-    this.message,
-    this.data,
-  });
+  LeaveTypesApiResponse({required this.success, this.message, this.data});
 
   factory LeaveTypesApiResponse.fromJson(Map<String, dynamic> json) {
     return LeaveTypesApiResponse(
       success: json['success'] as bool? ?? false,
       message: json['message'] as String?,
       data: json['data'] != null
-          ? LeaveTypesResponseModel.fromJson(json['data'] as Map<String, dynamic>)
+          ? LeaveTypesResponseModel.fromJson(
+              json['data'] as Map<String, dynamic>,
+            )
           : null,
     );
   }
 }
-

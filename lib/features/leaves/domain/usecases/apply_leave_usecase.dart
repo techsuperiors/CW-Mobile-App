@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dartz/dartz.dart';
 import '../../../../core/error/failures.dart';
 import '../entities/leave_apply_result.dart';
@@ -24,6 +25,7 @@ class ApplyLeaveUseCase {
     required String shortCode,
     required int requestTo,
     required List<String> rHDates,
+    List<File> attachmentFiles = const [],
   }) async {
     return await repository.applyLeave(
       leaveType: leaveType,
@@ -40,6 +42,7 @@ class ApplyLeaveUseCase {
       shortCode: shortCode,
       requestTo: requestTo,
       rHDates: rHDates,
+      attachmentFiles: attachmentFiles,
     );
   }
 }

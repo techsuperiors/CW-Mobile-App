@@ -1,414 +1,284 @@
-import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import '../../../../core/utils/responsive_utils.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import '../../../../core/constants/app_assets.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_text_styles.dart';
 
-/// Attendance summary card with data points and multi-layered circular progress
+/// Attendance summary card with individual circular progress rings
 class AttendanceSummary extends StatelessWidget {
-  const AttendanceSummary({super.key});
+  final int workingDays;
+  final int wfhDays;
+  final int leaveDays;
+  final int maxDays;
+  final bool isLoading;
+  final DateTime? selectedDate;
+  final VoidCallback? onPreviousMonth;
+  final VoidCallback? onNextMonth;
+
+  const AttendanceSummary({
+    super.key,
+    this.selectedDate,
+    this.onPreviousMonth,
+    this.onNextMonth,
+    this.workingDays = 0,
+    this.wfhDays = 0,
+    this.leaveDays = 0,
+    this.maxDays = 30,
+    this.isLoading = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+    final now = DateTime.now();
+    final monthYearStr =
+        "${_getMonthName(selectedDate?.month ?? now.month)} ${selectedDate?.year ?? now.year}";
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.042), // ~4.2% of screen width
+      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.042),
       child: Container(
-        padding: EdgeInsets.all(screenWidth * 0.053), // ~5.3% of screen width
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.textPrimary.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-            gradient: LinearGradient(
-              begin: Alignment.bottomRight,
-              end: Alignment.topLeft,
-              colors: [
-                AppColors.background,
-                AppColors.background,
-                AppColors.attendanceGradientLight.withOpacity(0.3),
-              ],
-              stops: const [0.0, 0.7, 1.0],
+        padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.053),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.textPrimary.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-          ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Left side - Title and data points
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    AppStrings.attendance,
-                    style: AppTextStyles.heading4(context).copyWith(
-                      color: AppColors.textPrimary,
-                    ),
+            // Title Row
+            SizedBox(height: screenHeight * 0.008),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  AppStrings.attendance,
+                  style: AppTextStyles.bodyMedium(context).copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
                   ),
-                  SizedBox(height: screenHeight * 0.02), // 2% of screen height
-                  // Data points
-                  _buildDataPoint(
-                    context,
-                    value: '15',
-                    label: AppStrings.workingDays,
-                    color: AppColors.success,
-                  ),
-                  SizedBox(height: screenHeight * 0.015), // 1.5% of screen height
-                  _buildDataPoint(
-                    context,
-                    value: '10',
-                    label: AppStrings.wfhDays,
-                    color: AppColors.primary,
-                  ),
-                  SizedBox(height: screenHeight * 0.015), // 1.5% of screen height
-                  _buildDataPoint(
-                    context,
-                    value: '05',
-                    label: AppStrings.leaveDays,
-                    color: AppColors.warning,
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(width: screenWidth * 0.053), // ~5.3% of screen width
-            // Right side - Multi-layered circular progress
-            SizedBox(
-              width: screenWidth * 0.32, // 32% of screen width
-              height: screenWidth * 0.32,
-              child: CustomPaint(
-                painter: MultiLayerProgressPainter(
-                  workingDays: 15,
-                  wfhDays: 10,
-                  leaveDays: 5,
-                  maxDays: 30, // Can be 30 or 31 based on month
                 ),
-              ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+
+                  children: [
+                    GestureDetector(
+                      onTap: onPreviousMonth,
+                      child: Icon(
+                        Icons.chevron_left,
+                        color: AppColors.calendararrow,
+                        size: screenWidth * 0.06,
+                      ),
+                    ),
+                    Text(
+                      monthYearStr,
+                      style: AppTextStyles.bodySmall(
+                        context,
+                      ).copyWith(color: AppColors.textSecondary),
+                    ),
+                    // Display actual month
+                    GestureDetector(
+                      onTap: onNextMonth,
+                      child: Icon(
+                        Icons.chevron_right,
+                        color: AppColors.calendararrow,
+                        size: screenWidth * 0.06,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
+            SizedBox(height: screenHeight * 0.016),
+            // Three individual ring cards
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildRingCard(
+                  context,
+                  label: AppStrings.workingDays,
+                  value:
+                      isLoading ? '--' : workingDays.toString().padLeft(2, '0'),
+                  progress: isLoading ? 0 : workingDays / maxDays,
+                  color: AppColors.success,
+                  trackColor: AppColors.success.withOpacity(0.15),
+                ),
+                _buildRingCard(
+                  context,
+                  label: AppStrings.wfhDays,
+                  value: isLoading ? '--' : wfhDays.toString().padLeft(2, '0'),
+                  progress: isLoading ? 0 : wfhDays / maxDays,
+                  color: AppColors.primary,
+                  trackColor: AppColors.primary.withOpacity(0.15),
+                ),
+                _buildRingCard(
+                  context,
+                  label: AppStrings.leaveDays,
+                  value:
+                      isLoading ? '--' : leaveDays.toString().padLeft(2, '0'),
+                  progress: isLoading ? 0 : leaveDays / maxDays,
+                  color: AppColors.warning,
+                  trackColor: AppColors.warning.withOpacity(0.15),
+                ),
+              ],
+            ),
+            SizedBox(height: screenHeight * 0.008),
+
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDataPoint(
+  Widget _buildRingCard(
     BuildContext context, {
-    required String value,
     required String label,
+    required String value,
+    required double progress,
     required Color color,
+    required Color trackColor,
   }) {
-    return Row(
+    final screenWidth = MediaQuery.of(context).size.width;
+    final ringSize = screenWidth * 0.26;
+    final innerContentWidth = ringSize * 0.55;
+    return Column(
       children: [
-        Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: MediaQuery.of(context).size.width * 0.027, // ~2.7% of screen width
-            vertical: MediaQuery.of(context).size.height * 0.0075, // 0.75% of screen height
-          ),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            value,
-            style: AppTextStyles.bodyLarge(context).copyWith(
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ),
-        SizedBox(width: MediaQuery.of(context).size.width * 0.032), // ~3.2% of screen width
-        Flexible(
-          child: Text(
-            label,
-            style: AppTextStyles.bodyMedium(context).copyWith(
-              color: AppColors.textSecondary,
-            ),
-            overflow: TextOverflow.ellipsis,
+        SizedBox(
+          width: ringSize,
+          height: ringSize,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Ring painter
+              CustomPaint(
+                size: Size(ringSize, ringSize),
+                painter: SingleRingProgressPainter(
+                  progress: progress,
+                  activeColor: color,
+                  trackColor: trackColor,
+                ),
+              ),
+              // Center text
+              SizedBox(
+                width: innerContentWidth,
+                // Force a width smaller than the ring itself
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        // Short label inside ring (Working / WFH / Leave)
+                        label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        // Standard practice for safety
+                        softWrap: true,
+                        // Explicitly tell Flutter to wrap
+                        style: AppTextStyles.labelSmall(context).copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Text(
+                      value,
+                      style: AppTextStyles.heading5(context).copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
+
+  String _getMonthName(int month) {
+    return [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ][month - 1];
+  }
 }
 
-/// Custom painter for multi-layered circular progress chart
-class MultiLayerProgressPainter extends CustomPainter {
-  final int workingDays;
-  final int wfhDays;
-  final int leaveDays;
-  final int maxDays;
+/// Custom painter for a single circular progress ring
+class SingleRingProgressPainter extends CustomPainter {
+  final double progress; // 0.0 to 1.0
+  final Color activeColor;
+  final Color trackColor;
 
-  MultiLayerProgressPainter({
-    required this.workingDays,
-    required this.wfhDays,
-    required this.leaveDays,
-    required this.maxDays,
+  SingleRingProgressPainter({
+    required this.progress,
+    required this.activeColor,
+    required this.trackColor,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final startAngle = -math.pi / 2; // Start from top (12 o'clock)
+    final radius = (size.width / 2) - 8;
+    const strokeWidth = 6.0;
+    const startAngle = -math.pi / 2; // 12 o'clock
 
-    // Calculate progress percentages based on max days
-    final ring1Progress = workingDays / maxDays; // Working days
-    final ring2Progress = wfhDays / maxDays; // WFH days
-    final ring3Progress = leaveDays / maxDays; // Leave days
-
-    // Ring 1 (Outermost) - Green to teal-blue gradient (Working Days)
-    final ring1Radius = 55.0;
-    final ring1StrokeWidth = 12.0;
-    
-    _drawProgressRing(
-      canvas,
-      center: center,
-      radius: ring1Radius,
-      strokeWidth: ring1StrokeWidth,
-      startAngle: startAngle,
-      progress: ring1Progress,
-      color: AppColors.success,
-    );
-
-    // Ring 2 (Second from outside) - Light blue (WFH Days)
-    final ring2Radius = 40.0;
-    final ring2StrokeWidth = 10.0;
-    // All rings start from the same position (top)
-    
-    _drawProgressRing(
-      canvas,
-      center: center,
-      radius: ring2Radius,
-      strokeWidth: ring2StrokeWidth,
-      startAngle: startAngle,
-      progress: ring2Progress,
-      color: AppColors.primary,
-    );
-
-    // Ring 3 (Innermost) - Light orange (Leave Days)
-    final ring3Radius = 25.0;
-    final ring3StrokeWidth = 8.0;
-    // All rings start from the same position (top)
-    
-    _drawProgressRing(
-      canvas,
-      center: center,
-      radius: ring3Radius,
-      strokeWidth: ring3StrokeWidth,
-      startAngle: startAngle,
-      progress: ring3Progress,
-      color: AppColors.warning,
-    );
-
-    // Draw remaining/unselected portions for all rings
-    _drawRemainingPortions(
-      canvas,
-      center: center,
-      ring1Radius: ring1Radius,
-      ring1StrokeWidth: ring1StrokeWidth,
-      ring1Progress: ring1Progress,
-      ring2Radius: ring2Radius,
-      ring2StrokeWidth: ring2StrokeWidth,
-      ring2Progress: ring2Progress,
-      ring3Radius: ring3Radius,
-      ring3StrokeWidth: ring3StrokeWidth,
-      ring3Progress: ring3Progress,
-      startAngle: startAngle,
-    );
-  }
-
-  void _drawProgressRing(
-    Canvas canvas, {
-    required Offset center,
-    required double radius,
-    required double strokeWidth,
-    required double startAngle,
-    required double progress,
-    required Color color,
-  }) {
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final progressSweepAngle = 2 * math.pi * progress;
-
-    // Use solid color instead of gradient
-    final progressPaint = Paint()
-      ..color = color
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..isAntiAlias = true;
-
-    canvas.drawArc(
-      rect,
-      startAngle,
-      progressSweepAngle,
-      false,
-      progressPaint,
-    );
-  }
-
-  void _drawRemainingPortions(
-    Canvas canvas, {
-    required Offset center,
-    required double ring1Radius,
-    required double ring1StrokeWidth,
-    required double ring1Progress,
-    required double ring2Radius,
-    required double ring2StrokeWidth,
-    required double ring2Progress,
-    required double ring3Radius,
-    required double ring3StrokeWidth,
-    required double ring3Progress,
-    required double startAngle,
-  }) {
-    // Ring 1 remaining - starts after ring1 progress ends
-    final ring1Remaining = 1.0 - ring1Progress;
-    if (ring1Remaining > 0) {
-      final ring1RemainingStart = startAngle + (2 * math.pi * ring1Progress);
-      _drawRemainingRing(
-        canvas,
-        center: center,
-        radius: ring1Radius,
-        strokeWidth: ring1StrokeWidth,
-        startAngle: ring1RemainingStart,
-        sweepAngle: 2 * math.pi * ring1Remaining,
-      );
-    }
-
-    // Ring 2 remaining - starts after ring2 progress ends
-    final ring2Remaining = 1.0 - ring2Progress;
-    if (ring2Remaining > 0) {
-      final ring2RemainingStart = startAngle + (2 * math.pi * ring2Progress);
-      _drawRemainingRing(
-        canvas,
-        center: center,
-        radius: ring2Radius,
-        strokeWidth: ring2StrokeWidth,
-        startAngle: ring2RemainingStart,
-        sweepAngle: 2 * math.pi * ring2Remaining,
-      );
-    }
-
-    // Ring 3 remaining - starts after ring3 progress ends
-    final ring3Remaining = 1.0 - ring3Progress;
-    if (ring3Remaining > 0) {
-      final ring3RemainingStart = startAngle + (2 * math.pi * ring3Progress);
-      _drawRemainingRing(
-        canvas,
-        center: center,
-        radius: ring3Radius,
-        strokeWidth: ring3StrokeWidth,
-        startAngle: ring3RemainingStart,
-        sweepAngle: 2 * math.pi * ring3Remaining,
-      );
-    }
-  }
-
-  void _drawRemainingRing(
-    Canvas canvas, {
-    required Offset center,
-    required double radius,
-    required double strokeWidth,
-    required double startAngle,
-    required double sweepAngle,
-  }) {
     final rect = Rect.fromCircle(center: center, radius: radius);
 
-    // Create gradient for remaining arc
-    final remainingGradient = SweepGradient(
-      center: Alignment.center,
-      startAngle: startAngle,
-      colors: [
-        AppColors.background,
-        AppColors.attendanceVeryLightGrey,
-        AppColors.attendanceGreyDepth,
-        AppColors.attendanceVeryLightGrey,
-        AppColors.background,
-      ],
-      stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
-    );
+    // Track (background ring)
+    final trackPaint =
+        Paint()
+          ..color = trackColor
+          ..strokeWidth = strokeWidth
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..isAntiAlias = true;
 
-    // Draw shadow
-    final shadowPaint = Paint()
-      ..color = AppColors.textPrimary.withOpacity(0.08)
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0)
-      ..isAntiAlias = true;
+    canvas.drawCircle(center, radius, trackPaint);
 
-    canvas.save();
-    canvas.translate(1.5, 1.5);
-    canvas.drawArc(
-      rect,
-      startAngle,
-      sweepAngle,
-      false,
-      shadowPaint,
-    );
-    canvas.restore();
+    // Active progress arc
+    if (progress > 0) {
+      final progressSweep = 2 * math.pi * progress.clamp(0.0, 1.0);
 
-    // Draw border
-    final borderPaint = Paint()
-      ..color = AppColors.attendanceLightGreyBorder
-      ..strokeWidth = strokeWidth + 1.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..isAntiAlias = true;
+      final progressPaint =
+          Paint()
+            ..color = activeColor
+            ..strokeWidth = strokeWidth
+            ..style = PaintingStyle.stroke
+            ..strokeCap = StrokeCap.round
+            ..isAntiAlias = true;
 
-    canvas.drawArc(
-      rect,
-      startAngle,
-      sweepAngle,
-      false,
-      borderPaint,
-    );
-
-    // Draw remaining arc with gradient
-    final remainingPaint = Paint()
-      ..shader = remainingGradient.createShader(rect)
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..isAntiAlias = true;
-
-    canvas.drawArc(
-      rect,
-      startAngle,
-      sweepAngle,
-      false,
-      remainingPaint,
-    );
-
-    // Draw inner highlight
-    final innerHighlightRadius = radius - (strokeWidth / 2) + 0.5;
-    final innerHighlightPaint = Paint()
-      ..color = AppColors.background.withOpacity(0.4)
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..isAntiAlias = true;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: innerHighlightRadius),
-      startAngle,
-      sweepAngle,
-      false,
-      innerHighlightPaint,
-    );
+      canvas.drawArc(rect, startAngle, progressSweep, false, progressPaint);
+    }
   }
 
   @override
-  bool shouldRepaint(MultiLayerProgressPainter oldDelegate) {
-    return oldDelegate.workingDays != workingDays ||
-        oldDelegate.wfhDays != wfhDays ||
-        oldDelegate.leaveDays != leaveDays ||
-        oldDelegate.maxDays != maxDays;
+  bool shouldRepaint(SingleRingProgressPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.activeColor != activeColor ||
+        oldDelegate.trackColor != trackColor;
   }
 }

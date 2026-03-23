@@ -10,7 +10,12 @@ abstract class TicketRemoteDataSource {
   Future<List<TicketApiModel>> getTicketList(String requestType);
   Future<TicketStatsModel> getTicketStats();
   Future<TicketDetailsModel> getTicketDetails(int ticketId);
-  Future<TicketStatsModel> uploadTicketFile(int clientId, int ticketId, String filePath);
+  Future<List<UploadedFileModel>> uploadTicketFile(
+    int clientId,
+    int ticketId,
+    String filePath,
+  );
+  Future<String> deleteTicketFile(int supportDocumentId, String fileId);
 }
 
 /// Ticket remote data source implementation
@@ -31,11 +36,7 @@ class TicketRemoteDataSourceImpl implements TicketRemoteDataSource {
 
       final response = await apiClient.get(
         url,
-        options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        ),
+        options: Options(headers: {'Content-Type': 'application/json'}),
       );
 
       final apiResponse = TicketListApiResponse.fromJson(
@@ -68,11 +69,7 @@ class TicketRemoteDataSourceImpl implements TicketRemoteDataSource {
     try {
       final response = await apiClient.get(
         AppUrls.ticketStats,
-        options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        ),
+        options: Options(headers: {'Content-Type': 'application/json'}),
       );
 
       final apiResponse = TicketStatsApiResponse.fromJson(
@@ -112,11 +109,7 @@ class TicketRemoteDataSourceImpl implements TicketRemoteDataSource {
 
       final response = await apiClient.get(
         url,
-        options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        ),
+        options: Options(headers: {'Content-Type': 'application/json'}),
       );
 
       final apiResponse = TicketDetailsApiResponse.fromJson(
@@ -145,7 +138,7 @@ class TicketRemoteDataSourceImpl implements TicketRemoteDataSource {
   }
 
   @override
-  Future<TicketStatsModel> uploadTicketFile(
+  Future<List<UploadedFileModel>> uploadTicketFile(
     int clientId,
     int ticketId,
     String filePath,
@@ -179,11 +172,7 @@ class TicketRemoteDataSourceImpl implements TicketRemoteDataSource {
         );
       }
 
-      if (apiResponse.data == null) {
-        throw ServerException('Ticket file upload response data not found');
-      }
-
-      return apiResponse.data!;
+      return apiResponse.fileData;
     } on ServerException {
       rethrow;
     } catch (e) {
@@ -191,6 +180,42 @@ class TicketRemoteDataSourceImpl implements TicketRemoteDataSource {
         rethrow;
       }
       throw ServerException('Failed to upload ticket file: ${e.toString()}');
+    }
+  }
+
+  @override
+  Future<String> deleteTicketFile(int supportDocumentId, String fileId) async {
+    try {
+      final payload = TicketFileDeleteRequest(
+        supportDocumentId: supportDocumentId,
+        fileId: fileId,
+      );
+      final encodedPayload = encodeData(payload.toJson());
+
+      final response = await apiClient.put(
+        AppUrls.ticketFileDelete,
+        data: {'payload': encodedPayload},
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      final apiResponse = TicketFileDeleteResponse.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.success) {
+        throw ServerException(
+          apiResponse.message ?? 'Failed to delete ticket file',
+        );
+      }
+
+      return apiResponse.message ?? 'File deleted.';
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      if (e is ServerException) {
+        rethrow;
+      }
+      throw ServerException('Failed to delete ticket file: ${e.toString()}');
     }
   }
 }

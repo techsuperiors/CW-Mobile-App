@@ -43,6 +43,38 @@ class AttendanceRegularizeRequest {
   }
 }
 
+class AttendanceRegularizeUpdateRequest {
+  final int id;
+  final String requestFor;
+  final String requestDate;
+  final String checkIn;
+  final String checkOut;
+  final int statusUpdatedBy;
+  final String description;
+
+  AttendanceRegularizeUpdateRequest({
+    required this.id,
+    required this.requestFor,
+    required this.requestDate,
+    required this.checkIn,
+    required this.checkOut,
+    required this.statusUpdatedBy,
+    required this.description,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'request_for': requestFor,
+      'request_date': requestDate,
+      'check_in': checkIn,
+      'check_out': checkOut,
+      'status_updated_by': statusUpdatedBy,
+      'description': description,
+    };
+  }
+}
+
 /// Attendance Regularize Response Model
 class AttendanceRegularizeResponse {
   final bool success;

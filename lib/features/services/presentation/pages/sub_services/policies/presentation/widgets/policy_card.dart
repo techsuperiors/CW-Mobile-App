@@ -8,13 +8,11 @@ import '../pages/policy_detail_page.dart';
 class PolicyCard extends StatelessWidget {
   final PolicyModel policy;
 
-  const PolicyCard({
-    super.key,
-    required this.policy,
-  });
+  const PolicyCard({super.key, required this.policy});
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
     return InkWell(
       onTap: () {
         // Navigate to policy detail page when tapped
@@ -28,7 +26,7 @@ class PolicyCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.backgroundLight,
+          color: AppColors.background,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
@@ -38,85 +36,92 @@ class PolicyCard extends StatelessWidget {
             ),
           ],
         ),
-        padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.042), // ~4.2% of screen width
+        padding: EdgeInsets.all(
+          MediaQuery.of(context).size.width * 0.042,
+        ), // ~4.2% of screen width
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Policy Name and Kebab Menu
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  policy.name,
-                  style: AppTextStyles.bodyLarge(context).copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(context).colorScheme.primary,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Policy Name and Kebab Menu
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(
+                    policy.name,
+                    style: AppTextStyles.bodyLarge(context).copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.more_vert,
-                  size: MediaQuery.of(context).size.width * 0.053, // ~5.3% of screen width
-                  color: AppColors.textSecondary,
-                ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: () {
-                  // Handle kebab menu tap
-                },
-              ),
-            ],
-          ),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.02), // 2% of screen height
-          // Assigned By
-          _buildDetailRow(
-            context,
-            'Assigned By',
-            policy.assignedBy,
-            policy.assignedByAvatar,
-          ),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.015), // 1.5% of screen height
-          // Assigned Date
-          _buildDetailRow(context, 'Assigned Date', policy.assignedDate, null),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.015), // 1.5% of screen height
-          // Status
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Status: ',
-                style: AppTextStyles.bodySmall(context).copyWith(
-                  fontWeight: FontWeight.w400,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  policy.status,
+              ],
+            ),
+
+            SizedBox(height: screenHeight * 0.02), // 2% of screen height
+            // Assigned By
+            _buildDetailRow(
+              context,
+              'Assigned By',
+              policy.assignedBy,
+              policy.assignedByAvatar,
+            ),
+
+            // SizedBox(height: screenHeight * 0.015), // 1.5% of screen height
+            Divider(height: screenHeight * 0.03, color: AppColors.border),
+
+            // SizedBox(height: screenHeight * 0.015), // 1.5% of screen height
+            // Assigned Date
+            _buildDetailRow(
+              context,
+              'Assigned Date',
+              policy.assignedDate,
+              null,
+            ),
+            Divider(height: screenHeight * 0.03, color: AppColors.border),
+            // Status
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Status: ',
                   style: AppTextStyles.bodySmall(context).copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: policy.isAcknowledged
-                        ? AppColors.success
-                        : AppColors.warning,
+                    fontWeight: FontWeight.w400,
+                    color: AppColors.textSecondary,
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
+                Expanded(
+                  child: Text(
+                    policy.status,
+                    style: AppTextStyles.bodySmall(context).copyWith(
+                      fontWeight: FontWeight.w500,
+                      color:
+                          policy.isAcknowledged
+                              ? AppColors.success
+                              : AppColors.warning,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildDetailRow(BuildContext context, String label, String value, String? avatarPath) {
+  Widget _buildDetailRow(
+    BuildContext context,
+    String label,
+    String value,
+    String? avatarPath,
+  ) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final smallerDimension = screenWidth < screenHeight ? screenWidth : screenHeight;
-    
+    final smallerDimension =
+        screenWidth < screenHeight ? screenWidth : screenHeight;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -138,8 +143,12 @@ class PolicyCard extends StatelessWidget {
               if (avatarPath != null) ...[
                 SizedBox(width: screenWidth * 0.021), // ~2.1% of screen width
                 CircleAvatar(
-                  radius: smallerDimension * 0.033, // ~3.3% of smaller dimension
-                  backgroundImage: AssetImage(avatarPath),
+                  radius: smallerDimension * 0.033,
+                  // ~3.3% of smaller dimension
+                  backgroundImage:
+                      avatarPath.startsWith('http')
+                          ? NetworkImage(avatarPath)
+                          : AssetImage(avatarPath) as ImageProvider,
                 ),
               ],
               SizedBox(width: screenWidth * 0.021), // ~2.1% of screen width
@@ -151,7 +160,6 @@ class PolicyCard extends StatelessWidget {
                 ),
                 textAlign: TextAlign.right,
               ),
-
             ],
           ),
         ),
@@ -159,4 +167,3 @@ class PolicyCard extends StatelessWidget {
     );
   }
 }
-

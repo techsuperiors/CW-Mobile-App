@@ -65,9 +65,7 @@ class Ticket {
 class TicketList {
   final List<Ticket> tickets;
 
-  TicketList({
-    required this.tickets,
-  });
+  TicketList({required this.tickets});
 }
 
 /// Ticket Document Entity
@@ -76,11 +74,7 @@ class TicketDocument {
   final String url;
   final String name;
 
-  TicketDocument({
-    required this.id,
-    required this.url,
-    required this.name,
-  });
+  TicketDocument({required this.id, required this.url, required this.name});
 }
 
 /// Ticket Activity Entity
@@ -235,4 +229,13 @@ class TicketDetails {
     this.ticketSubCategory,
     required this.followers,
   });
+}
+
+/// Uploaded File Entity - represents a file returned from the upload API
+class UploadedFile {
+  final String id;
+  final String url;
+  final String name;
+
+  UploadedFile({required this.id, required this.url, required this.name});
 }

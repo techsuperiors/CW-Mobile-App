@@ -13,6 +13,7 @@ class AppConstants {
   static const String savedEmailKey = 'saved_email';
   static const String savedPasswordKey = 'saved_password';
   static const String rememberMeKey = 'remember_me';
+  static const String savedAccountsKey = 'saved_accounts';
 
   // Pagination
   static const int defaultPageSize = 20;
@@ -38,4 +39,3 @@ class AppConstants {
   // Debounce Duration
   static const Duration debounceDuration = Duration(milliseconds: 500);
 }
-

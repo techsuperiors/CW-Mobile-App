@@ -15,6 +15,9 @@ import '../../../../../../../leaves/data/datasources/leave_types_remote_datasour
 import '../../../../../../../leaves/data/repositories/leave_types_repository_impl.dart';
 import '../../../../../../../leaves/domain/usecases/get_leave_types_usecase.dart';
 import '../../../../../../../leaves/domain/usecases/apply_leave_usecase.dart';
+import '../../../../../../../leaves/domain/usecases/delete_leave_file_usecase.dart';
+import '../../../../../../../leaves/domain/usecases/update_leave_usecase.dart';
+import '../../../../../../../leaves/domain/usecases/upload_leave_files_usecase.dart';
 import '../../../../../../../user/presentation/bloc/user_profile_state.dart';
 import '../bloc/leave_request_bloc.dart';
 import '../bloc/leave_request_event.dart';
@@ -35,17 +38,31 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
 
   // Helper function to get color for leave type
   Color _getLeaveTypeColor(String leaveCode) {
-    switch (leaveCode.toUpperCase()) {
+    final code = leaveCode.toUpperCase().trim();
+
+    switch (code) {
       case 'LOP':
-        return const Color(0xFF1976D2); // Dark blue for LOP
-      case 'EL':
-        return AppColors.attendanceTeal;
-      case 'CL':
-        return AppColors.leavePaternity;
-      case 'SL':
-        return AppColors.leavePaidHoliday;
+        return AppColors.error;
+
+      case 'EL': // Earned Leave
+        return AppColors.leaveEarned;
+
+      case 'CL': // Casual Leave
+        return AppColors.leaveCasual;
+
+      case 'CLF': // Casual Leave Female (ya variant)
+        return AppColors.leavecompoff;
+
+      case 'SL': // Sick Leave
+        return AppColors.leaveSick;
+
+      case 'PLV': // Privilege Leave
+        return AppColors.leaveprivilage;
+      case 'OCL': // Privilege Leave
+        return AppColors.ozicasualLeave;
+
       default:
-        return AppColors.primary;
+        return AppColors.serviceTeal;
     }
   }
 
@@ -63,9 +80,15 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
     );
     final getLeaveTypesUseCase = GetLeaveTypesUseCase(repository);
     final applyLeaveUseCase = ApplyLeaveUseCase(repository);
+    final updateLeaveUseCase = UpdateLeaveUseCase(repository);
+    final uploadLeaveFilesUseCase = UploadLeaveFilesUseCase(repository);
+    final deleteLeaveFileUseCase = DeleteLeaveFileUseCase(repository);
     _leaveRequestBloc = LeaveRequestBloc(
       getLeaveTypesUseCase: getLeaveTypesUseCase,
       applyLeaveUseCase: applyLeaveUseCase,
+      updateLeaveUseCase: updateLeaveUseCase,
+      uploadLeaveFilesUseCase: uploadLeaveFilesUseCase,
+      deleteLeaveFileUseCase: deleteLeaveFileUseCase,
     );
   }
 
@@ -81,6 +104,7 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
       value: _leaveRequestBloc,
       child: ResponsiveScaffold(
         appBar: AppBar(
+          forceMaterialTransparency: true,
           elevation: 0,
           backgroundColor: AppColors.background,
           foregroundColor: AppColors.textPrimary,
@@ -97,9 +121,9 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                 ),
                 Flexible(
                   child: Text(
-                    AppStrings.services,
-                    style: AppTextStyles.bodyLarge(context).copyWith(
-                      fontWeight: FontWeight.w500,
+                    "Back",
+                    style: AppTextStyles.bodyMedium(context).copyWith(
+                      fontWeight: FontWeight.w400,
                       color: Theme.of(context).colorScheme.primary,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -133,11 +157,9 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
 
             return BlocBuilder<LeaveRequestBloc, LeaveRequestState>(
               builder: (context, state) {
-                if (state is LeaveRequestLoading || 
+                if (state is LeaveRequestLoading ||
                     profileState is! UserProfileLoaded) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
+                  return const Center(child: CircularProgressIndicator());
                 }
 
                 if (state is LeaveRequestError) {
@@ -150,7 +172,9 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                           size: MediaQuery.of(context).size.width * 0.15,
                           color: AppColors.error,
                         ),
-                        SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.02,
+                        ),
                         Text(
                           state.message,
                           style: AppTextStyles.bodyMedium(context),
@@ -163,16 +187,20 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
 
                 if (state is LeaveRequestLoaded) {
                   final leaveTypes = state.leaveTypes.leaveTypes;
-                  
                   // Separate LOP from other leave types
-                  final lopLeaves = leaveTypes.where(
-                    (lt) => lt.leaveCode.toUpperCase() == 'LOP',
-                  ).toList();
-                  
-                  final otherLeaves = leaveTypes.where(
-                    (lt) => lt.leaveCode.toUpperCase() != 'LOP',
-                  ).toList();
+                  final lopLeaves =
+                      leaveTypes.where((lt) {
+                        final name = (lt.leaveType ?? "").trim().toUpperCase();
+                        final code = (lt.leaveCode ?? "").trim().toUpperCase();
+                        return name == "LOP" || code == "LOP";
+                      }).toList();
 
+                  final otherLeaves =
+                      leaveTypes.where((lt) {
+                        final type = lt.leaveType.trim().toUpperCase();
+                        final code = lt.leaveCode.trim().toUpperCase();
+                        return type != 'LOP' && code != 'LOP';
+                      }).toList();
                   return SingleChildScrollView(
                     padding: EdgeInsets.symmetric(
                       horizontal: MediaQuery.of(context).size.width * 0.01,
@@ -182,36 +210,60 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         // Loss of Pay (LOP) Card
-                        if (state.leaveTypes.lossOffPay && lopLeaves.isNotEmpty)
-                          LeaveTypeCard(
-                            title: 'Loss of Pay (LOP)',
-                            totalLeaves: lopLeaves.first.currentMonthLop ?? 
-                                        lopLeaves.first.totalLeaves ?? 0,
-                            consumed: lopLeaves.first.consumedLeaves ?? 0,
-                            allocatedQuota: lopLeaves.first.totalLeaves ?? 0,
-                            annualQuota: lopLeaves.first.totalLeaves ?? 0,
-                            color: _getLeaveTypeColor('LOP'),
-                            isLOP: true,
-                          ),
-                        if (state.leaveTypes.lossOffPay && lopLeaves.isNotEmpty)
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.02),
-                        // Other leave types
                         ...otherLeaves.map((leaveType) {
                           return Column(
                             children: [
                               LeaveTypeCard(
                                 title: leaveType.leaveType,
-                                totalLeaves: leaveType.remainingLeaves ?? leaveType.count,
-                                consumed: leaveType.consumedLeaves ?? 0,
-                                allocatedQuota: leaveType.allocatedQuota ?? leaveType.annualQuota ?? 0,
-                                annualQuota: leaveType.annualQuota ?? 0,
+                                totalLeaves:
+                                    (leaveType.remainingLeaves ??
+                                            leaveType.count)
+                                        .toDouble(),
+                                consumed:
+                                    (leaveType.consumedLeaves ?? 0).toDouble(),
+                                allocatedQuota:
+                                    (leaveType.allocatedQuota ??
+                                            leaveType.annualQuota ??
+                                            0)
+                                        .toDouble(),
+                                annualQuota:
+                                    (leaveType.annualQuota ?? 0).toDouble(),
+                                accruedSoFar: leaveType.allocatedLeave,
                                 color: _getLeaveTypeColor(leaveType.leaveCode),
                                 isLOP: false,
                               ),
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                              SizedBox(
+                                height:
+                                    MediaQuery.of(context).size.height * 0.02,
+                              ),
                             ],
                           );
                         }),
+
+                        if (state.leaveTypes.lossOffPay && lopLeaves.isNotEmpty)
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.02,
+                          ),
+                        if (lopLeaves.isNotEmpty)
+                          LeaveTypeCard(
+                            title: 'Loss of Pay (LOP)',
+                            totalLeaves:
+                                (lopLeaves.first.currentMonthLop ??
+                                        lopLeaves.first.totalLeaves ??
+                                        0)
+                                    .toDouble(),
+                            consumed:
+                                (lopLeaves.first.consumedLeaves ?? 0)
+                                    .toDouble(),
+                            allocatedQuota:
+                                (lopLeaves.first.totalLeaves ?? 0).toDouble(),
+                            annualQuota:
+                                (lopLeaves.first.totalLeaves ?? 0).toDouble(),
+                            accruedSoFar: lopLeaves.first.allocatedLeave,
+                            color: _getLeaveTypeColor('LOP'),
+                            isLOP: true,
+                          ),
+                        // Other leave types
                       ],
                     ),
                   );
@@ -226,4 +278,3 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
     );
   }
 }
-
