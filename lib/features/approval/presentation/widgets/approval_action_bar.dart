@@ -96,32 +96,17 @@ class _ActionButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 0,
           disabledBackgroundColor: color.withValues(alpha: 0.7),
           disabledForegroundColor: Colors.white,
         ),
-        icon:
-            isLoading
-                ? SizedBox(
-                  width: screenWidth * 0.05,
-                  height: screenHeight * 0.05,
-                  child: const CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-                : SvgPicture.asset(
-                  iconAsset,
-                  width: 20,
-                  height: 20,
-                  colorFilter: const ColorFilter.mode(
-                    Colors.white,
-                    BlendMode.srcIn,
-                  ),
-                ),
+        icon: SvgPicture.asset(
+          iconAsset,
+          width: 20,
+          height: 20,
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+        ),
         label: Text(
           label,
           style: AppTextStyles.bodyMedium(

@@ -1,9 +1,7 @@
 import 'package:collectivWork/core/extension/string_extensions.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../leaves/domain/entities/leave_type.dart';
 
@@ -28,6 +26,7 @@ class LeavesSummary extends StatelessWidget {
       return {
         'label': type.leaveType,
         'count': type.count,
+        'total': type.totalLeaves ?? type.count,
         'color': _getColorForLeaveType(type.leaveType),
       };
     }).toList();
@@ -39,6 +38,13 @@ class LeavesSummary extends StatelessWidget {
       0.0,
       (sum, type) => sum + (type['count'] as double),
     );
+  }
+
+  String _formatLeaveValue(double value) {
+    if (value % 1 == 0) {
+      return value.toInt().toString();
+    }
+    return value.toString();
   }
 
   Color _getColorForLeaveType(String leaveType) {
@@ -86,7 +92,7 @@ class LeavesSummary extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: AppColors.textPrimary.withOpacity(0.1),
+              color: AppColors.textPrimary.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -174,8 +180,7 @@ class LeavesSummary extends StatelessWidget {
                               const SizedBox(width: 8),
                               Flexible(
                                 child: Text(
-                                  '${(type['label'] as String).capitalizeFirst()} (${_getTotalLeaves() > 0 ? ((type['count'] as double) / _getTotalLeaves() * 100).toStringAsFixed(1) : '0.0'}%)',
-                                  // '${(type['label'] as String).capitalizeFirst()} (${(type['count'] as num).toString().padLeft(2, '0')})',
+                                  '${(type['label'] as String).capitalizeFirst()} (${_formatLeaveValue(type['count'] as double)}/${_formatLeaveValue(type['total'] as double)})',
                                   style: AppTextStyles.bodySmall(context)
                                       .copyWith(
                                         color: AppColors.textSecondary,

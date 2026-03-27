@@ -9,7 +9,13 @@ class GetLeaveStatsUseCase {
 
   GetLeaveStatsUseCase(this.repository);
 
-  Future<Either<Failure, LeaveStatsEntity>> call() {
-    return repository.getLeaveStats();
+  Future<Either<Failure, LeaveStatsEntity>> call({
+    String? startDate,
+    String? endDate,
+  }) {
+    return repository.getLeaveStats(
+      startDate: startDate,
+      endDate: endDate,
+    );
   }
 }

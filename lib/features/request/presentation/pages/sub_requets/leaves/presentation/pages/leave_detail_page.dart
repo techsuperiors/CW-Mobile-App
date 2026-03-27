@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../../../../../core/constants/app_assets.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/constants/app_urls.dart';
@@ -111,6 +113,7 @@ class _LeaveDetailView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
 
     return ResponsiveScaffold(
       backgroundColor: AppColors.backgroundMedium,
@@ -164,60 +167,93 @@ class _LeaveDetailView extends StatelessWidget {
           BlocBuilder<LeaveDetailBloc, LeaveDetailState>(
             builder: (context, state) {
               if (state is LeaveDetailLoaded) {
-                return PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
-                  onSelected: (value) async {
-                    switch (value) {
-                      case 'Edit':
-                        final editableLeave = _mapDetailToEditableLeave(
-                          state.detail,
+                final bool isPending =
+                    state.detail.status.toLowerCase() == 'pending';
+                final menuActions = <Map<String, String>>[
+                  if (isPending && !isApprovalMode)
+                    {'value': 'Edit', 'icon': AppAssets.editIconwfh},
+                  if (isPending && !isApprovalMode)
+                    {'value': 'Withdraw', 'icon': AppAssets.withdrawIcon},
+                  {'value': 'Activity', 'icon': AppAssets.activityIcon},
+                ];
+
+                Future<void> handleAction(String value) async {
+                  switch (value) {
+                    case 'Edit':
+                      final editableLeave = _mapDetailToEditableLeave(
+                        state.detail,
+                      );
+                      final bool? updated = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (_) =>
+                                  ApplyLeavePage(leaveRequest: editableLeave),
+                        ),
+                      );
+
+                      if (updated == true && context.mounted) {
+                        context.read<LeaveDetailBloc>().add(
+                          FetchLeaveDetail(int.tryParse(leaveEntity.id) ?? 0),
                         );
-                        final bool? updated = await Navigator.push<bool>(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (_) => ApplyLeavePage(
-                                  leaveRequest: editableLeave,
-                                ), // Ensure leaveRequest is passed
+                      }
+                      break;
+                    case 'Withdraw':
+                      _showWithdrawDialog(context, state.detail);
+                      break;
+                    case 'Activity':
+                      _showActivitySheet(context, state.detail);
+                      break;
+                  }
+                }
+
+                if (menuActions.length >= 2) {
+                  return PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
+                    onSelected: handleAction,
+                    itemBuilder: (context) {
+                      return menuActions.map((action) {
+                        return PopupMenuItem(
+                          value: action['value'],
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: screenWidth * 0.05,
+                                height: screenHeight * 0.05,
+                                child: SvgPicture.asset(action['icon']!),
+                              ),
+                              SizedBox(width: screenWidth * 0.02),
+                              Text(
+                                action['value']!,
+                                style: AppTextStyles.heading5(context).copyWith(
+                                  fontWeight: FontWeight.w400,
+                                  color: AppColors.textHeading,
+                                ),
+                              ),
+                            ],
                           ),
                         );
+                      }).toList();
+                    },
+                  );
+                }
 
-                        // 2. If the user submitted successfully (returned true), refresh the BLoC
-                        if (updated == true && context.mounted) {
-                          context.read<LeaveDetailBloc>().add(
-                            FetchLeaveDetail(int.tryParse(leaveEntity.id) ?? 0),
-                          );
-                        }
-                        break;
-                      case 'Withdraw':
-                        _showWithdrawDialog(context, state.detail);
-                        break;
-                      case 'Activity':
-                        _showActivitySheet(context, state.detail);
-                        break;
-                    }
-                  },
-                  itemBuilder: (context) {
-                    final bool isPending =
-                        state.detail.status.toLowerCase() == 'pending';
-
-                    return [
-                      if (isPending && !isApprovalMode)
-                        const PopupMenuItem(value: 'Edit', child: Text('Edit')),
-
-                      if (isPending && !isApprovalMode)
-                        const PopupMenuItem(
-                          value: 'Withdraw',
-                          child: Text('Withdraw'),
-                        ),
-
-                      const PopupMenuItem(
-                        value: 'Activity',
-                        child: Text('Activity'),
+                if (menuActions.length == 1) {
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => handleAction(menuActions.first['value']!),
+                    child: Padding(
+                      padding: EdgeInsets.only(right: screenWidth * 0.06),
+                      child: SizedBox(
+                        width: screenWidth * 0.06,
+                        height: screenHeight * 0.03,
+                        child: SvgPicture.asset(menuActions.first['icon']!),
                       ),
-                    ];
-                  },
-                );
+                    ),
+                  );
+                }
+
+                return const SizedBox.shrink();
               }
 
               return const SizedBox.shrink();
@@ -399,8 +435,11 @@ class _LeaveDetailView extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      isDismissible: true,
+
       builder:
           (_) => DraggableScrollableSheet(
+            expand: false,
             initialChildSize: 0.5,
             minChildSize: 0.3,
             maxChildSize: 0.9,
@@ -554,8 +593,8 @@ class _DetailsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy');
-
     final statusColor = _statusColor(detail.status);
+    final appliedOn = detail.createdAt ?? detail.requestDate;
 
     return _Card(
       sw: sw,
@@ -586,7 +625,12 @@ class _DetailsCard extends StatelessWidget {
             sh: sh,
           ),
           _Div(sh: sh),
-          _Row(label: 'Reason:', value: detail.reason, sw: sw, sh: sh),
+          _Row(
+            label: 'Reason:',
+            value: detail.reason.trim().isEmpty ? '-' : detail.reason,
+            sw: sw,
+            sh: sh,
+          ),
           _Div(sh: sh),
           // Request To with avatar
           _RequestToRow(detail: detail, sw: sw, sh: sh),
@@ -616,7 +660,7 @@ class _DetailsCard extends StatelessWidget {
           _Div(sh: sh),
           _Row(
             label: 'Applied On:',
-            value: DateFormat('dd/MM/yyyy HH:mm').format(detail.requestDate),
+            value: DateFormat('dd/MM/yyyy hh:mm a').format(appliedOn),
             sw: sw,
             sh: sh,
           ),
@@ -641,24 +685,22 @@ class _DetailsCard extends StatelessWidget {
             sh: sh,
             isApprovalMode: isApprovalMode,
           ),
-
-
-
         ],
       ),
     );
   }
-
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved':
-        return const Color(0xFF12B76A);
+        return AppColors.approvalSheetAccept;
       case 'rejected':
-        return const Color(0xFFF04438);
+        return AppColors.approvalSheetReject;
       case 'withdrawn':
-        return const Color(0xFFF79009);
+        return AppColors.approvalSheetWithdrawn;
+      case 'pending':
+        return AppColors.approvalSheetPending;
       default:
-        return const Color(0xFF2196F3);
+        return  AppColors.approvalSheetPending;
     }
   }
 }
@@ -700,15 +742,16 @@ class _RequestToRow extends StatelessWidget {
             onTap: () => _showApproversSheet(context),
             child: Row(
               children: [
-                _ApproverAvatarStack(users: approverUsers, avatarSize: sw * 0.07),
+                _ApproverAvatarStack(
+                  users: approverUsers,
+                  avatarSize: sw * 0.07,
+                ),
                 SizedBox(width: sw * 0.02),
                 Text(
                   approverUsers.length == 1
                       ? approverUsers.first.fullName
                       : '${approverUsers.length} approvers',
-                  style: AppTextStyles.bodySmall(
-                    context,
-                  ).copyWith(
+                  style: AppTextStyles.bodySmall(context).copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w500,
                   ),
@@ -888,8 +931,9 @@ class _DescriptionCard extends StatelessWidget {
                 ),
               );
             },
-            isLoading: context.watch<LeaveDetailBloc>().state
-                is LeaveDetailStatusUpdating,
+            isLoading:
+                context.watch<LeaveDetailBloc>().state
+                    is LeaveDetailStatusUpdating,
           ),
         ],
         if (detail.fileDocuments.isNotEmpty) ...[
@@ -950,9 +994,7 @@ class _CommentsCard extends StatelessWidget {
                 ),
                 child: Text(
                   '${detail.comments.length}',
-                  style: AppTextStyles.labelSmall(
-                    context,
-                  ).copyWith(
+                  style: AppTextStyles.labelSmall(context).copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w700,
                   ),
@@ -996,9 +1038,7 @@ class _CommentsCard extends StatelessWidget {
                             alignment: Alignment.center,
                             child: Text(
                               _initials(comment.user?.fullName ?? 'User'),
-                              style: AppTextStyles.bodySmall(
-                                context,
-                              ).copyWith(
+                              style: AppTextStyles.bodySmall(context).copyWith(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -1036,10 +1076,7 @@ class _CommentsCard extends StatelessWidget {
                         comment.comment,
                         style: AppTextStyles.bodyMedium(
                           context,
-                        ).copyWith(
-                          color: AppColors.textPrimary,
-                          height: 1.45,
-                        ),
+                        ).copyWith(color: AppColors.textPrimary, height: 1.45),
                       ),
                     ],
                   ),
@@ -1047,8 +1084,7 @@ class _CommentsCard extends StatelessWidget {
               ),
             ),
             SizedBox(height: sh * 0.008),
-          ]
-          ,
+          ],
           Container(
             padding: EdgeInsets.all(sw * 0.02),
             decoration: BoxDecoration(
@@ -1084,8 +1120,7 @@ class _CommentsCard extends StatelessWidget {
                   height: sw * 0.12,
                   width: sw * 0.12,
                   child: ElevatedButton(
-                    onPressed: ()
-                    {
+                    onPressed: () {
                       final trimmedComment = commentController.text.trim();
                       if (trimmedComment.isNotEmpty) {
                         context.read<LeaveDetailBloc>().add(
@@ -1106,14 +1141,11 @@ class _CommentsCard extends StatelessWidget {
                       ),
                       elevation: 0,
                     ),
-                    child: Icon(
-                      Icons.arrow_upward_rounded,
-                      size: sw * 0.05,
-                    ),
+                    child: Icon(Icons.arrow_upward_rounded, size: sw * 0.05),
                   ),
                 ),
               ],
-          ),
+            ),
           ),
         ],
       ),
@@ -1333,40 +1365,48 @@ class _ActivityTile extends StatelessWidget {
     final cleanText = activity.action.replaceAll(RegExp(r'<[^>]*>'), '');
     return Padding(
       padding: EdgeInsets.only(bottom: sh * 0.012),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            margin: const EdgeInsets.only(top: 5),
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
+      child: Container(
+        padding: EdgeInsets.all(sw * 0.04),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              margin: const EdgeInsets.only(top: 5),
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
             ),
-          ),
-          SizedBox(width: sw * 0.025),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  cleanText,
-                  style: AppTextStyles.bodySmall(
-                    context,
-                  ).copyWith(color: AppColors.textPrimary),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  DateFormat('dd/MM/yyyy HH:mm').format(activity.updatedAt),
-                  style: AppTextStyles.bodySmall(
-                    context,
-                  ).copyWith(color: AppColors.textSecondary, fontSize: 11),
-                ),
-              ],
+            SizedBox(width: sw * 0.025),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    cleanText,
+                    style: AppTextStyles.bodyMediumHeading(
+                      context,
+                    ).copyWith(color: AppColors.textPrimary),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    DateFormat('dd/MM/yyyy HH:mm').format(activity.updatedAt),
+                    style: AppTextStyles.bodySmall(
+                      context,
+                    ).copyWith(color: AppColors.textSecondary, fontSize: 11),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1500,28 +1540,30 @@ class _ApproverAvatarStack extends StatelessWidget {
   final List<LeaveApprover> users;
   final double avatarSize;
 
-  const _ApproverAvatarStack({
-    required this.users,
-    required this.avatarSize,
-  });
+  const _ApproverAvatarStack({required this.users, required this.avatarSize});
 
   @override
   Widget build(BuildContext context) {
     final visibleUsers = users.take(3).toList();
     final overlap = avatarSize * 0.35;
+    final edgePadding = avatarSize * 0.08;
     final width =
         visibleUsers.length == 1
-            ? avatarSize
-            : avatarSize + ((visibleUsers.length - 1) * (avatarSize - overlap));
+            ? avatarSize + (edgePadding * 2)
+            : avatarSize +
+                ((visibleUsers.length - 1) * (avatarSize - overlap)) +
+                (edgePadding * 2);
 
     return SizedBox(
       width: width,
-      height: avatarSize,
+      height: avatarSize + (edgePadding * 2),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           for (var i = 0; i < visibleUsers.length; i++)
             Positioned(
-              left: i * (avatarSize - overlap),
+              left: edgePadding + (i * (avatarSize - overlap)),
+              top: edgePadding,
               child: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,

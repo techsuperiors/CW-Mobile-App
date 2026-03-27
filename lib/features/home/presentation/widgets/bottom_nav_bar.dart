@@ -62,14 +62,14 @@ class BottomNavBar extends StatelessWidget {
                     activeColor: activeColor,
                     inactiveColor: inactiveColor,
                   ),
-                  _buildNavItem(
-                    index: 1,
-                    icon: AppAssets.iconPosts,
-                    isSvgIcon: true,
-                    label: AppStrings.posts,
-                    activeColor: activeColor,
-                    inactiveColor: inactiveColor,
-                  ),
+                  // _buildNavItem(
+                  //   index: 1,
+                  //   icon: AppAssets.iconPosts,
+                  //   isSvgIcon: true,
+                  //   label: AppStrings.posts,
+                  //   activeColor: activeColor,
+                  //   inactiveColor: inactiveColor,
+                  // ),
                   _buildNavItem(
                     index: 2,
                     icon: AppAssets.iconHome,

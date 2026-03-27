@@ -133,6 +133,7 @@ class LeaveTypeCard extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      isDismissible: false,
       backgroundColor: Colors.transparent,
       builder: (context) {
         final networkInfo = NetworkInfoImpl(Connectivity());

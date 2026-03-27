@@ -98,8 +98,8 @@ class OnDutyActivityBottomSheet extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            width: screenWidth * 0.1,
-                            height: screenWidth * 0.1,
+                            width: screenWidth * 0.08,
+                            height: screenWidth * 0.08,
                             decoration: BoxDecoration(
                               color: visual.$2.withOpacity(0.10),
                               shape: BoxShape.circle,
@@ -117,11 +117,9 @@ class OnDutyActivityBottomSheet extends StatelessWidget {
                               children: [
                                 Text(
                                   _formatAction(item),
-                                  style: AppTextStyles.bodyMedium(context)
-                                      .copyWith(
-                                        color: AppColors.textPrimary,
-                                        height: 1.45,
-                                      ),
+                                  style: AppTextStyles.bodyMediumHeading(
+                                    context,
+                                  ).copyWith(color: AppColors.textPrimary),
                                 ),
                                 SizedBox(height: screenHeight * 0.008),
                                 Text(

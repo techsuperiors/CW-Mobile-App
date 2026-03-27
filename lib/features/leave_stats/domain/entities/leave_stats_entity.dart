@@ -5,6 +5,8 @@ class LeaveStatsEntity {
   final int workingDays;
   final int wfhDays;
   final int leaveDays;
+  final int regularizeDays;
+  final int onDutyDays;
   final String startDate;
   final String endDate;
 
@@ -12,6 +14,8 @@ class LeaveStatsEntity {
     required this.workingDays,
     required this.wfhDays,
     required this.leaveDays,
+    this.regularizeDays = 0,
+    this.onDutyDays = 0,
     required this.startDate,
     required this.endDate,
   });

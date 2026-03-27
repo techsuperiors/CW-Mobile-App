@@ -3,6 +3,7 @@ class AppAssets {
   // Logo
   static const String appLogo = 'assets/icons/app_logo.svg';
   static const String appNameLogo = 'assets/images/app_logo_name.svg';
+  static const String splashIcon = 'assets/images/splash_icon.png';
 
   static const String successIcon = 'assets/icons/success_icon.svg';
 
@@ -17,7 +18,7 @@ class AppAssets {
   static const String iconServices = 'assets/icons/service_icon.svg';
   static const String iconPosts = 'assets/icons/posts_icons.svg';
   static const String iconHome = 'assets/icons/home_icon.svg';
-  static const String iconRequest = 'assets/icons/request_icon.svg';
+  static const String iconRequest = 'assets/icons/request_icon_bottom_nav.svg';
   static const String iconApproval = 'assets/icons/approval_icon.svg';
 
   // Placeholder Images
@@ -84,6 +85,11 @@ class AppAssets {
   static const String laptopIcon="assets/icons/laptop_icon.svg";
   static const String headphonesIcon="assets/icons/headphone_icon.svg";
 
+  //Payslip Images
+  static const String payslipThumbnailImage="assets/images/payslip_thumbnail.png";
+
+  //Gifs
+  static const String swipeGif="assets/gifs/swipe_gif.gif";
+
 
 }
-

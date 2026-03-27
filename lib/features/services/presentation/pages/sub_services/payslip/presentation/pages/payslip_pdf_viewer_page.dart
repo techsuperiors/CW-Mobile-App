@@ -1,12 +1,12 @@
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:native_screenshot_widget/native_screenshot_widget.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webcontent_converter/webcontent_converter.dart';
 
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
@@ -27,9 +27,7 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
   late final WebViewController _webViewController;
   bool _isPageLoading = true;
   late final String _htmlDocument;
-  final NativeScreenshotController _screenshotController =
-      NativeScreenshotController();
-  Uint8List? _pdfBytes;
+  late final String _pdfHtmlDocument;
 
   String get _htmlContent => widget.payslip.template.trim();
 
@@ -37,21 +35,22 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
   void initState() {
     super.initState();
     _htmlDocument = _buildHtmlDocument(_htmlContent);
+    _pdfHtmlDocument = _buildPdfHtmlDocument(_htmlContent);
     _webViewController =
-        WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..setBackgroundColor(Colors.white)
-          ..setNavigationDelegate(
-            NavigationDelegate(
-              onPageFinished: (_) {
-                if (mounted) {
-                  setState(() {
-                    _isPageLoading = false;
-                  });
-                }
-              },
-            ),
-          );
+    WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.white)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (_) {
+            if (mounted) {
+              setState(() {
+                _isPageLoading = false;
+              });
+            }
+          },
+        ),
+      );
 
     if (_htmlContent.isNotEmpty) {
       _webViewController.loadRequest(
@@ -64,35 +63,6 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
     } else {
       _isPageLoading = false;
     }
-  }
-
-  Future<Uint8List> _generatePdfBytes() async {
-    if (_pdfBytes != null) {
-      return _pdfBytes!;
-    }
-
-    final screenshotBytes = await _screenshotController.takeScreenshot();
-    if (screenshotBytes == null || screenshotBytes.isEmpty) {
-      throw Exception('Could not capture payslip preview.');
-    }
-
-    final document = pw.Document();
-    final screenshotImage = pw.MemoryImage(screenshotBytes);
-
-    document.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(12),
-        build:
-            (context) => pw.Center(
-              child: pw.Image(screenshotImage, fit: pw.BoxFit.contain),
-            ),
-      ),
-    );
-
-    final pdfBytes = await document.save();
-
-    return pdfBytes;
   }
 
   Future<void> _downloadPdf() async {
@@ -112,27 +82,31 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
     });
 
     try {
-      final pdfBytes = await _generatePdfBytes();
-
-      if (_pdfBytes == null && mounted) {
-        setState(() {
-          _pdfBytes = pdfBytes;
-        });
-      }
-
       final fileName =
           'Payslip_${widget.payslip.displayName.replaceAll(' ', '_')}.pdf';
-
-      await Printing.layoutPdf(name: fileName, onLayout: (_) async => pdfBytes);
+      final directory = await _resolveDownloadDirectory();
+      await directory.create(recursive: true);
+      final filePath = path.join(directory.path, fileName);
+      final savedPath = await WebcontentConverter.contentToPDF(
+        content: _pdfHtmlDocument,
+        savedPath: filePath,
+        format: PaperFormat.a4,
+        margins: PdfMargins.px(top: 16, bottom: 16, right: 16, left: 16),
+      );
+      if (savedPath == null || savedPath.isEmpty) {
+        throw Exception('Could not generate payslip PDF.');
+      }
+      final file = File(savedPath);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Choose "Save as PDF" to download the payslip.'),
+          content: Text('Payslip Successfully downloaded'),
           backgroundColor: AppColors.success,
           duration: const Duration(seconds: 3),
         ),
       );
+      await OpenFilex.open(file.path);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -150,20 +124,28 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
     }
   }
 
-  String _buildHtmlDocument(String rawHtml) {
-    final normalized =
-        rawHtml.contains('<!DOCTYPE html>')
-            ? rawHtml
-            : '''
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  </head>
-  <body>$rawHtml</body>
-</html>
-''';
+  Future<Directory> _resolveDownloadDirectory() async {
+    if (Platform.isIOS) {
+      return getApplicationDocumentsDirectory();
+    }
 
+    final scopedDownloadDirs = await getExternalStorageDirectories(
+      type: StorageDirectory.downloads,
+    );
+    if (scopedDownloadDirs != null && scopedDownloadDirs.isNotEmpty) {
+      return scopedDownloadDirs.first;
+    }
+
+    final externalDir = await getExternalStorageDirectory();
+    if (externalDir != null) {
+      return externalDir;
+    }
+
+    return getApplicationDocumentsDirectory();
+  }
+
+  String _buildHtmlDocument(String rawHtml) {
+    final normalized = _wrapHtmlDocument(rawHtml);
     final withHeadStyle = normalized.replaceFirst('</head>', '''
   <base href="https://app.collectivwork.com/">
   <style>
@@ -201,6 +183,95 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
     );
   }
 
+  String _buildPdfHtmlDocument(String rawHtml) {
+    final normalized = _wrapHtmlDocument(rawHtml);
+    final withHeadStyle = normalized.replaceFirst('</head>', '''
+  <base href="https://app.collectivwork.com/">
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #ffffff !important;
+      color: #111111 !important;
+      width: 100% !important;
+      min-height: 0 !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+
+    body, div, section, article, main, header, footer, aside,
+    .container, .container-fluid, .content, .page, .wrapper {
+      min-height: 0 !important;
+      height: auto !important;
+      overflow: visible !important;
+      max-height: none !important;
+    }
+
+    [style*="overflow: hidden"],
+    [style*="overflow:hidden"],
+    [style*="overflow-y: hidden"],
+    [style*="overflow-y:hidden"],
+    [style*="height: 100vh"],
+    [style*="height:100vh"],
+    [style*="position: fixed"],
+    [style*="position:fixed"],
+    [style*="position: sticky"],
+    [style*="position:sticky"] {
+      overflow: visible !important;
+      height: auto !important;
+      max-height: none !important;
+      position: static !important;
+    }
+
+    img, svg, canvas {
+      max-width: 100% !important;
+      height: auto !important;
+      display: block;
+    }
+
+    table {
+      width: 100% !important;
+      border-collapse: collapse;
+    }
+
+    table, thead, tbody, tr, td, th {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+  </style>
+</head>''');
+
+    return withHeadStyle.replaceFirst(
+      '<body>',
+      '<body style="background:#ffffff !important; margin:0; padding:0; height:auto !important; overflow:visible !important;">',
+    );
+  }
+
+  String _wrapHtmlDocument(String rawHtml) {
+    return rawHtml.contains('<!DOCTYPE html>')
+        ? rawHtml
+        : '''
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body>$rawHtml</body>
+</html>
+''';
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -208,7 +279,7 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         elevation: 0,
-        leadingWidth: 150,
+        leadingWidth: 110,
 
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.textPrimary,
@@ -217,6 +288,8 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
             Navigator.of(context).pop();
           },
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.arrow_back_ios,
@@ -248,70 +321,67 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
         actions: [
           IconButton(
             icon:
-                _isDownloading
-                    ? SizedBox(
-                      width: screenWidth * 0.05,
-                      height: screenWidth * 0.05,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppColors.textPrimary,
-                        ),
-                      ),
-                    )
-                    : Icon(
-                      Icons.download_rounded,
-                      color: AppColors.textPrimary,
-                      size: screenWidth * 0.058,
-                    ),
+            _isDownloading
+                ? SizedBox(
+              width: screenWidth * 0.05,
+              height: screenWidth * 0.05,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.textPrimary,
+                ),
+              ),
+            )
+                : Icon(
+              Icons.download_rounded,
+              color: AppColors.textPrimary,
+              size: screenWidth * 0.058,
+            ),
             onPressed: _isDownloading ? null : _downloadPdf,
           ),
         ],
       ),
       body:
-          _htmlContent.isEmpty
-              ? Center(
-                child: Text(
-                  'Payslip template is not available yet.',
-                  style: AppTextStyles.bodyLarge(
-                    context,
-                  ).copyWith(color: AppColors.textPrimary),
-                ),
-              )
-              : Stack(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.all(screenWidth * 0.03),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: NativeScreenshot(
-                        controller: _screenshotController,
-                        child: Container(
-                          color: Colors.white,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: WebViewWidget(
-                              controller: _webViewController,
-                            ),
-                          ),
-                        ),
+      _htmlContent.isEmpty
+          ? Center(
+        child: Text(
+          'Payslip template is not available yet.',
+          style: AppTextStyles.bodyLarge(
+            context,
+          ).copyWith(color: AppColors.textPrimary),
+        ),
+      )
+          : Stack(
+        children: [
+          Padding(
+            padding: EdgeInsets.all(screenWidth * 0.03),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                color: Colors.white,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
+                    ],
                   ),
-                  if (_isPageLoading)
-                    const Center(child: CircularProgressIndicator()),
-                ],
+                  child: WebViewWidget(
+                    controller: _webViewController,
+                  ),
+                ),
               ),
+            ),
+          ),
+          if (_isPageLoading)
+            const Center(child: CircularProgressIndicator()),
+        ],
+      ),
     );
   }
 }

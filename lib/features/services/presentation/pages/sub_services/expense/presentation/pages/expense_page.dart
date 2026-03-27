@@ -1,9 +1,12 @@
+import 'package:collectivWork/core/constants/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../../../../../core/constants/app_assets.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
@@ -20,6 +23,7 @@ import '../../../../../../../user/presentation/bloc/user_profile_bloc.dart';
 import '../../../../../../../user/presentation/bloc/user_profile_state.dart';
 import '../../data/expense_remote_data.dart';
 import '../../data/models/expense_item_model.dart';
+import 'edit_expense_page.dart';
 import 'expense_detail_page.dart';
 
 class ExpensePage extends StatefulWidget {
@@ -58,6 +62,10 @@ class _ExpensePageState extends State<ExpensePage>
       label: 'Rejected',
       status: ExpenseApprovalStatus.rejected,
     ),
+    StatusTabDefinition(
+      label: 'Withdrawn',
+      status: ExpenseApprovalStatus.withdrawn,
+    ),
   ];
 
   @override
@@ -67,7 +75,10 @@ class _ExpensePageState extends State<ExpensePage>
     _topTabController.addListener(() {
       if (mounted) setState(() {});
     });
-    _statusTabController = TabController(length: _statusTabs.length, vsync: this);
+    _statusTabController = TabController(
+      length: _statusTabs.length,
+      vsync: this,
+    );
     _statusTabController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -93,15 +104,16 @@ class _ExpensePageState extends State<ExpensePage>
   void _reload() {
     if (_loadedUserId == null) return;
     setState(() {
-      _reimbursementFuture = _remoteData.getReimbursements(userId: _loadedUserId!);
+      _reimbursementFuture = _remoteData.getReimbursements(
+        userId: _loadedUserId!,
+      );
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final title = _topTabController.index == 0 ? 'Reimbursement' : 'Approval';
-
+    final screenHeight = MediaQuery.of(context).size.height;
     return ResponsiveScaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
@@ -135,27 +147,21 @@ class _ExpensePageState extends State<ExpensePage>
         ),
         leadingWidth: 110,
         title: Text(
-          title,
-          style: AppTextStyles.heading4(context).copyWith(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
+          AppStrings.expenses,
+          style: AppTextStyles.heading4(
+            context,
+          ).copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
         ),
         centerTitle: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(44),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: TabBar(
-              controller: _topTabController,
-              indicatorColor: Theme.of(context).colorScheme.primary,
-              labelColor: AppColors.textPrimary,
-              unselectedLabelColor: AppColors.textSecondary,
-              tabs: const [
-                Tab(text: 'Reimbursement'),
-                Tab(text: 'Approval'),
-              ],
-            ),
+          child: TabBar(
+            controller: _topTabController,
+            automaticIndicatorColorAdjustment: false,
+            indicatorColor: Theme.of(context).colorScheme.primary,
+            labelColor: AppColors.textPrimary,
+            unselectedLabelColor: AppColors.textSecondary,
+            tabs: const [Tab(text: 'Reimbursement'), Tab(text: 'Approval')],
           ),
         ),
       ),
@@ -175,13 +181,16 @@ class _ExpensePageState extends State<ExpensePage>
               return Column(
                 children: [
                   _buildToolbar(context),
-                  const SizedBox(height: 12),
+                  SizedBox(height: screenHeight * 0.02),
                   Expanded(
                     child: FutureBuilder<List<ExpenseItemModel>>(
                       future: _reimbursementFuture,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
                         }
                         if (snapshot.hasError) {
                           return ApiErrorState(
@@ -190,22 +199,28 @@ class _ExpensePageState extends State<ExpensePage>
                           );
                         }
                         final items = snapshot.data ?? const [];
-                        return StatusTabbedSection<ExpenseApprovalStatus, ExpenseItemModel>(
+                        return StatusTabbedSection<
+                          ExpenseApprovalStatus,
+                          ExpenseItemModel
+                        >(
                           controller: _statusTabController,
                           tabs: _statusTabs,
                           items: items,
-                          searchQuery: _searchController.text.trim().toLowerCase(),
-                          statusSelector: (item) {
-                            if (item.approvalStatus == ExpenseApprovalStatus.withdrawn) {
-                              return ExpenseApprovalStatus.rejected;
-                            }
-                            return item.approvalStatus;
-                          },
+                          searchQuery:
+                              _searchController.text.trim().toLowerCase(),
+                          statusSelector: (item) => item.approvalStatus,
                           matchesSearch: (item, query) {
                             if (query.isEmpty) return true;
-                            return item.expenseName.toLowerCase().contains(query) ||
-                                item.expenseType.toLowerCase().contains(query) ||
-                                (item.invoiceNumber?.toLowerCase().contains(query) ?? false);
+                            return item.expenseName.toLowerCase().contains(
+                                  query,
+                                ) ||
+                                item.expenseType.toLowerCase().contains(
+                                  query,
+                                ) ||
+                                (item.invoiceNumber?.toLowerCase().contains(
+                                      query,
+                                    ) ??
+                                    false);
                           },
                           tabColorBuilder: RequestTabTheme.colorForIndex,
                           emptyBuilder: (context) => const RequestEmptyState(),
@@ -215,7 +230,9 @@ class _ExpensePageState extends State<ExpensePage>
                               dateSelector: (item) => item.fromDate,
                             );
                             return ListView.builder(
-                              padding: const EdgeInsets.only(bottom: 12),
+                              padding: EdgeInsets.only(
+                                bottom: screenHeight * 0.01,
+                              ),
                               itemCount: grouped.length,
                               itemBuilder: (context, index) {
                                 final entry = grouped[index];
@@ -229,7 +246,9 @@ class _ExpensePageState extends State<ExpensePage>
                                     ),
                                     child: Text(
                                       entry,
-                                      style: AppTextStyles.bodySmall(context).copyWith(
+                                      style: AppTextStyles.bodySmall(
+                                        context,
+                                      ).copyWith(
                                         fontWeight: FontWeight.w500,
                                         color: AppColors.textSecondary,
                                       ),
@@ -237,20 +256,25 @@ class _ExpensePageState extends State<ExpensePage>
                                   );
                                 }
                                 return Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 6,
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: screenWidth * 0.002,
+                                    vertical: screenHeight * 0.006,
                                   ),
                                   child: _ExpenseCard(
                                     item: entry as ExpenseItemModel,
                                     onTap: () async {
-                                      await Navigator.of(context).push(
+                                      final shouldRefresh =
+                                          await Navigator.of(context).push<bool>(
                                         MaterialPageRoute(
-                                          builder: (_) => ExpenseDetailPage(
-                                            expense: entry,
-                                          ),
+                                          builder:
+                                              (_) => ExpenseDetailPage(
+                                                expense: entry,
+                                              ),
                                         ),
                                       );
+                                      if (shouldRefresh == true && mounted) {
+                                        _reload();
+                                      }
                                     },
                                   ),
                                 );
@@ -273,81 +297,90 @@ class _ExpensePageState extends State<ExpensePage>
 
   Widget _buildToolbar(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search',
-                  prefixIcon: Icon(
-                    Icons.search,
-                    color: AppColors.textSecondary,
-                    size: screenWidth * 0.06,
+    final screenHeight = MediaQuery.of(context).size.height;
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.060,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F2F2), // light grey background
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: AppStrings.search,
+                hintStyle: AppTextStyles.bodyMedium(
+                  context,
+                ).copyWith(color: AppColors.textTertiary),
+
+                prefixIcon: Padding(
+                  padding: EdgeInsets.all(screenWidth * 0.03),
+                  child: SvgPicture.asset(
+                    AppAssets.searchIcon,
+                    width: screenWidth * 0.045,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.grey,
+                      BlendMode.srcIn,
+                    ),
                   ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8), // 👈 curved border
+                  borderSide: BorderSide.none,
+                ),
+
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: MediaQuery.of(context).size.height * 0.010,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 10),
-
-          const SizedBox(width: 10),
-          _ToolbarButton(
-            icon: Icons.add,
-            filled: true,
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Create reimbursement flow pending.')),
+        ),
+        SizedBox(width: MediaQuery.of(context).size.width * 0.042),
+        SizedBox(
+          height: screenHeight * 0.060, // 5.0% of screen height
+          child: InkWell(
+            onTap: () async {
+              final state = context.read<UserProfileBloc>().state;
+              if (state is! UserProfileLoaded) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('User profile is still loading.'),
+                  ),
+                );
+                return;
+              }
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ExpenseFormPage(userId: state.profile.userId),
+                ),
               );
             },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ToolbarButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool filled;
-
-  const _ToolbarButton({
-    required this.icon,
-    required this.onTap,
-    this.filled = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: filled ? AppColors.attendanceTeal : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: filled ? AppColors.attendanceTeal : AppColors.border,
+            customBorder: const CircleBorder(),
+            child: SvgPicture.asset(AppAssets.addIcon),
           ),
         ),
-        child: Icon(
-          icon,
-          color: filled ? Colors.white : AppColors.attendanceTeal,
-        ),
-      ),
+      ],
     );
   }
 }
@@ -372,14 +405,13 @@ class _ExpenseCard extends StatelessWidget {
   }
 
   String get _statusLabel {
-    if (item.approvalStatus == ExpenseApprovalStatus.withdrawn) {
-      return 'Rejected';
-    }
     return item.approvalStatusLabel;
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -400,16 +432,21 @@ class _ExpenseCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 6,
-                height: 120,
+                width: screenWidth * 0.02,
+                height: screenHeight * 0.14,
                 decoration: BoxDecoration(
                   color: _accentColor,
-                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                  borderRadius: const BorderRadius.horizontal(
+                    left: Radius.circular(16),
+                  ),
                 ),
               ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  padding: EdgeInsets.symmetric(
+                    vertical: screenHeight * 0.016,
+                    horizontal: screenWidth * 0.04,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -419,17 +456,18 @@ class _ExpenseCard extends StatelessWidget {
                           Expanded(
                             child: Text(
                               item.expenseName,
-                              style: AppTextStyles.bodyMediumHeading(context).copyWith(
+                              style: AppTextStyles.bodyMediumHeading(
+                                context,
+                              ).copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.textPrimary,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 10),
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 3,
+                            padding:  EdgeInsets.symmetric(
+                              horizontal: screenWidth*0.02,
+                              vertical: screenHeight*0.003,
                             ),
                             decoration: BoxDecoration(
                               color: _accentColor,
@@ -445,14 +483,14 @@ class _ExpenseCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                       SizedBox(height: screenHeight*0.008),
                       Text(
                         'Amount : ${NumberFormat.currency(symbol: '₹ ', decimalDigits: 0).format(item.amount)}',
-                        style: AppTextStyles.bodySmall(context).copyWith(
-                          color: AppColors.textPrimary,
-                        ),
+                        style: AppTextStyles.bodySmall(
+                          context,
+                        ).copyWith(color: AppColors.textPrimary),
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(height: screenHeight*0.004),
                       Row(
                         children: [
                           Icon(
@@ -460,7 +498,7 @@ class _ExpenseCard extends StatelessWidget {
                             size: 14,
                             color: _accentColor,
                           ),
-                          const SizedBox(width: 4),
+                           SizedBox(width: screenWidth*0.02),
                           Text(
                             '${DateFormat('MMM d').format(item.fromDate)} to ${DateFormat('MMM d').format(item.toDate)}',
                             style: AppTextStyles.bodySmall(context).copyWith(
@@ -470,12 +508,12 @@ class _ExpenseCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
+                       SizedBox(height: screenHeight*0.004),
                       Text(
                         'Duration : ${item.durationDays} ${item.durationDays == 1 ? 'day' : 'days'}',
-                        style: AppTextStyles.bodySmall(context).copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                        style: AppTextStyles.bodySmall(
+                          context,
+                        ).copyWith(color: AppColors.textSecondary),
                       ),
                     ],
                   ),
@@ -517,9 +555,9 @@ class _ApprovalPlaceholder extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Reimbursement listing is live. Approval data API is still needed to populate this tab.',
-              style: AppTextStyles.bodySmall(context).copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: AppTextStyles.bodySmall(
+                context,
+              ).copyWith(color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
           ],

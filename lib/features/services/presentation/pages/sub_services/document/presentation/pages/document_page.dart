@@ -1,191 +1,225 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/network/api_client.dart';
+import '../../../../../../../../core/network/network_info.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
+import '../../data/datasources/document_remote_datasource.dart';
+import '../../data/repositories/document_repository_impl.dart';
 import '../../domain/models/document_folder_model.dart';
-import '../data/document_data.dart';
+import '../../domain/usecases/get_document_folders_usecase.dart';
+import '../../../employee_agreement/presentation/pages/employee_agreement_page.dart';
+import '../cubit/document_folders_cubit.dart';
+import '../cubit/document_folders_state.dart';
 import '../widgets/document_folder_card.dart';
 import 'document_detail_page.dart';
 
-/// Document page showing list of folders with Document/Shared tabs
 class DocumentPage extends StatefulWidget {
   final int? serviceId;
 
-  const DocumentPage({
-    super.key,
-    this.serviceId,
-  });
+  const DocumentPage({super.key, this.serviceId});
 
   @override
   State<DocumentPage> createState() => _DocumentPageState();
 }
 
-class _DocumentPageState extends State<DocumentPage> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  int _currentTabIndex = 0;
+class _DocumentPageState extends State<DocumentPage> {
+  late final DocumentFoldersCubit _foldersCubit;
+
+  bool _isEmployeeAgreementFolder(DocumentFolderModel folder) {
+    final normalized = folder.name.trim().toLowerCase();
+    return normalized == 'employee agreements' ||
+        normalized.contains('employee agree');
+  }
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      setState(() {
-        _currentTabIndex = _tabController.index;
-      });
-    });
+    final networkInfo = NetworkInfoImpl(Connectivity());
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final remoteDataSource = DocumentRemoteDataSourceImpl(apiClient);
+    final repository = DocumentRepositoryImpl(
+      remoteDataSource: remoteDataSource,
+      networkInfo: networkInfo,
+    );
+
+    _foldersCubit = DocumentFoldersCubit(
+      getDocumentFoldersUseCase: GetDocumentFoldersUseCase(repository),
+    )..loadFolders();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _foldersCubit.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
 
-    return ResponsiveScaffold(
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        leading: GestureDetector(
-          onTap: () => Navigator.of(context).pop(),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.arrow_back_ios,
-                color: Theme.of(context).colorScheme.primary,
-                size: screenWidth * 0.048, // ~4.8% of screen width
-              ),
-              Flexible(
-                child: Text(
-                  AppStrings.services,
-                  style: AppTextStyles.bodyMedium(context).copyWith(
-                    fontWeight: FontWeight.w400,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+    return BlocProvider.value(
+      value: _foldersCubit,
+      child: ResponsiveScaffold(
+        backgroundColor: AppColors.backgroundMedium,
+        appBar: AppBar(
+          elevation: 0,
+         forceMaterialTransparency: true,
+          leading: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.arrow_back_ios,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: screenWidth * 0.048,
                 ),
-              ),
-            ],
-          ),
-        ),
-        leadingWidth: 110,
-        title: Text(
-          AppStrings.document,
-          style: AppTextStyles.heading4(context).copyWith(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.more_vert,
-              color: AppColors.textSecondary,
-              size: screenWidth * 0.053, // ~5.3% of screen width
-            ),
-            onPressed: () {
-              // Handle menu tap
-            },
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Theme.of(context).colorScheme.primary,
-          indicatorWeight: 3,
-          labelColor: AppColors.textPrimary,
-          unselectedLabelColor: AppColors.textSecondary,
-          labelStyle: AppTextStyles.bodyMedium(context).copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-          unselectedLabelStyle: AppTextStyles.bodyMedium(context),
-          tabs: const [
-            Tab(text: AppStrings.document),
-            Tab(text: 'Shared'),
-          ],
-        ),
-      ),
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: 0, // Services is active
-        onTap: NavigationHelper.getBottomNavHandler(context),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildDocumentTab(context),
-          _buildSharedTab(context),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDocumentTab(BuildContext context) {
-    final folders = DocumentData.getEmployeeFolders();
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return ListView.builder(
-      padding: EdgeInsets.symmetric(
-        horizontal: MediaQuery.of(context).size.width * 0.04,
-        vertical: screenHeight * 0.025,
-      ),
-      itemCount: folders.length,
-      itemBuilder: (context, index) {
-        final spacing = screenHeight < 600 ? 12.0 : (screenHeight < 700 ? 14.0 : 16.0);
-        return Padding(
-          padding: EdgeInsets.only(bottom: spacing),
-          child: DocumentFolderCard(
-            folder: folders[index],
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => DocumentDetailPage(
-                    folder: folders[index],
-                    isShared: false,
+                Flexible(
+                  child: Text(
+                    AppStrings.back,
+                    style: AppTextStyles.bodyMedium(context).copyWith(
+                      fontWeight: FontWeight.w400,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
+                ),
+              ],
+            ),
+          ),
+          leadingWidth: 110,
+          title: Text(
+            AppStrings.document,
+            style: AppTextStyles.heading4(context).copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          centerTitle: true,
+        ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 0,
+          onTap: NavigationHelper.getBottomNavHandler(context),
+        ),
+        body: BlocBuilder<DocumentFoldersCubit, DocumentFoldersState>(
+          builder: (context, state) {
+            if (state is DocumentFoldersInitial ||
+                state is DocumentFoldersLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (state is DocumentFoldersError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.folder_off_outlined,
+                      color: AppColors.error,
+                      size: 56,
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        state.message,
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.bodyMedium(context).copyWith(
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _foldersCubit.loadFolders,
+                      child: const Text('Retry'),
+                    ),
+                  ],
                 ),
               );
-            },
-          ),
-        );
-      },
+            }
+
+            final loadedState = state as DocumentFoldersLoaded;
+            final orderedFolders = <DocumentFolderModel>[
+              ...loadedState.sharedFolders,
+              ...loadedState.documentFolders,
+            ];
+            return _buildFolderList(
+              context,
+              orderedFolders,
+              sharedFolderIds: loadedState.sharedFolders
+                  .map((folder) => folder.id)
+                  .toSet(),
+            );
+          },
+        ),
+      ),
     );
   }
 
-  Widget _buildSharedTab(BuildContext context) {
-    final folders = DocumentData.getSharedFolders();
+  Widget _buildFolderList(
+    BuildContext context,
+    List<DocumentFolderModel> folders, {
+    Set<String> sharedFolderIds = const <String>{},
+  }) {
     final screenHeight = MediaQuery.of(context).size.height;
+
+    if (folders.isEmpty) {
+      return Center(
+        child: Text(
+          AppStrings.noData,
+          style: AppTextStyles.bodyMedium(context).copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
 
     return ListView.builder(
       padding: EdgeInsets.symmetric(
-        horizontal: MediaQuery.of(context).size.width * 0.04,
-        vertical: screenHeight * 0.025,
+        horizontal: MediaQuery.of(context).size.width * 0.004,
+        vertical: screenHeight * 0.005,
       ),
       itemCount: folders.length,
       itemBuilder: (context, index) {
-        final spacing = screenHeight < 600 ? 12.0 : (screenHeight < 700 ? 14.0 : 16.0);
+        final spacing = screenHeight < 600
+            ? 6.0
+            : (screenHeight < 700 ? 8.0 : 10.0);
+        final folder = folders[index];
+        final isShared = sharedFolderIds.contains(folder.id);
+
         return Padding(
           padding: EdgeInsets.only(bottom: spacing),
           child: DocumentFolderCard(
-            folder: folders[index],
-            isSelected: index == 0, // First item selected as shown in design
+            folder: folder,
+            isSelected: isShared,
             onTap: () {
+              if (_isEmployeeAgreementFolder(folder)) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        EmployeeAgreementPage(serviceId: widget.serviceId),
+                  ),
+                );
+                return;
+              }
+
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => DocumentDetailPage(
-                    folder: folders[index],
-                    isShared: true,
+                    folder: folder,
+                    isShared: isShared,
                   ),
                 ),
               );

@@ -117,10 +117,9 @@ class RegularizeActivityBottomSheet extends StatelessWidget {
                               children: [
                                 Text(
                                   _formatAction(item),
-                                  style: AppTextStyles.bodyMedium(context)
+                                  style: AppTextStyles.bodyMediumHeading(context)
                                       .copyWith(
                                         color: AppColors.textPrimary,
-                                        height: 1.45,
                                       ),
                                 ),
                                 SizedBox(height: screenHeight * 0.008),

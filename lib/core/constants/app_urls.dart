@@ -54,6 +54,10 @@ class AppUrls {
   static const String clientFileUpload = '/api/admin/clients/upload/file';
   static const String employeePolicyMapperUpdate =
       '/api/admin/policies/employee/mapper/update';
+  static const String documents = '/api/documents';
+  static const String documentUserDirectory = '/api/documents/user/directory';
+  static const String documentDirectoryDetails =
+      '/api/documents/directory/details';
 
   // Posts endpoints
   // static const String posts = '/api/api/mobile/app/posts';
@@ -155,4 +159,11 @@ class AppUrls {
   // Expense endpoints
   static const String expenseList = '/api/expense/list';
   static const String expenseDetails = '/api/expense/details';
+  static const String expenseComments = '/api/expense/comments';
+  static const String expenseWithdraw = '/api/expense/request/withdraw';
+  static const String expenseCreate = '/api/expense/create';
+  static const String expenseFileDelete = '/api/expense/file/delete';
+  static const String expenseUpdate = '/api/expense/update';
+  static const String expenseUserPolicy = '/api/expense/user/policy';
+  static const String userTripList = '/api/users/trip/list';
 }

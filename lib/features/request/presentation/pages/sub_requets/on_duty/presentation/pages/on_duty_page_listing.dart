@@ -228,8 +228,7 @@ class _OnDutyPageListingState extends State<OnDutyPageListing>
                                           builder:
                                               (context) => OnDutyDetailPage(
                                                 onDutyRequest:
-                                                    state
-                                                        .filteredOnDutyRequests[index],
+                                                    req,
                                               ),
                                         ),
                                       );

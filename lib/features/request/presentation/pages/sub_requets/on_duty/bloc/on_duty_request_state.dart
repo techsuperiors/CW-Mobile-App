@@ -21,6 +21,8 @@ class OnDutyRequestLoading extends OnDutyRequestState {
 
 /// Loaded state
 class OnDutyRequestLoaded extends OnDutyRequestState {
+  static const Object _unset = Object();
+
   final List<OnDutyRequestModel> onDutyRequests;
   final List<OnDutyRequestModel> filteredOnDutyRequests;
   final String? searchQuery;
@@ -44,15 +46,19 @@ class OnDutyRequestLoaded extends OnDutyRequestState {
   OnDutyRequestLoaded copyWith({
     List<OnDutyRequestModel>? onDutyRequests,
     List<OnDutyRequestModel>? filteredOnDutyRequests,
-    String? searchQuery,
-    OnDutyStatus? statusFilter,
+    Object? searchQuery = _unset,
+    Object? statusFilter = _unset,
   }) {
     return OnDutyRequestLoaded(
       onDutyRequests: onDutyRequests ?? this.onDutyRequests,
       filteredOnDutyRequests:
           filteredOnDutyRequests ?? this.filteredOnDutyRequests,
-      searchQuery: searchQuery ?? this.searchQuery,
-      statusFilter: statusFilter ?? this.statusFilter,
+      searchQuery:
+      identical(searchQuery, _unset) ? this.searchQuery : searchQuery as String?,
+      statusFilter:
+      identical(statusFilter, _unset)
+          ? this.statusFilter
+          : statusFilter as OnDutyStatus?,
     );
   }
 }

@@ -19,6 +19,7 @@ class PolicyModel {
   final String? htmlContent;
   final String? coverImage;
   final bool eConsentRequired;
+  final bool isConsentSignatureEnabled;
   final String? signatureUrl;
   final int assignedUserId;
 
@@ -40,6 +41,7 @@ class PolicyModel {
     this.htmlContent,
     this.coverImage,
     this.eConsentRequired = false,
+    this.isConsentSignatureEnabled = false,
     this.signatureUrl,
     this.assignedUserId = 0,
   });
@@ -47,6 +49,7 @@ class PolicyModel {
   factory PolicyModel.fromJson(Map<String, dynamic> json) {
     final createdBy = json['CreatedBy'] as Map<String, dynamic>?;
     final assignedUsers = json['AssignedUsers'] as List<dynamic>? ?? const [];
+    final visibility = json['visibility'] as Map<String, dynamic>?;
     final assignedUser =
         assignedUsers.isNotEmpty && assignedUsers.first is Map<String, dynamic>
             ? assignedUsers.first as Map<String, dynamic>
@@ -80,6 +83,8 @@ class PolicyModel {
       htmlContent: (json['html_content'] as String?)?.trim(),
       coverImage: json['cover_image'] as String?,
       eConsentRequired: assignedUser?['econsent_required'] as bool? ?? false,
+      isConsentSignatureEnabled:
+          visibility?['is_consent_signature'] as bool? ?? false,
       signatureUrl: assignedUser?['signature_url'] as String?,
       assignedUserId: _toInt(assignedUser?['user_id']),
     );

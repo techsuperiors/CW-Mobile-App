@@ -22,6 +22,7 @@ class RegularizeRequestLoading extends RegularizeRequestState {
 
 /// Loaded state
 class RegularizeRequestLoaded extends RegularizeRequestState {
+  static const Object _unset = Object();
   final List<RegularizeRequestModel> regularizeRequests;
   final List<RegularizeRequestModel> filteredRegularizeRequests;
   final String? searchQuery;
@@ -45,14 +46,18 @@ class RegularizeRequestLoaded extends RegularizeRequestState {
   RegularizeRequestLoaded copyWith({
     List<RegularizeRequestModel>? regularizeRequests,
     List<RegularizeRequestModel>? filteredRegularizeRequests,
-    String? searchQuery,
-    RegularizeStatus? statusFilter,
+    Object? searchQuery = _unset,
+    Object? statusFilter = _unset,
   }) {
     return RegularizeRequestLoaded(
       regularizeRequests: regularizeRequests ?? this.regularizeRequests,
       filteredRegularizeRequests: filteredRegularizeRequests ?? this.filteredRegularizeRequests,
-      searchQuery: searchQuery ?? this.searchQuery,
-      statusFilter: statusFilter ?? this.statusFilter,
+      searchQuery:
+      identical(searchQuery, _unset) ? this.searchQuery : searchQuery as String?,
+      statusFilter:
+      identical(statusFilter, _unset)
+          ? this.statusFilter
+          : statusFilter as RegularizeStatus?,
     );
   }
 }

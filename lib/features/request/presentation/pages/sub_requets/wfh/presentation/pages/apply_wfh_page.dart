@@ -16,7 +16,6 @@ import '../../../../../../../../core/network/network_info.dart';
 import '../../../../../../../../core/error/exceptions.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../../../../../../../core/widgets/common/app_text_field.dart';
-import '../../../../../../../authentication/data/datasources/auth_local_datasource.dart';
 import '../../models/wfh_request_model.dart';
 
 /// Apply WFH form page
@@ -244,6 +243,10 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
       _showError('Please select a date');
       return;
     }
+    if (_selectedWfhDuration == 'Multiple Day WFH' && _toDate == null) {
+      _showError('Please select an end date');
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
@@ -266,7 +269,9 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
           final parts = token.split('.');
           if (parts.length == 3) {
             String jwtPayload = parts[1];
-            while (jwtPayload.length % 4 != 0) jwtPayload += '=';
+            while (jwtPayload.length % 4 != 0) {
+              jwtPayload += '=';
+            }
             final decoded = utf8.decode(base64Url.decode(jwtPayload));
             final payloadMap = jsonDecode(decoded) as Map<String, dynamic>;
             userId = payloadMap['user_id'] as int?;
@@ -279,24 +284,24 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
       final requestType = isSingleDay ? 'single' : 'multiple';
       final dateFormat = DateFormat('yyyy-MM-dd');
 
-      // Base fields (Common for both)
+      final DateTime startDate = _fromDate!;
+      final DateTime endDate =
+          isSingleDay ? _fromDate! : (_toDate ?? _fromDate!);
+
       Map<String, dynamic> payload = {
         'subject': _subjectController.text.trim(),
         'request_type': requestType,
         'description': _descriptionController.text.trim(),
         'user_id': userId,
-        'start_date': dateFormat.format(_fromDate!),
-        'end_date': dateFormat.format(_toDate ?? _fromDate!),
+        'start_date': dateFormat.format(startDate),
+        'end_date': dateFormat.format(endDate),
       };
 
-      // Conditional fields based on decoded payloads
       if (isSingleDay) {
-        // Single Day: requires wfh_request_date
-        payload['wfh_request_date'] = _fromDate!.toUtc().toIso8601String();
+        payload['wfh_request_date'] = startDate.toUtc().toIso8601String();
       } else {
-        // Multiple Days: requires request_date, to_request_date, and half-day info
-        payload['wfh_request_date'] = _fromDate!.toUtc().toIso8601String();
-        payload['wfh_to_request_date'] = (_toDate ?? _fromDate!).toUtc().toIso8601String();
+        payload['wfh_request_date'] = startDate.toUtc().toIso8601String();
+        payload['wfh_to_request_date'] = endDate.toUtc().toIso8601String();
         payload['start_half'] = _halfDayToApi(_fromHalfDay);
         payload['end_half'] = _halfDayToApi(_toHalfDay);
       }
@@ -330,7 +335,7 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
       // Check if it's your custom ServerException
       if (e is ServerException) {
         // Agar aapki class mein 'message' field hai toh:
-        errorMessage = e.message ?? 'Server Error';
+        errorMessage = e.message;
       }
       // Agar Dio directly error throw kar raha hai
       else if (e is DioException) {
@@ -375,6 +380,8 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
         leading: GestureDetector(
           onTap: () => Navigator.of(context).pop(),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.arrow_back_ios,
@@ -461,6 +468,9 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
                 onChanged: (value) {
                   setState(() {
                     _selectedWfhDuration = value;
+                    if (value == 'Single Day WFH') {
+                      _toDate = null;
+                    }
                   });
                 },
               ),

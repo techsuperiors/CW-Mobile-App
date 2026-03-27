@@ -261,17 +261,17 @@ class _CreateAssetRequestPageState extends State<CreateAssetRequestPage> {
             SizedBox(height: sh * 0.022),
 
             // ── Request Type ──────────────────────────────────────────────
-            _buildLabel('Request Type *'),
-            SizedBox(height: sh * 0.008),
-            _buildDropdown<String>(
-              context: context,
-              hint: 'Select Request Type',
-              value: _requestType,
-              items: _requestTypes,
-              labelBuilder: (t) => t,
-              onChanged:
-                  (t) => setState(() => _requestType = t ?? 'Allocation'),
-            ),
+            // _buildLabel('Request Type *'),
+            // SizedBox(height: sh * 0.008),
+            // _buildDropdown<String>(
+            //   context: context,
+            //   hint: 'Select Request Type',
+            //   value: _requestType,
+            //   items: _requestTypes,
+            //   labelBuilder: (t) => t,
+            //   onChanged:
+            //       (t) => setState(() => _requestType = t ?? 'Allocation'),
+            // ),
 
             SizedBox(height: sh * 0.022),
 

@@ -71,16 +71,16 @@ class CompOffRequestCard extends StatelessWidget {
                             SizedBox(height: screenHeight * 0.006),
                             Text(
                               DateFormat('dd MMM yyyy').format(request.date),
-                              style: AppTextStyles.bodySmall(context).copyWith(
-                                color: statusColor,
-                              ),
+                              style: AppTextStyles.bodySmall(
+                                context,
+                              ).copyWith(color: statusColor),
                             ),
                             SizedBox(height: screenHeight * 0.006),
                             Text(
                               request.reason,
-                              style: AppTextStyles.bodySmall(context).copyWith(
-                                color: AppColors.textSecondary,
-                              ),
+                              style: AppTextStyles.bodySmall(
+                                context,
+                              ).copyWith(color: AppColors.textSecondary),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -119,14 +119,13 @@ class CompOffRequestCard extends StatelessWidget {
   Color _getStatusColor(CompOffStatus status) {
     switch (status) {
       case CompOffStatus.pending:
-        return const Color(0xFF0086C9); // Blue
+        return AppColors.approvalSheetPending; //
       case CompOffStatus.approved:
-        return const Color(0xFF12B76A); // Green
+        return AppColors.approvalSheetAccept; // 0xFF12B76A
       case CompOffStatus.rejected:
-        return const Color(0xFFF04438); // Red
+        return AppColors.approvalSheetReject; // 0xFFF04438
       case CompOffStatus.withdrawn:
-        return const Color(0xFFF79009); // Orange
+        return AppColors.approvalSheetWithdrawn; // 0xFFF79009
     }
   }
-
 }

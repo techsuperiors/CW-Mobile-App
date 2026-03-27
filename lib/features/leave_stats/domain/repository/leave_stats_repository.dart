@@ -4,5 +4,8 @@ import '../entities/leave_stats_entity.dart';
 
 /// Abstract contract for leave stats operations.
 abstract class LeaveStatsRepository {
-  Future<Either<Failure, LeaveStatsEntity>> getLeaveStats();
+  Future<Either<Failure, LeaveStatsEntity>> getLeaveStats({
+    String? startDate,
+    String? endDate,
+  });
 }

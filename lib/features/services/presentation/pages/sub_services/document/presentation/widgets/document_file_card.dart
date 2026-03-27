@@ -8,12 +8,14 @@ class DocumentFileCard extends StatelessWidget {
   final DocumentFileModel file;
   final VoidCallback? onDownload;
   final VoidCallback? onTap;
+  final VoidCallback? onMoreTap;
 
   const DocumentFileCard({
     super.key,
     required this.file,
     this.onDownload,
     this.onTap,
+    this.onMoreTap,
   });
 
   @override
@@ -28,6 +30,11 @@ class DocumentFileCard extends StatelessWidget {
         padding: EdgeInsets.symmetric(
           horizontal: screenWidth * 0.042, // ~4.2% of screen width
           vertical: screenHeight * 0.015, // 1.5% of screen height
+        ),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: AppColors.borderLight),
+          color: AppColors.background
         ),
         child: Row(
           children: [
@@ -48,29 +55,29 @@ class DocumentFileCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  SizedBox(height: screenHeight * 0.005), // 0.5% of screen height
+                  SizedBox(height: screenHeight * 0.005),
+                  // 0.5% of screen height
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        file.fileSize,
-                        style: AppTextStyles.bodySmall(context).copyWith(
-                          fontWeight: FontWeight.w400,
-                          color: AppColors.textSecondary,
+                      Flexible(
+                        child: Text(
+                          file.fileSize,
+                          style: AppTextStyles.bodySmall(context).copyWith(
+                            fontWeight: FontWeight.w400,
+                            color: AppColors.textSecondary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      SizedBox(width: screenWidth * 0.021), // ~2.1% of screen width
-                      Text(
-                        '•',
-                        style: AppTextStyles.bodySmall(context).copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      SizedBox(width: screenWidth * 0.021), // ~2.1% of screen width
-                      Text(
-                        file.date,
-                        style: AppTextStyles.bodySmall(context).copyWith(
-                          fontWeight: FontWeight.w400,
-                          color: AppColors.textSecondary,
+                      Flexible(
+                        child: Text(
+                          file.date,
+                          style: AppTextStyles.bodySmall(context).copyWith(
+                            fontWeight: FontWeight.w400,
+                            color: AppColors.textSecondary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -78,18 +85,15 @@ class DocumentFileCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Three dots menu
             IconButton(
               icon: Icon(
                 Icons.more_vert,
-                size: screenWidth * 0.053, // ~5.3% of screen width
+                size: screenWidth * 0.053,
                 color: AppColors.textSecondary,
               ),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
-              onPressed: () {
-                _showDownloadMenu(context);
-              },
+              onPressed: onMoreTap,
             ),
           ],
         ),
@@ -119,13 +123,13 @@ class DocumentFileCard extends StatelessWidget {
         break;
       default:
         iconColor = AppColors.textSecondary;
-        iconData = Icons.insert_drive_file;
+        iconData = Icons.web_rounded;
     }
 
     return Container(
       padding: EdgeInsets.all(screenWidth * 0.027), // ~2.7% of screen width
       decoration: BoxDecoration(
-        color: iconColor.withOpacity(0.1),
+        color: iconColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(
@@ -136,91 +140,4 @@ class DocumentFileCard extends StatelessWidget {
     );
   }
 
-  void _showDownloadMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        padding: EdgeInsets.symmetric(
-          vertical: MediaQuery.of(context).size.height * 0.02,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(
-                Icons.download,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: Text(
-                'Download',
-                style: AppTextStyles.bodyLarge(context),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                if (onDownload != null) {
-                  onDownload!();
-                } else {
-                  // Default download action
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Downloading ${file.name}...'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                }
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.share,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: Text(
-                'Share',
-                style: AppTextStyles.bodyLarge(context),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Sharing ${file.name}...'),
-                    backgroundColor: AppColors.info,
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.delete_outline,
-                color: AppColors.error,
-              ),
-              title: Text(
-                'Delete',
-                style: AppTextStyles.bodyLarge(context).copyWith(
-                  color: AppColors.error,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Deleting ${file.name}...'),
-                    backgroundColor: AppColors.error,
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

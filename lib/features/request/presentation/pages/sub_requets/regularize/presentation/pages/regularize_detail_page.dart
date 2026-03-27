@@ -185,7 +185,9 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                     ),
                     leadingWidth: 110,
                     title: Text(
-                      widget.isApprovalMode ? 'Regularize Approval' : 'Regularize',
+                      widget.isApprovalMode
+                          ? 'Regularize Approval'
+                          : 'Regularize',
                       style: AppTextStyles.heading4(context).copyWith(
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -200,14 +202,16 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                               ? ApprovalActionBar(
                                 isLoading:
                                     state is RegularizeDetailStatusUpdating,
-                                onApprove: () => _updateRequestStatus('Approved'),
-                                onReject:
-                                    () => _showRejectRemarkSheet(context),
+                                onApprove:
+                                    () => _updateRequestStatus('Approved'),
+                                onReject: () => _showRejectRemarkSheet(context),
                               )
                               : null)
                           : BottomNavBar(
                             currentIndex: 3,
-                            onTap: NavigationHelper.getBottomNavHandler(context),
+                            onTap: NavigationHelper.getBottomNavHandler(
+                              context,
+                            ),
                           ),
                   body: _buildDetailsContent(
                     context,
@@ -243,7 +247,7 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
   ) {
     final statusColor = _getStatusColor(currentRequest.status);
     final dateFormat = DateFormat('dd-MMM-yyyy');
-    final dateTimeFormat = DateFormat('dd-MMM-yyyy HH:mm');
+    final dateTimeFormat = DateFormat('dd-MMM-yyyy hh:mm a');
 
     // Calculate number of days
     final numberOfDays =
@@ -294,6 +298,14 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
   ) {
     final requestId = int.tryParse(widget.regularizeRequest.id) ?? 0;
     final detail = _detailFromState(state);
+    final isPending = currentRequest.status == RegularizeStatus.pending;
+    final menuActions = <Map<String, String>>[
+      if (isPending && !widget.isApprovalMode)
+        {'value': 'Edit', 'icon': AppAssets.editIconwfh},
+      if (isPending && !widget.isApprovalMode)
+        {'value': 'Withdraw', 'icon': AppAssets.withdrawIcon},
+      {'value': 'Activity', 'icon': AppAssets.activityIcon},
+    ];
 
     return Container(
       decoration: BoxDecoration(
@@ -325,133 +337,120 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                   ),
                 ),
               ),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
-                onSelected: (value) async {
-                  if (value == 'Edit') {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (context) => ApplyRegularizePage(
-                              regularizeRequest: currentRequest,
-                            ),
-                      ),
-                    );
-                    if (result == true && context.mounted) {
-                      _shouldRefreshListing = true;
-                      context.read<RegularizeDetailBloc>().add(
-                        LoadRegularizeDetail(
-                          requestId: requestId,
-                          clientId: _clientId,
+              if (menuActions.length >= 2)
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
+                  onSelected: (value) async {
+                    if (value == 'Edit') {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => ApplyRegularizePage(
+                                regularizeRequest: currentRequest,
+                              ),
                         ),
                       );
-                    }
-                  } else if (value == 'Withdraw') {
-                    context.read<RegularizeDetailBloc>().add(
-                      UpdateRegularizeRequestStatus(
-                        requestId: requestId,
-                        clientId: _clientId,
-                        status: 'Withdrawn',
-                      ),
-                    );
-                  } else if (value == 'Activity') {
-                    _showActivityBottomSheet(
-                      context,
-                      detail?.activity ?? const [],
-                    );
-                  }
-                },
-                itemBuilder:
-                    (context){
-                      final isPending =
-                          currentRequest.status == RegularizeStatus.pending;
-                      return [
-                        if (isPending && !widget.isApprovalMode)
-                          PopupMenuItem(
-                            value: 'Edit',
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                SizedBox(
-                                  width: screenWidth * 0.05,
-
-                                  height: screenHeight * 0.05,
-                                  child: SvgPicture.asset(
-                                    AppAssets.editIconwfh,
-                                  ),
-                                ),
-                                SizedBox(width: screenWidth * 0.02),
-                                Text(
-                                  'Edit',
-                                  style: AppTextStyles.heading5(
-                                    context,
-                                  ).copyWith(
-                                    fontWeight: FontWeight.w400,
-                                    color: AppColors.textHeading,
-                                  ),
-                                ),
-                              ],
-                            ),
+                      if (result == true && context.mounted) {
+                        _shouldRefreshListing = true;
+                        context.read<RegularizeDetailBloc>().add(
+                          LoadRegularizeDetail(
+                            requestId: requestId,
+                            clientId: _clientId,
                           ),
-                        if (isPending && !widget.isApprovalMode)
-                          PopupMenuItem(
-                            value: 'Withdraw',
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: screenWidth * 0.05,
-
-                                  height: screenHeight * 0.05,
-                                  child: SvgPicture.asset(
-                                    AppAssets.withdrawIcon,
-                                  ),
-                                ),
-                                SizedBox(width: screenWidth * 0.02),
-                                Text(
-                                  'Withdraw',
-                                  style: AppTextStyles.heading5(
-                                    context,
-                                  ).copyWith(
-                                    fontWeight: FontWeight.w400,
-                                    color: AppColors.textHeading,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        PopupMenuItem(
-                          value: 'Activity',
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: screenWidth * 0.05,
-
-                                height: screenHeight * 0.05,
-                                child: SvgPicture.asset(
-                                  AppAssets.activityIcon,
-                                ),
-                              ),
-                              SizedBox(width: screenWidth * 0.02),
-                              Text(
-                                'Activity',
-                                style: AppTextStyles.heading5(
-                                  context,
-                                ).copyWith(
-                                  fontWeight: FontWeight.w400,
-                                  color: AppColors.textHeading,
-                                ),
-                              ),
-                            ],
-                          ),
+                        );
+                      }
+                    } else if (value == 'Withdraw') {
+                      context.read<RegularizeDetailBloc>().add(
+                        UpdateRegularizeRequestStatus(
+                          requestId: requestId,
+                          clientId: _clientId,
+                          status: 'Withdrawn',
                         ),
-                      ];
+                      );
+                    } else if (value == 'Activity') {
+                      _showActivityBottomSheet(
+                        context,
+                        detail?.activity ?? const [],
+                      );
                     }
-
-              ),
+                  },
+                  itemBuilder: (context) {
+                    return menuActions.map((action) {
+                      return PopupMenuItem(
+                        value: action['value'],
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: screenWidth * 0.05,
+                              height: screenHeight * 0.05,
+                              child: SvgPicture.asset(action['icon']!),
+                            ),
+                            SizedBox(width: screenWidth * 0.02),
+                            Text(
+                              action['value']!,
+                              style: AppTextStyles.heading5(context).copyWith(
+                                fontWeight: FontWeight.w400,
+                                color: AppColors.textHeading,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList();
+                  },
+                )
+              else if (menuActions.length == 1)
+                InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () async {
+                    final action = menuActions.first['value'];
+                    if (action == 'Edit') {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => ApplyRegularizePage(
+                                regularizeRequest: currentRequest,
+                              ),
+                        ),
+                      );
+                      if (result == true && context.mounted) {
+                        _shouldRefreshListing = true;
+                        context.read<RegularizeDetailBloc>().add(
+                          LoadRegularizeDetail(
+                            requestId: requestId,
+                            clientId: _clientId,
+                          ),
+                        );
+                      }
+                    } else if (action == 'Withdraw') {
+                      context.read<RegularizeDetailBloc>().add(
+                        UpdateRegularizeRequestStatus(
+                          requestId: requestId,
+                          clientId: _clientId,
+                          status: 'Withdrawn',
+                        ),
+                      );
+                    } else if (action == 'Activity') {
+                      _showActivityBottomSheet(
+                        context,
+                        detail?.activity ?? const [],
+                      );
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: SizedBox(
+                      width: screenWidth * 0.06,
+                      height: screenHeight * 0.03,
+                      child: SvgPicture.asset(menuActions.first['icon']!),
+                    ),
+                  ),
+                ),
             ],
           ),
-          SizedBox(height: screenHeight*0.02,),
+          SizedBox(height: screenHeight * 0.02),
           _buildDetailRow(
             context,
             'Leave Type:',
@@ -620,9 +619,7 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                   approvers.length == 1
                       ? approvers.first.fullName
                       : '${approvers.length} approvers',
-                  style: AppTextStyles.bodySmall(
-                    context,
-                  ).copyWith(
+                  style: AppTextStyles.bodySmall(context).copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w500,
                   ),
@@ -691,8 +688,6 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     );
   }
 
-
-
   Widget _buildDetailRow(
     BuildContext context,
     String label,
@@ -735,10 +730,7 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     RegularizeRequestModel currentRequest,
   ) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-
-      ),
+      decoration: BoxDecoration(color: Colors.white),
       padding: EdgeInsets.all(screenWidth * 0.042),
       width: double.infinity,
       child: Column(
@@ -820,17 +812,17 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
           ),
           SizedBox(height: screenHeight * 0.015),
 
-            ...comments.map(
-              (comment) => Padding(
-                padding: EdgeInsets.only(bottom: screenHeight * 0.012),
-                child: _buildCommentTile(
-                  context,
-                  screenWidth,
-                  screenHeight,
-                  comment,
-                ),
+          ...comments.map(
+            (comment) => Padding(
+              padding: EdgeInsets.only(bottom: screenHeight * 0.012),
+              child: _buildCommentTile(
+                context,
+                screenWidth,
+                screenHeight,
+                comment,
               ),
             ),
+          ),
           SizedBox(height: screenHeight * 0.01),
           TextField(
             controller: _commentController,
@@ -987,11 +979,13 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      isDismissible: true,
       builder:
           (context) => DraggableScrollableSheet(
             initialChildSize: 0.5, // Start at half screen
             minChildSize: 0.3, // Minimum 30% of screen
             maxChildSize: 0.9, // Maximum 90% of screen (can be dragged up)
+            expand: false,
             builder:
                 (context, scrollController) => Container(
                   decoration: const BoxDecoration(
@@ -1045,13 +1039,13 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
   Color _getStatusColor(RegularizeStatus status) {
     switch (status) {
       case RegularizeStatus.pending:
-        return const Color(0xFF2196F3); // Blue
+        return AppColors.approvalSheetPending; //
       case RegularizeStatus.approved:
-        return const Color(0xFF4CAF50); // Green
+        return AppColors.approvalSheetAccept; // 0xFF12B76A
       case RegularizeStatus.rejected:
-        return const Color(0xFFE53935); // Red
+        return AppColors.approvalSheetReject; // 0xFFF04438
       case RegularizeStatus.withdrawn:
-        return const Color(0xFF667085); // Gray
+        return AppColors.approvalSheetWithdrawn; // 0xFFF79009
     }
   }
 
@@ -1116,21 +1110,16 @@ class _RegularizeApproverAvatar extends StatelessWidget {
   final AttendanceRegularizeApprover approver;
   final double size;
 
-  const _RegularizeApproverAvatar({
-    required this.approver,
-    required this.size,
-  });
+  const _RegularizeApproverAvatar({required this.approver, required this.size});
 
   @override
   Widget build(BuildContext context) {
     Color bgColor = AppColors.primary;
-    if (approver.profileColor != null && approver.profileColor!.startsWith('#')) {
+    if (approver.profileColor != null &&
+        approver.profileColor!.startsWith('#')) {
       try {
         bgColor = Color(
-          int.parse(
-            approver.profileColor!.replaceFirst('#', 'FF'),
-            radix: 16,
-          ),
+          int.parse(approver.profileColor!.replaceFirst('#', 'FF'), radix: 16),
         );
       } catch (_) {}
     }
@@ -1145,15 +1134,15 @@ class _RegularizeApproverAvatar extends StatelessWidget {
       child:
           approver.imageUrl == null || approver.imageUrl!.isEmpty
               ? Text(
-                  approver.firstName.isNotEmpty
-                      ? approver.firstName[0].toUpperCase()
-                      : '?',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: size * 0.45,
-                    fontWeight: FontWeight.w600,
-                  ),
-                )
+                approver.firstName.isNotEmpty
+                    ? approver.firstName[0].toUpperCase()
+                    : '?',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: size * 0.45,
+                  fontWeight: FontWeight.w600,
+                ),
+              )
               : null,
     );
   }
@@ -1172,16 +1161,20 @@ class _RegularizeApproverAvatarStack extends StatelessWidget {
   Widget build(BuildContext context) {
     final visibleApprovers = approvers.take(3).toList();
     final overlap = avatarSize * 0.35;
+    final edgePadding = avatarSize * 0.08;
+
     final width =
         visibleApprovers.length == 1
-            ? avatarSize
+            ? avatarSize + (edgePadding * 2)
             : avatarSize +
-                ((visibleApprovers.length - 1) * (avatarSize - overlap));
+                ((visibleApprovers.length - 1) * (avatarSize - overlap)) +
+                (edgePadding * 2);
 
     return SizedBox(
       width: width,
-      height: avatarSize,
+      height: avatarSize + (edgePadding * 2),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           for (var i = 0; i < visibleApprovers.length; i++)
             Positioned(

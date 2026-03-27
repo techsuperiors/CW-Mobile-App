@@ -167,13 +167,13 @@ class RegularizeRequestCard extends StatelessWidget {
   Color _getStatusColor(RegularizeStatus status) {
     switch (status) {
       case RegularizeStatus.pending:
-        return const Color(0xFF0086C9); // Blue
+        return AppColors.approvalSheetPending; //
       case RegularizeStatus.approved:
-        return const Color(0xFF12B76A); // Green
+        return AppColors.approvalSheetAccept; // 0xFF12B76A
       case RegularizeStatus.rejected:
-        return const Color(0xFFF04438); // Red
+        return AppColors.approvalSheetReject; // 0xFFF04438
       case RegularizeStatus.withdrawn:
-        return const Color(0xFFF79009); // Orange
+        return AppColors.approvalSheetWithdrawn; // 0xFFF79009
     }
   }
 }

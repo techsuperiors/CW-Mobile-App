@@ -1,3 +1,4 @@
+import 'package:collectivWork/core/constants/app_assets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -14,8 +15,8 @@ class LeaveHistoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sw=MediaQuery.of(context).size.width;
-    final sh=MediaQuery.of(context).size.height;
+    final sw = MediaQuery.of(context).size.width;
+    final sh = MediaQuery.of(context).size.height;
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.background,
@@ -33,9 +34,7 @@ class LeaveHistoryPage extends StatelessWidget {
         children: [
           // Header
           Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: sw * 0.04,
-            ),
+            padding: EdgeInsets.symmetric(horizontal: sw * 0.04),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -60,12 +59,11 @@ class LeaveHistoryPage extends StatelessWidget {
               builder: (context, state) {
                 if (state is LeaveHistoryLoading ||
                     state is LeaveHistoryInitial) {
-                  return  Center(child: LoadingWidget());
-                }
-                else if (state is LeaveHistoryError) {
+                  return Center(child: LoadingWidget());
+                } else if (state is LeaveHistoryError) {
                   return Center(
                     child: Padding(
-                      padding:  EdgeInsets.all(24.0),
+                      padding: EdgeInsets.all(24.0),
                       child: Text(
                         state.message,
                         textAlign: TextAlign.center,
@@ -75,8 +73,7 @@ class LeaveHistoryPage extends StatelessWidget {
                       ),
                     ),
                   );
-                }
-                else if (state is LeaveHistoryLoaded) {
+                } else if (state is LeaveHistoryLoaded) {
                   final history = state.history.reversed.toList();
                   if (history.isEmpty) {
                     return Center(
@@ -88,7 +85,6 @@ class LeaveHistoryPage extends StatelessWidget {
                       ),
                     );
                   }
-
                   return SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: ConstrainedBox(
@@ -99,7 +95,6 @@ class LeaveHistoryPage extends StatelessWidget {
                         headingRowColor: WidgetStateProperty.all(
                           AppColors.borderLight.withOpacity(0.3),
                         ),
-                        // columnSpacing: 24,
                         headingTextStyle: AppTextStyles.bodyMedium(
                           context,
                         ).copyWith(
@@ -117,7 +112,9 @@ class LeaveHistoryPage extends StatelessWidget {
                         rows:
                             history.map((record) {
                               final dateFormat = DateFormat('dd-MM-yyyy');
-                              final dateStr = dateFormat.format(record.date);
+                              final dateStr = dateFormat.format(
+                                record.date,
+                              );
                               // Determine if this is a positive (addition) or negative (deduction/subtraction)
                               final isPositive =
                                   record.action.toLowerCase() == 'addition';
@@ -128,7 +125,9 @@ class LeaveHistoryPage extends StatelessWidget {
                                       : '- ${record.leaveCount.abs()}';
 
                               final changeColor =
-                                  isPositive ? Colors.green : AppColors.error;
+                                  isPositive
+                                      ? Colors.green
+                                      : AppColors.error;
 
                               return DataRow(
                                 cells: [
@@ -143,7 +142,9 @@ class LeaveHistoryPage extends StatelessWidget {
                                       ),
                                       decoration: BoxDecoration(
                                         color: changeColor.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(4),
+                                        borderRadius: BorderRadius.circular(
+                                          4,
+                                        ),
                                       ),
                                       child: Text(
                                         changeLabel,
@@ -156,7 +157,8 @@ class LeaveHistoryPage extends StatelessWidget {
                                   ),
                                   DataCell(
                                     Text(
-                                      record.remainingLeaves.toStringAsFixed(2),
+                                      record.remainingLeaves
+                                          .toStringAsFixed(2),
                                     ),
                                   ),
                                   DataCell(Text(record.remarks)),

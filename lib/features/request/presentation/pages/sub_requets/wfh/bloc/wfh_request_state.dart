@@ -22,6 +22,8 @@ class WfhRequestLoading extends WfhRequestState {
 
 /// Loaded state
 class WfhRequestLoaded extends WfhRequestState {
+  static const Object _unset = Object();
+
   final List<WfhRequestModel> wfhRequests;
   final List<WfhRequestModel> filteredWfhRequests;
   final String? searchQuery;
@@ -45,14 +47,18 @@ class WfhRequestLoaded extends WfhRequestState {
   WfhRequestLoaded copyWith({
     List<WfhRequestModel>? wfhRequests,
     List<WfhRequestModel>? filteredWfhRequests,
-    String? searchQuery,
-    WfhStatus? statusFilter,
+    Object? searchQuery = _unset,
+    Object? statusFilter = _unset,
   }) {
     return WfhRequestLoaded(
       wfhRequests: wfhRequests ?? this.wfhRequests,
       filteredWfhRequests: filteredWfhRequests ?? this.filteredWfhRequests,
-      searchQuery: searchQuery ?? this.searchQuery,
-      statusFilter: statusFilter ?? this.statusFilter,
+      searchQuery:
+      identical(searchQuery, _unset) ? this.searchQuery : searchQuery as String?,
+      statusFilter:
+      identical(statusFilter, _unset)
+          ? this.statusFilter
+          : statusFilter as WfhStatus?,
     );
   }
 }

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
-import 'dart:math' as math;
 import '../../../../core/constants/app_assets.dart';
-import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_text_styles.dart';
@@ -91,7 +89,7 @@ class PunchDetails extends StatelessWidget {
                     context,
 
                     time: _getPunchOutDisplay(),
-                    label: AppStrings.punchOut,
+                    label: 'Last Punch Out',
                     icon: AppAssets.iconPunchOut,
                     iconColor: AppColors.success,
                     backgroundColor: AppColors.background,
@@ -99,7 +97,7 @@ class PunchDetails extends StatelessWidget {
                   ),
                   _buildPunchCard(
                     context,
-                    time: _formatBreakTime() ?? '-',
+                    time: _formatBreakTime(),
                     label: AppStrings.breakTime,
                     icon: AppAssets.iconBreak,
                     iconColor: AppColors.warning,
@@ -151,42 +149,20 @@ class PunchDetails extends StatelessWidget {
     final minutes = (breakTimeSeconds % 3600) ~/ 60;
 
     if (hours > 0) {
-      return '${hours}h ${minutes} min'; // e.g. "1h 30m"
+      return '${hours}h $minutes min'; // e.g. "1h 30m"
     }
-    return '${minutes} min'; // e.g. "45m"
+    return '$minutes min'; // e.g. "45m"
   }
 
   String _getPunchOutDisplay() {
-    // Constant define
     const String notYet = "Not yet";
-
-    final punchInStr = attendanceDetails?.punchIn;
     final punchOutStr = attendanceDetails?.punchOut;
 
-    // 1. Basic check
     if (punchOutStr == null || punchOutStr.isEmpty || punchOutStr == '-') {
       return notYet;
     }
 
-    // 2. if punchIn missing directly show formatted output
-    if (punchInStr == null || punchInStr.isEmpty || punchInStr == '-') {
-      return attendanceDetails?.formattedPunchOut ?? notYet;
-    }
-
-    try {
-      final punchInTime = DateTime.parse(punchInStr);
-      final punchOutTime = DateTime.parse(punchOutStr);
-
-      // 3. Business Logic: if new PunchIn  , this means user is logged in
-      if (punchInTime.isAfter(punchOutTime)) {
-        return notYet;
-      }
-
-      return attendanceDetails?.formattedPunchOut ?? notYet;
-    } catch (e) {
-      // Parsing error fallback
-      return attendanceDetails?.formattedPunchOut ?? notYet;
-    }
+    return attendanceDetails?.formattedPunchOut ?? notYet;
   }
 
   Widget _buildPunchCard(
@@ -206,7 +182,7 @@ class PunchDetails extends StatelessWidget {
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor.withOpacity(0.3), width: 1),
+        border: Border.all(color: borderColor.withValues(alpha: 0.3), width: 1),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

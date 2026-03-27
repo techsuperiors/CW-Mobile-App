@@ -9,11 +9,7 @@ class OvertimeRequestCard extends StatelessWidget {
   final OvertimeRequestModel request;
   final VoidCallback? onTap;
 
-  const OvertimeRequestCard({
-    super.key,
-    required this.request,
-    this.onTap,
-  });
+  const OvertimeRequestCard({super.key, required this.request, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -74,10 +70,12 @@ class OvertimeRequestCard extends StatelessWidget {
                             ),
                             SizedBox(height: screenHeight * 0.006),
                             Text(
-                              DateFormat('dd MMM yyyy').format(request.requestDate),
-                              style: AppTextStyles.bodySmall(context).copyWith(
-                                color: statusColor,
-                              ),
+                              DateFormat(
+                                'dd MMM yyyy',
+                              ).format(request.requestDate),
+                              style: AppTextStyles.bodySmall(
+                                context,
+                              ).copyWith(color: statusColor),
                             ),
                           ],
                         ),
@@ -113,13 +111,14 @@ class OvertimeRequestCard extends StatelessWidget {
   Color _getStatusColor(OvertimeStatus status) {
     switch (status) {
       case OvertimeStatus.pending:
-        return const Color(0xFF0086C9); // Blue
+        return AppColors
+            .approvalSheetPending; //
       case OvertimeStatus.approved:
-        return const Color(0xFF12B76A); // Green
+        return AppColors.approvalSheetAccept; // 0xFF12B76A
       case OvertimeStatus.rejected:
-        return const Color(0xFFF04438); // Red
+        return AppColors.approvalSheetReject; // 0xFFF04438
       case OvertimeStatus.withdrawn:
-        return const Color(0xFFF79009); // Orange
+        return AppColors.approvalSheetWithdrawn; // 0xFFF79009
     }
   }
 }

@@ -228,6 +228,13 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
     final checkOut = detail?.checkOut;
     final requestId = int.tryParse(widget.overtimeRequest.id) ?? 0;
     final isPending = currentRequest.status == OvertimeStatus.pending;
+    final menuActions = <Map<String, String>>[
+      if (isPending && !widget.isApprovalMode)
+        {'value': 'Edit', 'icon': AppAssets.editIconwfh},
+      if (isPending && !widget.isApprovalMode)
+        {'value': 'Withdraw', 'icon': AppAssets.withdrawIcon},
+      {'value': 'Activity', 'icon': AppAssets.activityIcon},
+    ];
 
     return Container(
       decoration: BoxDecoration(
@@ -249,62 +256,59 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
                   context,
                 ).copyWith(fontWeight: FontWeight.w700, color: statusColor),
               ),
-
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
-                onSelected: (value) async {
-                  if (value == 'Edit') {
-                    final result = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (_) => ApplyOvertimePage(
-                              overtimeRequest: currentRequest,
-                              overtimeDetail: detail,
-                            ),
-                      ),
-                    );
-                    if (result == true && context.mounted) {
-                      _shouldRefreshListing = true;
-                      context.read<OvertimeDetailBloc>().add(
-                        LoadOvertimeDetail(
-                          requestId: requestId,
-                          clientId: _clientId,
+              if (menuActions.length >= 2)
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
+                  onSelected: (value) async {
+                    if (value == 'Edit') {
+                      final result = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (_) => ApplyOvertimePage(
+                                overtimeRequest: currentRequest,
+                                overtimeDetail: detail,
+                              ),
                         ),
                       );
+                      if (result == true && context.mounted) {
+                        _shouldRefreshListing = true;
+                        context.read<OvertimeDetailBloc>().add(
+                          LoadOvertimeDetail(
+                            requestId: requestId,
+                            clientId: _clientId,
+                          ),
+                        );
+                      }
+                    } else if (value == 'Withdraw') {
+                      context.read<OvertimeDetailBloc>().add(
+                        UpdateOvertimeRequestStatus(
+                          requestId: requestId,
+                          clientId: _clientId,
+                          status: 'Withdrawn',
+                        ),
+                      );
+                    } else if (value == 'Activity') {
+                      _showActivityBottomSheet(
+                        context,
+                        detail?.activity ?? const [],
+                      );
                     }
-                  } else if (value == 'Withdraw') {
-                    context.read<OvertimeDetailBloc>().add(
-                      UpdateOvertimeRequestStatus(
-                        requestId: requestId,
-                        clientId: _clientId,
-                        status: 'Withdrawn',
-                      ),
-                    );
-                  } else if (value == 'Activity') {
-                    _showActivityBottomSheet(
-                      context,
-                      detail?.activity ?? const [],
-                    );
-                  }
-                },
-                itemBuilder: (_) {
-                  return [
-                    if (isPending && !widget.isApprovalMode)
-                      PopupMenuItem(
-                        value: 'Edit',
+                  },
+                  itemBuilder: (_) {
+                    return menuActions.map((action) {
+                      return PopupMenuItem(
+                        value: action['value'],
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             SizedBox(
                               width: screenWidth * 0.05,
-
                               height: screenHeight * 0.05,
-                              child: SvgPicture.asset(AppAssets.editIconwfh),
+                              child: SvgPicture.asset(action['icon']!),
                             ),
                             SizedBox(width: screenWidth * 0.02),
                             Text(
-                              'Edit',
+                              action['value']!,
                               style: AppTextStyles.heading5(context).copyWith(
                                 fontWeight: FontWeight.w400,
                                 color: AppColors.textHeading,
@@ -312,53 +316,59 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
                             ),
                           ],
                         ),
-                      ),
-                    if (isPending && !widget.isApprovalMode)
-                      PopupMenuItem(
-                        value: 'Withdraw',
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: screenWidth * 0.05,
-
-                              height: screenHeight * 0.05,
-                              child: SvgPicture.asset(AppAssets.withdrawIcon),
-                            ),
-                            SizedBox(width: screenWidth * 0.02),
-                            Text(
-                              'Withdraw',
-                              style: AppTextStyles.heading5(context).copyWith(
-                                fontWeight: FontWeight.w400,
-                                color: AppColors.textHeading,
+                      );
+                    }).toList();
+                  },
+                )
+              else if (menuActions.length == 1)
+                InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () async {
+                    final action = menuActions.first['value'];
+                    if (action == 'Edit') {
+                      final result = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (_) => ApplyOvertimePage(
+                                overtimeRequest: currentRequest,
+                                overtimeDetail: detail,
                               ),
-                            ),
-                          ],
                         ),
-                      ),
-                    PopupMenuItem(
-                      value: 'Activity',
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: screenWidth * 0.05,
-
-                            height: screenHeight * 0.05,
-                            child: SvgPicture.asset(AppAssets.activityIcon),
+                      );
+                      if (result == true && context.mounted) {
+                        _shouldRefreshListing = true;
+                        context.read<OvertimeDetailBloc>().add(
+                          LoadOvertimeDetail(
+                            requestId: requestId,
+                            clientId: _clientId,
                           ),
-                          SizedBox(width: screenWidth * 0.02),
-                          Text(
-                            'Activity',
-                            style: AppTextStyles.heading5(context).copyWith(
-                              fontWeight: FontWeight.w400,
-                              color: AppColors.textHeading,
-                            ),
-                          ),
-                        ],
-                      ),
+                        );
+                      }
+                    } else if (action == 'Withdraw') {
+                      context.read<OvertimeDetailBloc>().add(
+                        UpdateOvertimeRequestStatus(
+                          requestId: requestId,
+                          clientId: _clientId,
+                          status: 'Withdrawn',
+                        ),
+                      );
+                    } else if (action == 'Activity') {
+                      _showActivityBottomSheet(
+                        context,
+                        detail?.activity ?? const [],
+                      );
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: SizedBox(
+                      width: screenWidth * 0.06,
+                      height: screenHeight * 0.03,
+                      child: SvgPicture.asset(menuActions.first['icon']!),
                     ),
-                  ];
-                },
-              ),
+                  ),
+                ),
             ],
           ),
           SizedBox(height: screenHeight * 0.01),
@@ -494,9 +504,7 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
                   approverUsers.length == 1
                       ? approverUsers.first.fullName
                       : '${approverUsers.length} approvers',
-                  style: AppTextStyles.bodySmall(
-                    context,
-                  ).copyWith(
+                  style: AppTextStyles.bodySmall(context).copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w500,
                   ),
@@ -606,7 +614,7 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
           SizedBox(height: screenHeight * 0.002),
           if (comments.isNotEmpty) ...[
             ...comments.map(
-                  (comment) => Padding(
+              (comment) => Padding(
                 padding: EdgeInsets.only(bottom: screenHeight * 0.012),
                 child: Container(
                   width: double.infinity,
@@ -632,9 +640,7 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
                             alignment: Alignment.center,
                             child: Text(
                               _initials(comment.user?.fullName ?? 'User'),
-                              style: AppTextStyles.bodySmall(
-                                context,
-                              ).copyWith(
+                              style: AppTextStyles.bodySmall(context).copyWith(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -655,8 +661,8 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
                                 Text(
                                   comment.createdAt != null
                                       ? DateFormat(
-                                    'dd MMM yyyy, hh:mm a',
-                                  ).format(comment.createdAt!)
+                                        'dd MMM yyyy, hh:mm a',
+                                      ).format(comment.createdAt!)
                                       : 'Just now',
                                   style: AppTextStyles.bodySmall(
                                     context,
@@ -672,10 +678,7 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
                         comment.comment,
                         style: AppTextStyles.bodyMedium(
                           context,
-                        ).copyWith(
-                          color: AppColors.textPrimary,
-                          height: 1.45,
-                        ),
+                        ).copyWith(color: AppColors.textPrimary, height: 1.45),
                       ),
                     ],
                   ),
@@ -729,17 +732,19 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
       ),
     );
   }
+
   String _initials(String name) {
     final parts =
-    name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .take(2)
-        .toList();
+        name
+            .trim()
+            .split(RegExp(r'\s+'))
+            .where((part) => part.isNotEmpty)
+            .take(2)
+            .toList();
     if (parts.isEmpty) return 'U';
     return parts.map((part) => part[0].toUpperCase()).join();
   }
+
   Widget _buildDetailRow(
     BuildContext context,
     String label,
@@ -781,8 +786,10 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      isDismissible: true,
       builder:
           (context) => DraggableScrollableSheet(
+            expand: false,
             initialChildSize: 0.5,
             minChildSize: 0.3,
             maxChildSize: 0.9,
@@ -880,13 +887,13 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
   Color _getStatusColor(OvertimeStatus status) {
     switch (status) {
       case OvertimeStatus.pending:
-        return const Color(0xFF2196F3);
+        return AppColors.approvalSheetPending; //
       case OvertimeStatus.approved:
-        return const Color(0xFF4CAF50);
+        return AppColors.approvalSheetAccept; // 0xFF12B76A
       case OvertimeStatus.rejected:
-        return const Color(0xFFE53935);
+        return AppColors.approvalSheetReject; // 0xFFF04438
       case OvertimeStatus.withdrawn:
-        return const Color(0xFF667085);
+        return AppColors.approvalSheetWithdrawn; // 0xFFF79009
     }
   }
 }
@@ -929,9 +936,9 @@ class _OvertimeApproversSheetContent extends StatelessWidget {
         if (approvers.isEmpty)
           Text(
             'No approvers found.',
-            style: AppTextStyles.bodyMedium(context).copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.bodyMedium(
+              context,
+            ).copyWith(color: AppColors.textSecondary),
           )
         else
           ...approvers.map(
@@ -1025,9 +1032,9 @@ class _OvertimeApproverTile extends StatelessWidget {
               children: [
                 Text(
                   user.fullName.isNotEmpty ? user.fullName : 'Approver',
-                  style: AppTextStyles.bodyMediumHeading(context).copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: AppTextStyles.bodyMediumHeading(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
                 if (user.email?.isNotEmpty == true) ...[
                   const SizedBox(height: 2),
@@ -1073,15 +1080,21 @@ class _OvertimeApproverAvatarStack extends StatelessWidget {
   Widget build(BuildContext context) {
     final visibleUsers = users.take(3).toList();
     final overlap = avatarSize * 0.35;
+    final edgePadding = avatarSize * 0.08;
+
     final width =
         visibleUsers.length == 1
-            ? avatarSize
-            : avatarSize + ((visibleUsers.length - 1) * (avatarSize - overlap));
+            ? avatarSize + (edgePadding * 2)
+            : avatarSize +
+                ((visibleUsers.length - 1) * (avatarSize - overlap)) +
+                (edgePadding * 2);
+    ;
 
     return SizedBox(
       width: width,
-      height: avatarSize,
+      height: avatarSize + (edgePadding * 2),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           for (var i = 0; i < visibleUsers.length; i++)
             Positioned(
@@ -1103,16 +1116,14 @@ class _OvertimeApproverAvatarStack extends StatelessWidget {
                       visibleUsers[i].imageUrl == null ||
                               visibleUsers[i].imageUrl!.isEmpty
                           ? Text(
-                              visibleUsers[i].fullName.isNotEmpty
-                                  ? visibleUsers[i].fullName[0].toUpperCase()
-                                  : '?',
-                              style: AppTextStyles.bodyMedium(
-                                context,
-                              ).copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            )
+                            visibleUsers[i].fullName.isNotEmpty
+                                ? visibleUsers[i].fullName[0].toUpperCase()
+                                : '?',
+                            style: AppTextStyles.bodyMedium(context).copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
                           : null,
                 ),
               ),

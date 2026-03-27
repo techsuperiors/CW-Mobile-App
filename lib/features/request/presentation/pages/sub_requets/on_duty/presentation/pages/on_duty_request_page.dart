@@ -218,9 +218,12 @@ class _OnDutyRequestPageState extends State<OnDutyRequestPage> {
                 elevation: 0,
                 backgroundColor: AppColors.background,
                 foregroundColor: AppColors.textPrimary,
+                leadingWidth: 110,
                 leading: GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         Icons.arrow_back_ios,
@@ -312,40 +315,6 @@ class _OnDutyRequestPageState extends State<OnDutyRequestPage> {
                       ),
                       SizedBox(height: screenHeight * 0.02),
 
-                      // Request To (Manager)
-                      Builder(
-                        builder: (context) {
-                          List<String> managerItems = [];
-                          if (profileState is UserProfileLoaded) {
-                            final profile = profileState.profile;
-                            if (profile.reportingManagerInfo != null) {
-                              managerItems = [
-                                profile.reportingManagerInfo!.fullName,
-                              ];
-                            }
-                          }
-                          if (managerItems.isEmpty)
-                            managerItems = ['Loading...'];
-
-                          // Initialize if not set
-                          if (!managerItems.contains(_requestTo)) {
-                            _requestTo = managerItems.first;
-                          }
-
-                          return _buildDropdownField(
-                            context,
-                            label: 'Request To',
-                            value: _requestTo,
-                            items: managerItems,
-                            onChanged: (val) {
-                              if (val != null) setState(() => _requestTo = val);
-                            },
-                          );
-                        },
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-
-                      // Request Type / Duration
                       _buildDropdownField(
                         context,
                         label: 'On duty duration',

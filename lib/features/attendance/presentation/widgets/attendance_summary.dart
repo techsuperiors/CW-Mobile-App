@@ -13,6 +13,8 @@ class AttendanceSummary extends StatelessWidget {
   final int wfhDays;
   final int leaveDays;
   final int maxDays;
+  final int regularizeDays;
+  final int onDutyDays;
   final bool isLoading;
   final DateTime? selectedDate;
   final VoidCallback? onPreviousMonth;
@@ -26,6 +28,8 @@ class AttendanceSummary extends StatelessWidget {
     this.workingDays = 0,
     this.wfhDays = 0,
     this.leaveDays = 0,
+    this.regularizeDays = 0,
+    this.onDutyDays = 0,
     this.maxDays = 30,
     this.isLoading = false,
   });
@@ -107,10 +111,12 @@ class AttendanceSummary extends StatelessWidget {
               children: [
                 _buildRingCard(
                   context,
-                  label: AppStrings.workingDays,
+                  label: AppStrings.regularizeDays,
                   value:
-                      isLoading ? '--' : workingDays.toString().padLeft(2, '0'),
-                  progress: isLoading ? 0 : workingDays / maxDays,
+                      isLoading
+                          ? '--'
+                          : regularizeDays.toString().padLeft(2, '0'),
+                  progress: isLoading ? 0 : regularizeDays / maxDays,
                   color: AppColors.success,
                   trackColor: AppColors.success.withOpacity(0.15),
                 ),
@@ -124,10 +130,10 @@ class AttendanceSummary extends StatelessWidget {
                 ),
                 _buildRingCard(
                   context,
-                  label: AppStrings.leaveDays,
+                  label: AppStrings.ondutyDays,
                   value:
-                      isLoading ? '--' : leaveDays.toString().padLeft(2, '0'),
-                  progress: isLoading ? 0 : leaveDays / maxDays,
+                      isLoading ? '--' : onDutyDays.toString().padLeft(2, '0'),
+                  progress: isLoading ? 0 : onDutyDays / maxDays,
                   color: AppColors.warning,
                   trackColor: AppColors.warning.withOpacity(0.15),
                 ),

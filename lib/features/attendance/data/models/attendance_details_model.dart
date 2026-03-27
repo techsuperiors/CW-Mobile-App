@@ -293,11 +293,18 @@ class AttendanceDetailsModel {
       return value.toString();
     }
 
-    // Parse over_time object
+    // Parse over_time which may arrive either as a structured object
+    // or as a direct numeric total value.
     OverTimeModel? overTimeModel;
     if (json['over_time'] != null && json['over_time'] is Map) {
       overTimeModel = OverTimeModel.fromJson(
         json['over_time'] as Map<String, dynamic>,
+      );
+    } else if (json['over_time'] is num) {
+      overTimeModel = OverTimeModel(
+        total: (json['over_time'] as num).toInt(),
+        beforePunchIn: 0,
+        afterPunchOut: 0,
       );
     }
 

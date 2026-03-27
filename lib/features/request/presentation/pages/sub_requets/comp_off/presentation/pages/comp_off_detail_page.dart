@@ -178,7 +178,7 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
                 if (isBusy)
                   const Positioned.fill(
                     child: ColoredBox(
-                      color: Colors.black26,
+                      color: Colors.transparent,
                       child: Center(child: CircularProgressIndicator()),
                     ),
                   ),
@@ -239,6 +239,11 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
     final requestToColor = detail?.requestToColor;
     final requestId = int.tryParse(widget.request.id) ?? 0;
     final isPending = status == CompOffStatus.pending;
+    final menuActions = <Map<String, String>>[
+      if (isPending && !widget.isApprovalMode)
+        {'value': 'Edit', 'icon': AppAssets.editIconwfh},
+      {'value': 'Activity', 'icon': AppAssets.activityIcon},
+    ];
 
     return Container(
       width: double.infinity,
@@ -269,79 +274,89 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
                   ),
                 ),
               ),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
-                onSelected: (value) async {
-                  if (value == 'Edit') {
-                    final result = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (_) => ApplyCompOffPage(
-                              compOffRequest: compOffRequest,
-                            ),
-                      ),
-                    );
-                    if (result == true && context.mounted) {
-                      _shouldRefresh = true;
-                      context.read<CompOffDetailBloc>().add(
-                        LoadCompOffDetail(requestId),
-                      );
-                    }
-                  } else if (value == 'Activity') {
-                    _showActivity(context, detail?.activity ?? const []);
-                  }
-                },
-                itemBuilder: (context) {
-                  return [
-                    if (isPending && !widget.isApprovalMode)
-                      if (isPending)
-                        PopupMenuItem(
-                          value: 'Edit',
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            children: [
-                              SizedBox(
-                                width: screenWidth * 0.05,
-
-                                height: screenHeight * 0.05,
-                                child: SvgPicture.asset(AppAssets.editIconwfh),
+              if (menuActions.length >= 2)
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
+                  onSelected: (value) async {
+                    if (value == 'Edit') {
+                      final result = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (_) => ApplyCompOffPage(
+                                compOffRequest: compOffRequest,
                               ),
-                              SizedBox(width: screenWidth * 0.02),
-                              Text(
-                                'Edit',
-                                style: AppTextStyles.heading5(context).copyWith(
-                                  fontWeight: FontWeight.w400,
-                                  color: AppColors.textHeading,
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
-                    PopupMenuItem(
-                      value: 'Activity',
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: screenWidth * 0.05,
-
-                            height: screenHeight * 0.05,
-                            child: SvgPicture.asset(AppAssets.activityIcon),
-                          ),
-                          SizedBox(width: screenWidth * 0.02),
-                          Text(
-                            'Activity',
-                            style: AppTextStyles.heading5(context).copyWith(
-                              fontWeight: FontWeight.w400,
-                              color: AppColors.textHeading,
+                      );
+                      if (result == true && context.mounted) {
+                        _shouldRefresh = true;
+                        context.read<CompOffDetailBloc>().add(
+                          LoadCompOffDetail(requestId),
+                        );
+                      }
+                    } else if (value == 'Activity') {
+                      _showActivity(context, detail?.activity ?? const []);
+                    }
+                  },
+                  itemBuilder: (context) {
+                    return menuActions.map((action) {
+                      return PopupMenuItem(
+                        value: action['value'],
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: screenWidth * 0.05,
+                              height: screenHeight * 0.05,
+                              child: SvgPicture.asset(action['icon']!),
                             ),
-                          ),
-                        ],
-                      ),
+                            SizedBox(width: screenWidth * 0.02),
+                            Text(
+                              action['value']!,
+                              style: AppTextStyles.heading5(context).copyWith(
+                                fontWeight: FontWeight.w400,
+                                color: AppColors.textHeading,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList();
+                  },
+                )
+              else if (menuActions.length == 1)
+                InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () async {
+                    final action = menuActions.first['value'];
+                    if (action == 'Edit') {
+                      final result = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (_) => ApplyCompOffPage(
+                                compOffRequest: compOffRequest,
+                              ),
+                        ),
+                      );
+                      if (result == true && context.mounted) {
+                        _shouldRefresh = true;
+                        context.read<CompOffDetailBloc>().add(
+                          LoadCompOffDetail(requestId),
+                        );
+                      }
+                    } else if (action == 'Activity') {
+                      _showActivity(context, detail?.activity ?? const []);
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: SizedBox(
+                      width: screenWidth * 0.06,
+                      height: screenHeight * 0.03,
+                      child: SvgPicture.asset(menuActions.first['icon']!),
                     ),
-                  ];
-                },
-              ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 14),
@@ -351,14 +366,6 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
             requestBy,
             requestByImg,
             requestByColor,
-          ),
-          const SizedBox(height: 12),
-          _userRow(
-            context,
-            'Request To',
-            requestTo,
-            requestToImg,
-            requestToColor,
           ),
           const SizedBox(height: 12),
           _fieldRow(
@@ -776,13 +783,13 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
   Color _statusColor(CompOffStatus status) {
     switch (status) {
       case CompOffStatus.pending:
-        return const Color(0xFF2196F3);
+        return AppColors.approvalSheetPending; //
       case CompOffStatus.approved:
-        return const Color(0xFF4CAF50);
+        return AppColors.approvalSheetAccept; // 0xFF12B76A
       case CompOffStatus.rejected:
-        return const Color(0xFFE53935);
+        return AppColors.approvalSheetReject; // 0xFFF04438
       case CompOffStatus.withdrawn:
-        return const Color(0xFF667085);
+        return AppColors.approvalSheetWithdrawn; // 0xFFF79009
     }
   }
 
@@ -791,8 +798,10 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      isDismissible: true,
       builder:
           (_) => DraggableScrollableSheet(
+            expand: false,
             initialChildSize: 0.5,
             minChildSize: 0.3,
             maxChildSize: 0.9,
@@ -848,15 +857,20 @@ class _CompOffApproverAvatarStack extends StatelessWidget {
   Widget build(BuildContext context) {
     final visibleUsers = users.take(3).toList();
     final overlap = avatarSize * 0.35;
+    final edgePadding = avatarSize * 0.08;
+
     final width =
         visibleUsers.length == 1
-            ? avatarSize
-            : avatarSize + ((visibleUsers.length - 1) * (avatarSize - overlap));
+            ? avatarSize + (edgePadding * 2)
+            : avatarSize +
+                ((visibleUsers.length - 1) * (avatarSize - overlap)) +
+                (edgePadding * 2);
 
     return SizedBox(
       width: width,
-      height: avatarSize,
+      height: avatarSize + (edgePadding * 2),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           for (var i = 0; i < visibleUsers.length; i++)
             Positioned(
@@ -985,13 +999,20 @@ class _CompOffApproverTile extends StatelessWidget {
     final Color statusColor;
     switch (user.approvalStatus.toLowerCase()) {
       case 'approved':
-        statusColor = const Color(0xFF4CAF50);
+        statusColor = AppColors.approvalSheetAccept;
         break;
       case 'rejected':
-        statusColor = const Color(0xFFE53935);
+        statusColor = AppColors.approvalSheetReject;
+        break;
+      case 'withdrawn':
+        statusColor = AppColors.approvalSheetWithdrawn;
+        break;
+      case 'pending':
+        statusColor = AppColors.approvalSheetPending;
         break;
       default:
-        statusColor = const Color(0xFF2196F3);
+        statusColor = AppColors.approvalSheetPending;
+        break;
     }
 
     return Container(

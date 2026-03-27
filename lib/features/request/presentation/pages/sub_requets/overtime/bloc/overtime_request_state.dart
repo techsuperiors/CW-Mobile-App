@@ -18,6 +18,8 @@ class OvertimeRequestLoading extends OvertimeRequestState {
 }
 
 class OvertimeRequestLoaded extends OvertimeRequestState {
+  static const Object _unset = Object();
+
   final List<OvertimeRequestModel> requests;
   final List<OvertimeRequestModel> filteredRequests;
   final String? searchQuery;
@@ -33,24 +35,30 @@ class OvertimeRequestLoaded extends OvertimeRequestState {
   OvertimeRequestLoaded copyWith({
     List<OvertimeRequestModel>? requests,
     List<OvertimeRequestModel>? filteredRequests,
-    String? searchQuery,
-    OvertimeStatus? statusFilter,
+    Object? searchQuery = _unset,
+    Object? statusFilter = _unset,
   }) {
     return OvertimeRequestLoaded(
       requests: requests ?? this.requests,
       filteredRequests: filteredRequests ?? this.filteredRequests,
-      searchQuery: searchQuery ?? this.searchQuery,
-      statusFilter: statusFilter ?? this.statusFilter,
+      searchQuery:
+          identical(searchQuery, _unset)
+              ? this.searchQuery
+              : searchQuery as String?,
+      statusFilter:
+          identical(statusFilter, _unset)
+              ? this.statusFilter
+              : statusFilter as OvertimeStatus?,
     );
   }
 
   @override
   List<Object?> get props => [
-        requests,
-        filteredRequests,
-        searchQuery,
-        statusFilter,
-      ];
+    requests,
+    filteredRequests,
+    searchQuery,
+    statusFilter,
+  ];
 }
 
 class OvertimeRequestError extends OvertimeRequestState {

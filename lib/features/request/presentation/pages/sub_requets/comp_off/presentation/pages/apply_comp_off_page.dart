@@ -184,15 +184,6 @@ class _ApplyCompOffPageState extends State<ApplyCompOffPage> {
                           SizedBox(height: screenHeight * 0.02),
                           _buildTypeDropdown(context),
                           SizedBox(height: screenHeight * 0.02),
-
-                          // SizedBox(height: screenHeight * 0.02),
-                          // Text(
-                          //   AppStrings.dayworked,
-                          //   style: AppTextStyles.labelLarge(context).copyWith(
-                          //     color: AppColors.textPrimary,
-                          //     fontWeight: FontWeight.w500,
-                          //   ),
-                          // ),
                           _buildDatePicker(context),
                           SizedBox(height: screenHeight * 0.02),
                           // Duration field: hidden for Day, visible for Hours

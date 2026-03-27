@@ -65,7 +65,6 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
   DateTime? _selectedToDate;
   String _toHalfDay = 'Second Half';
   bool _clubLeave = false; // Default to false to match payload
-  String? _requestTo;
   int? _requestToId; // Store the reporting manager ID
   String? _selectedReason;
   bool _isSubmitting = false;
@@ -108,6 +107,9 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
     if (widget.leaveRequest != null) {
       _initializeFormFromLeaveRequest(widget.leaveRequest!);
     }
+
+    final profileState = context.read<UserProfileBloc>().state;
+    _hydrateRequestToFromProfileState(profileState);
   }
 
   void _initializeFormFromLeaveRequest(LeaveEntity leaveRequest) {
@@ -178,6 +180,8 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
 
   /// Handle form submission
   void _handleSubmit() {
+    _hydrateRequestToFromProfileState(context.read<UserProfileBloc>().state);
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -433,13 +437,7 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
               final profile = profileState.profile;
 
               // Initialize reporting manager when profile is loaded
-              if (_requestToId == null &&
-                  profile.reportingManagerInfo != null) {
-                setState(() {
-                  _requestTo = profile.reportingManagerInfo!.fullName;
-                  _requestToId = profile.reportingManager;
-                });
-              }
+              _hydrateRequestToFromProfileState(profileState);
               // Load leave types if not yet loaded (e.g. user opened Apply Leave before dashboard)
               final leaveTypesState = context.read<LeaveTypesBloc>().state;
               if (leaveTypesState is LeaveTypesInitial) {
@@ -703,45 +701,7 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
                     // Club Leave Type dropdown is disabled - always send empty string
                     // The dropdown is kept hidden as per requirement
                     SizedBox(height: screenHeight * 0.02),
-                    // Request To - Get from user profile
-                    BlocBuilder<UserProfileBloc, UserProfileState>(
-                      builder: (context, profileState) {
-                        List<String> managerItems = [];
 
-                        if (profileState is UserProfileLoaded) {
-                          final profile = profileState.profile;
-                          if (profile.reportingManagerInfo != null) {
-                            final managerName =
-                                profile.reportingManagerInfo!.fullName;
-                            managerItems = [managerName];
-                          }
-                        }
-
-                        // Show loading or placeholder if profile not loaded
-                        if (managerItems.isEmpty) {
-                          managerItems = ['Loading...'];
-                        }
-
-                        return _buildDropdownField(
-                          context,
-                          label: 'Request To',
-                          value: _requestTo,
-                          items: managerItems,
-                          onChanged: (value) {
-                            setState(() {
-                              _requestTo = value;
-                              // Update ID when profile is loaded
-                              if (profileState is UserProfileLoaded) {
-                                _requestToId =
-                                    profileState.profile.reportingManager;
-                              }
-                            });
-                          },
-                        );
-                      },
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    // Reason
                     _buildDropdownField(
                       context,
                       label: 'Reason',
@@ -845,6 +805,15 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
         ),
       ),
     );
+  }
+
+  void _hydrateRequestToFromProfileState(UserProfileState profileState) {
+    if (profileState is! UserProfileLoaded) return;
+
+    final profile = profileState.profile;
+    if (_requestToId != null || profile.reportingManagerInfo == null) return;
+
+    _requestToId = profile.reportingManager;
   }
 
   Widget _buildDropdownField(

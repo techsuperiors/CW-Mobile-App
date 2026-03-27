@@ -150,13 +150,13 @@ class WfhRequestCard extends StatelessWidget {
   Color _getStatusColor(WfhStatus status) {
     switch (status) {
       case WfhStatus.pending:
-        return const Color(0xFF0086C9);
+        return AppColors.approvalSheetPending; //
       case WfhStatus.approved:
-        return const Color(0xFF12B76A);
+        return AppColors.approvalSheetAccept; // 0xFF12B76A
       case WfhStatus.rejected:
-        return const Color(0xFFF04438);
+        return AppColors.approvalSheetReject; // 0xFFF04438
       case WfhStatus.withdrawn:
-        return const Color(0xFF9E9E9E);
+        return AppColors.approvalSheetWithdrawn; // 0xFFF79009
     }
   }
 }

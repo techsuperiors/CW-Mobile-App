@@ -594,44 +594,44 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
                       hint: 'Select Date',
                       onTap: () => _selectDate(context),
                     ),
-                    SizedBox(height: screenHeight * 0.02),
-                    // Request To - Get from user profile
-                    BlocBuilder<UserProfileBloc, UserProfileState>(
-                      builder: (context, profileState) {
-                        List<String> managerItems = [];
-
-                        if (profileState is UserProfileLoaded) {
-                          final profile = profileState.profile;
-                          if (profile.reportingManagerInfo != null) {
-                            final managerName =
-                                profile.reportingManagerInfo!.fullName;
-                            managerItems = [managerName];
-                          }
-                        }
-
-                        // Show loading or placeholder if profile not loaded
-                        if (managerItems.isEmpty) {
-                          managerItems = ['Loading...'];
-                        }
-
-                        return _buildDropdownField(
-                          context,
-                          label: 'Request To',
-                          value: _requestTo,
-                          items: managerItems,
-                          onChanged: (value) {
-                            setState(() {
-                              _requestTo = value;
-                              // Update ID when profile is loaded
-                              if (profileState is UserProfileLoaded) {
-                                _requestToId =
-                                    profileState.profile.reportingManager;
-                              }
-                            });
-                          },
-                        );
-                      },
-                    ),
+                    // SizedBox(height: screenHeight * 0.02),
+                    // // Request To - Get from user profile
+                    // BlocBuilder<UserProfileBloc, UserProfileState>(
+                    //   builder: (context, profileState) {
+                    //     List<String> managerItems = [];
+                    //
+                    //     if (profileState is UserProfileLoaded) {
+                    //       final profile = profileState.profile;
+                    //       if (profile.reportingManagerInfo != null) {
+                    //         final managerName =
+                    //             profile.reportingManagerInfo!.fullName;
+                    //         managerItems = [managerName];
+                    //       }
+                    //     }
+                    //
+                    //     // Show loading or placeholder if profile not loaded
+                    //     if (managerItems.isEmpty) {
+                    //       managerItems = ['Loading...'];
+                    //     }
+                    //
+                    //     return _buildDropdownField(
+                    //       context,
+                    //       label: 'Request To',
+                    //       value: _requestTo,
+                    //       items: managerItems,
+                    //       onChanged: (value) {
+                    //         setState(() {
+                    //           _requestTo = value;
+                    //           // Update ID when profile is loaded
+                    //           if (profileState is UserProfileLoaded) {
+                    //             _requestToId =
+                    //                 profileState.profile.reportingManager;
+                    //           }
+                    //         });
+                    //       },
+                    //     );
+                    //   },
+                    // ),
                     SizedBox(height: screenHeight * 0.02),
                     // Request Type (Radio Buttons)
                     Text(

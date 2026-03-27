@@ -180,6 +180,38 @@ class _AttendancePageState extends State<AttendancePage> {
     _calendarBloc.add(LoadCalendarData(month: month.month, year: month.year));
   }
 
+  DateTime _monthStart(DateTime month) => DateTime(month.year, month.month, 1);
+
+  DateTime _monthEnd(DateTime month) => DateTime(month.year, month.month + 1, 0);
+
+  Future<void> _refreshAttendanceSummaryOnly() async {
+    final networkInfo = NetworkInfoImpl(Connectivity());
+    final dio = Dio();
+    final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+
+    setState(() {
+      _isLoadingLeaveStats = true;
+    });
+
+    await _loadLeaveStats(
+      apiClient,
+      networkInfo,
+      targetMonth: _selectedMonth,
+    );
+  }
+
+  Future<void> _changeSelectedMonth(int monthOffset) async {
+    final nextMonth = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month + monthOffset,
+      1,
+    );
+    setState(() {
+      _selectedMonth = nextMonth;
+    });
+    await _refreshAttendanceSummaryOnly();
+  }
+
   /// Check if all APIs are loaded (leave types come from LeaveTypesBloc)
   bool _isAllDataLoaded(LeaveTypesState leaveTypesState) {
     if (!_isInitialLoad)
@@ -213,7 +245,8 @@ class _AttendancePageState extends State<AttendancePage> {
     final networkInfo = NetworkInfoImpl(Connectivity());
     final dio = Dio();
     final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
-    _loadCalendarData(_selectedMonth);
+    final effectiveMonth = targetMonth ?? _selectedMonth;
+    _loadCalendarData(effectiveMonth);
     // Call all APIs in parallel
     try {
       _notificationBloc.add(FetchNotificationCount());
@@ -221,7 +254,11 @@ class _AttendancePageState extends State<AttendancePage> {
         _loadUserProfile(apiClient, networkInfo),
         _loadAttendanceDetails(apiClient, networkInfo),
         _loadUpcomingEvents(apiClient, networkInfo),
-        _loadLeaveStats(apiClient, networkInfo),
+        _loadLeaveStats(
+          apiClient,
+          networkInfo,
+          targetMonth: effectiveMonth,
+        ),
       ]);
     } finally {
       _isLoadingInProgress = false;
@@ -354,6 +391,7 @@ class _AttendancePageState extends State<AttendancePage> {
   Future<void> _loadLeaveStats(
     ApiClient apiClient,
     NetworkInfo networkInfo,
+    {DateTime? targetMonth}
   ) async {
     try {
       final remoteDataSource = LeaveStatsRemoteDataSourceImpl(apiClient);
@@ -362,8 +400,14 @@ class _AttendancePageState extends State<AttendancePage> {
         networkInfo: networkInfo,
       );
       final getLeaveStatsUseCase = GetLeaveStatsUseCase(repository);
+      final effectiveMonth = targetMonth ?? _selectedMonth;
+      final startDate = _monthStart(effectiveMonth).toIso8601String();
+      final endDate = _monthEnd(effectiveMonth).toIso8601String();
 
-      final result = await getLeaveStatsUseCase();
+      final result = await getLeaveStatsUseCase(
+        startDate: startDate,
+        endDate: endDate,
+      );
 
       result.fold(
         (failure) {
@@ -496,9 +540,12 @@ class _AttendancePageState extends State<AttendancePage> {
                       PermissionGuard(
                         requiredPermission: "Attendance:My Attendance:Read",
                         child: AttendanceSummary(
-                          workingDays: _leaveStats?.workingDays ?? 0,
+                          selectedDate: _selectedMonth,
+                          onPreviousMonth: () => _changeSelectedMonth(-1),
+                          onNextMonth: () => _changeSelectedMonth(1),
                           wfhDays: _leaveStats?.wfhDays ?? 0,
-                          leaveDays: _leaveStats?.leaveDays ?? 0,
+                          regularizeDays: _leaveStats?.regularizeDays ?? 0,
+                          onDutyDays: _leaveStats?.onDutyDays ?? 0,
                           maxDays: _leaveStats?.totalDays ?? 30,
                           isLoading: _isLoadingLeaveStats,
                         ),

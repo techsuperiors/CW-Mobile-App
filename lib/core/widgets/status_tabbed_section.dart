@@ -58,11 +58,15 @@ class StatusTabbedSection<TStatus, TItem> extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
+    final searchScopedItems = items.where(
+      (item) => matchesSearch(item, searchQuery),
+    );
+
     final counts = <TStatus?, int>{};
-    counts[null] = items.length;
+    counts[null] = searchScopedItems.length;
     for (final tab in tabs) {
       if (tab.status != null) {
-        counts[tab.status] = items
+        counts[tab.status] = searchScopedItems
             .where((item) => statusSelector(item) == tab.status)
             .length;
       }
@@ -79,7 +83,7 @@ class StatusTabbedSection<TStatus, TItem> extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 6,
                 offset: const Offset(0, 2),
               ),

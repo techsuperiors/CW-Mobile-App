@@ -18,6 +18,8 @@ class CompOffRequestLoading extends CompOffRequestState {
 }
 
 class CompOffRequestLoaded extends CompOffRequestState {
+  static const Object _unset = Object();
+
   final List<CompOffRequestModel> requests;
   final List<CompOffRequestModel> filteredRequests;
   final String? searchQuery;
@@ -33,14 +35,20 @@ class CompOffRequestLoaded extends CompOffRequestState {
   CompOffRequestLoaded copyWith({
     List<CompOffRequestModel>? requests,
     List<CompOffRequestModel>? filteredRequests,
-    String? searchQuery,
-    CompOffStatus? statusFilter,
+    Object? searchQuery = _unset,
+    Object? statusFilter = _unset,
   }) {
     return CompOffRequestLoaded(
       requests: requests ?? this.requests,
       filteredRequests: filteredRequests ?? this.filteredRequests,
-      searchQuery: searchQuery ?? this.searchQuery,
-      statusFilter: statusFilter ?? this.statusFilter,
+      searchQuery:
+      identical(searchQuery, _unset)
+          ? this.searchQuery
+          : searchQuery as String?,
+      statusFilter:
+      identical(statusFilter, _unset)
+          ? this.statusFilter
+          : statusFilter as CompOffStatus?,
     );
   }
 

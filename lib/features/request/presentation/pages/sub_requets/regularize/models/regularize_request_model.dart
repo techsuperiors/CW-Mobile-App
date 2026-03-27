@@ -51,7 +51,9 @@ class RegularizeRequestModel {
       description: json['description'] as String?,
       modeType: json['mode_type'] as String?,
       status: parseStatusValue(json['request_status'] as String? ?? 'Pending'),
-      appliedDate: parseApiDate(json['created_at']),
+      appliedDate: parseApiDate(
+        json['created_at'] ?? json['updated_at'] ?? json['request_date'],
+      ),
 
       rejectRemark: json['reject_remark'] as String?,
       regularizedBy: json['regularized_by'] as String?,

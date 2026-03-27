@@ -111,7 +111,6 @@ class OnDutyRequestCard extends StatelessWidget {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-
                           ],
                         ),
                       ),
@@ -148,17 +147,18 @@ class OnDutyRequestCard extends StatelessWidget {
       ),
     );
   }
+
   Color _getStatusColor(OnDutyStatus status) {
     switch (status) {
       case OnDutyStatus.pending:
-        return const Color(0xFF0086C9); // Blue
+        return AppColors
+            .approvalSheetPending; // 0xFF2196F3 ya 0xFF0086C9
       case OnDutyStatus.approved:
-        return const Color(0xFF12B76A); // Green
+        return AppColors.approvalSheetAccept; // 0xFF12B76A
       case OnDutyStatus.rejected:
-        return const Color(0xFFF04438); // Red
+        return AppColors.approvalSheetReject; // 0xFFF04438
       case OnDutyStatus.withdrawn:
-        return const Color(0xFFF79009); // Orange
+        return AppColors.approvalSheetWithdrawn; // 0xFFF79009
     }
   }
-
 }

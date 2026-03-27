@@ -36,7 +36,7 @@ class DocumentFolderCard extends StatelessWidget {
               : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -50,8 +50,10 @@ class DocumentFolderCard extends StatelessWidget {
               padding: EdgeInsets.all(screenWidth * 0.027), // ~2.7% of screen width
               decoration: BoxDecoration(
                 color: folder.folderType == 'shared'
-                    ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                    : Colors.amber.withOpacity(0.1),
+                    ? Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.1)
+                    : Colors.amber.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(

@@ -7,8 +7,13 @@ import '../pages/policy_detail_page.dart';
 /// Card widget for displaying policy information
 class PolicyCard extends StatelessWidget {
   final PolicyModel policy;
+  final Future<void> Function()? onPolicyUpdated;
 
-  const PolicyCard({super.key, required this.policy});
+  const PolicyCard({
+    super.key,
+    required this.policy,
+    this.onPolicyUpdated,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -16,12 +21,16 @@ class PolicyCard extends StatelessWidget {
     return InkWell(
       onTap: () {
         // Navigate to policy detail page when tapped
-        Navigator.push(
+        Navigator.push<bool>(
           context,
           MaterialPageRoute(
             builder: (context) => PolicyDetailPage(policy: policy),
           ),
-        );
+        ).then((shouldRefresh) async {
+          if (shouldRefresh == true) {
+            await onPolicyUpdated?.call();
+          }
+        });
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
@@ -67,11 +76,8 @@ class PolicyCard extends StatelessWidget {
               policy.assignedBy,
               policy.assignedByAvatar,
             ),
-
             // SizedBox(height: screenHeight * 0.015), // 1.5% of screen height
             Divider(height: screenHeight * 0.03, color: AppColors.border),
-
-            // SizedBox(height: screenHeight * 0.015), // 1.5% of screen height
             // Assigned Date
             _buildDetailRow(
               context,
@@ -82,7 +88,7 @@ class PolicyCard extends StatelessWidget {
             Divider(height: screenHeight * 0.03, color: AppColors.border),
             // Status
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   'Status: ',
@@ -91,7 +97,7 @@ class PolicyCard extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                Expanded(
+                Flexible(
                   child: Text(
                     policy.status,
                     style: AppTextStyles.bodySmall(context).copyWith(

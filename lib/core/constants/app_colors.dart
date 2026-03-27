@@ -134,10 +134,14 @@ class AppColors {
 
   static const Color iconprofilecolor = Color(0xFF424242);
 
-  //Approval sheet color
-  static const Color approvalSheetAccept = Color(0xFF12B76A);
-  static const Color approvalSheetReject = Color(0xFFDC4303);
 
+
+  //Common
+
+  static const Color approvalSheetAccept = Color(0xFF12B76A); // approved
+  static const Color approvalSheetReject = Color(0xFFF04438); // rejected
+  static const Color approvalSheetWithdrawn = Color(0xFFF79009); // withdrawn
+  static const Color approvalSheetPending = Color(0xFF2196F3); // default/pending
 
   // Login Page Colors
   static const Color loginHeaderTeal = Color(0xFF0B7F7F); // Dark teal for login header

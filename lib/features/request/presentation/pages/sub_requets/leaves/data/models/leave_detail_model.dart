@@ -223,6 +223,7 @@ class LeaveDetailModel {
   final String dayType;
   final bool isClubing;
   final DateTime requestDate;
+  final DateTime? createdAt;
   final DateTime? statusUpdatedAt;
   final List<LeaveFileDocument> fileDocuments;
   final List<LeaveComment> comments;
@@ -251,6 +252,7 @@ class LeaveDetailModel {
     required this.dayType,
     required this.isClubing,
     required this.requestDate,
+    this.createdAt,
     this.statusUpdatedAt,
     required this.fileDocuments,
     required this.comments,
@@ -314,6 +316,9 @@ class LeaveDetailModel {
       dayType: data['day_type'] as String? ?? 'single',
       isClubing: data['is_clubing'] as bool? ?? false,
       requestDate: parseApiDate(data['request_date']),
+      createdAt: parseApiDateNullable(
+        data['created_at'] ?? data['updated_at'] ?? data['request_date'],
+      ),
       statusUpdatedAt: parseApiDateNullable(data['status_updated_at']),
       fileDocuments: docs,
       comments: commentsList,
@@ -344,6 +349,7 @@ class LeaveDetailModel {
     String? dayType,
     bool? isClubing,
     DateTime? requestDate,
+    DateTime? createdAt,
     DateTime? statusUpdatedAt,
     List<LeaveFileDocument>? fileDocuments,
     List<LeaveComment>? comments,
@@ -372,6 +378,7 @@ class LeaveDetailModel {
       dayType: dayType ?? this.dayType,
       isClubing: isClubing ?? this.isClubing,
       requestDate: requestDate ?? this.requestDate,
+      createdAt: createdAt ?? this.createdAt,
       statusUpdatedAt: statusUpdatedAt ?? this.statusUpdatedAt,
       fileDocuments: fileDocuments ?? this.fileDocuments,
       comments: comments ?? this.comments,

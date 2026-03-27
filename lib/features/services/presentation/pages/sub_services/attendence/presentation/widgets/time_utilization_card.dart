@@ -322,11 +322,12 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
               children: [
                 // Title
                 Text(
-                  "Today's Time Utilization",
+                  "Today's \nTime Utilization",
                   style: AppTextStyles.bodyMedium(context).copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
                 SizedBox(height: screenHeight * 0.010),
                 // Date with Holiday badge inline
@@ -334,9 +335,10 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
                   children: [
                     Text(
                       formattedDate,
-                      style: AppTextStyles.heading5(
-                        context,
-                      ).copyWith(color: AppColors.textSecondary,fontWeight: FontWeight.w400),
+                      style: AppTextStyles.heading5(context).copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w400,
+                      ),
                     ),
                     // Show Holiday status badge inline
                     if (_isHoliday) ...[
@@ -366,8 +368,8 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
                     ],
                   ],
                 ),
-                // SizedBox(height: screenHeight * 0.02),
 
+                // SizedBox(height: screenHeight * 0.02),
               ],
             ),
             // Timer and Punch In button row
@@ -377,39 +379,72 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
                 // Timer boxes (HH MM SS)
                 widget.isLoading
                     ? Row(
-                  children: [
-                    _buildTimeBox(context, '00'),
-                    SizedBox(width: screenWidth * 0.02),
-                    _buildTimeBox(context, '00'),
-                    SizedBox(width: screenWidth * 0.02),
-                    _buildTimeBox(context, '00'),
-                  ],
-                )
+                      children: [
+                        _buildTimeBox(context, '00'),
+                        SizedBox(width: screenWidth * 0.02),
+                        _buildTimeBox(context, '00'),
+                        SizedBox(width: screenWidth * 0.02),
+                        _buildTimeBox(context, '00'),
+                      ],
+                    )
                     : Row(
-                  children: [
-                    _buildTimeBox(context, hours),
-                    SizedBox(width: screenWidth * 0.01),
-                    _buildTimeBox(context, minutes),
-                    SizedBox(width: screenWidth * 0.01),
-                    _buildTimeBox(context, seconds),
-                  ],
-                ),
-                SizedBox(height: screenHeight * 0.017),
+                      children: [
+                        Column(
+                          children: [
+                            _buildTimeBox(context, hours),
+                            Text(
+                              "HH",
+                              style: AppTextStyles.bodySmall(context).copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(width: screenWidth * 0.01),
+                        Column(
+                          children: [
+                            _buildTimeBox(context, minutes),
+                            Text(
+                              "MM",
+                              style: AppTextStyles.bodySmall(context).copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(width: screenWidth * 0.01),
+                        Column(
+                          children: [
+                            _buildTimeBox(context, seconds),
+                            Text(
+                              "SS",
+                              style: AppTextStyles.bodySmall(context).copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                SizedBox(height: screenHeight * 0.008),
                 // Punch In/Out button
                 ElevatedButton(
                   onPressed:
-                  _isButtonDisabled
-                      ? null
-                      : _isPunchedIn
-                      ? _handlePunchOut
-                      : _handlePunchIn,
+                      _isButtonDisabled
+                          ? null
+                          : _isPunchedIn
+                          ? _handlePunchOut
+                          : _handlePunchIn,
                   style: ElevatedButton.styleFrom(
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     visualDensity: VisualDensity.compact,
                     backgroundColor:
-                    _isButtonDisabled
-                        ? AppColors.textSecondary.withOpacity(0.3)
-                        : AppColors.attendanceTeal,
+                        _isButtonDisabled
+                            ? AppColors.textSecondary.withOpacity(0.3)
+                            : AppColors.attendanceTeal,
                     foregroundColor: AppColors.textWhite,
                     padding: EdgeInsets.symmetric(
                       horizontal: screenWidth * 0.04,
@@ -426,25 +461,26 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
                     ),
                   ),
                   child:
-                  (_isPunchingIn || _isPunchingOut)
-                      ? SizedBox(
-                    width: screenWidth * 0.04,
-                    height: screenWidth * 0.04,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.textWhite,
-                      ),
-                    ),
-                  )
-                      : Text(
-                    _isPunchedIn
-                        ? AppStrings.punchOut
-                        : AppStrings.punchIn,
-                    style: AppTextStyles.heading5(
-                      context,
-                    ).copyWith(color: AppColors.textWhite,fontWeight: FontWeight.w400),
-                  ),
+                      (_isPunchingIn || _isPunchingOut)
+                          ? SizedBox(
+                            width: screenWidth * 0.04,
+                            height: screenWidth * 0.04,
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.textWhite,
+                              ),
+                            ),
+                          )
+                          : Text(
+                            _isPunchedIn
+                                ? AppStrings.punchOut
+                                : AppStrings.punchIn,
+                            style: AppTextStyles.heading5(context).copyWith(
+                              color: AppColors.textWhite,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
                 ),
               ],
             ),
@@ -462,7 +498,8 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
       width: screenWidth * 0.08,
       height: screenHeight * 0.04,
       decoration: BoxDecoration(
-        color: AppColors.background, border: Border.all(color: AppColors.border, width: 1),
+        color: AppColors.background,
+        border: Border.all(color: AppColors.border, width: 1),
       ),
       child: Center(
         child: Text(

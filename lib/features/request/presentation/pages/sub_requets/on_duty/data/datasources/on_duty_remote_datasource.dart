@@ -70,6 +70,7 @@ class OnDutyRemoteDataSourceImpl implements OnDutyRemoteDataSource {
       );
 
       final data = response.data as Map<String, dynamic>?;
+
       if (data == null) {
         throw const ServerException('Invalid server response');
       }

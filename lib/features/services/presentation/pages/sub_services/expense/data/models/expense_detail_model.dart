@@ -126,8 +126,83 @@ class ExpenseApprovalDetail extends Equatable {
   ];
 }
 
+class ExpenseComment extends Equatable {
+  final String id;
+  final String comment;
+  final DateTime? createdAt;
+  final ExpenseRequester createdBy;
+
+  const ExpenseComment({
+    required this.id,
+    required this.comment,
+    required this.createdAt,
+    required this.createdBy,
+  });
+
+  factory ExpenseComment.fromJson(Map<String, dynamic> json) {
+    return ExpenseComment(
+      id: json['id']?.toString() ?? '',
+      comment: json['comment']?.toString() ?? '',
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
+      createdBy: ExpenseRequester.fromJson(
+        json['commentCreatedBy'] as Map<String, dynamic>? ?? const {},
+      ),
+    );
+  }
+
+  Map<String, dynamic> toPayloadJson() {
+    return {
+      'id': id,
+      'comment': comment,
+      'created_at': createdAt?.toUtc().toIso8601String(),
+      'commentCreatedBy': {
+        'id': createdBy.id,
+        'first_name': createdBy.firstName,
+        'last_name': createdBy.lastName,
+        'image_url': createdBy.imageUrl,
+        'profile_color': createdBy.profileColor,
+      },
+    };
+  }
+
+  @override
+  List<Object?> get props => [id, comment, createdAt, createdBy];
+}
+
+class ExpenseActivity extends Equatable {
+  final String action;
+  final String actionType;
+  final String firstName;
+  final String lastName;
+  final DateTime? createdAt;
+
+  const ExpenseActivity({
+    required this.action,
+    required this.actionType,
+    required this.firstName,
+    required this.lastName,
+    required this.createdAt,
+  });
+
+  factory ExpenseActivity.fromJson(Map<String, dynamic> json) {
+    return ExpenseActivity(
+      action: json['action']?.toString() ?? '',
+      actionType: json['action_type']?.toString() ?? '',
+      firstName: json['first_name']?.toString() ?? '',
+      lastName: json['last_name']?.toString() ?? '',
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
+    );
+  }
+
+  @override
+  List<Object?> get props => [action, actionType, firstName, lastName, createdAt];
+}
+
 class ExpenseDetailModel extends Equatable {
   final int id;
+  final int expensePolicyId;
+  final int? tripId;
+  final String? tripType;
   final String expenseName;
   final String expenseType;
   final String? invoiceNumber;
@@ -141,7 +216,8 @@ class ExpenseDetailModel extends Equatable {
   final String approvalStatus;
   final DateTime? paidDate;
   final DateTime? actionTakenAt;
-  final String? comments;
+  final List<ExpenseComment> comments;
+  final List<ExpenseActivity> activity;
   final ExpensePolicyInfo policy;
   final ExpenseRequester requestUser;
   final List<ExpenseDocument> documents;
@@ -149,6 +225,9 @@ class ExpenseDetailModel extends Equatable {
 
   const ExpenseDetailModel({
     required this.id,
+    required this.expensePolicyId,
+    required this.tripId,
+    required this.tripType,
     required this.expenseName,
     required this.expenseType,
     required this.invoiceNumber,
@@ -163,6 +242,7 @@ class ExpenseDetailModel extends Equatable {
     required this.paidDate,
     required this.actionTakenAt,
     required this.comments,
+    required this.activity,
     required this.policy,
     required this.requestUser,
     required this.documents,
@@ -181,9 +261,22 @@ class ExpenseDetailModel extends Equatable {
             .whereType<Map<String, dynamic>>()
             .map(ExpenseApprovalDetail.fromJson)
             .toList();
+    final comments =
+        (data['comments'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(ExpenseComment.fromJson)
+            .toList();
+    final activity =
+        (data['activity'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(ExpenseActivity.fromJson)
+            .toList();
 
     return ExpenseDetailModel(
       id: (data['id'] as num?)?.toInt() ?? 0,
+      expensePolicyId: (data['expense_policy_id'] as num?)?.toInt() ?? 0,
+      tripId: (data['trip_id'] as num?)?.toInt(),
+      tripType: data['trip_type']?.toString(),
       expenseName: data['expense_name']?.toString() ?? '',
       expenseType: data['expense_type']?.toString() ?? '',
       invoiceNumber: data['invoice_number']?.toString(),
@@ -197,7 +290,8 @@ class ExpenseDetailModel extends Equatable {
       approvalStatus: data['approval_status']?.toString() ?? 'Pending',
       paidDate: DateTime.tryParse(data['paid_date']?.toString() ?? ''),
       actionTakenAt: DateTime.tryParse(data['action_taken_at']?.toString() ?? ''),
-      comments: data['comments']?.toString(),
+      comments: comments,
+      activity: activity,
       policy: ExpensePolicyInfo.fromJson(
         data['ExpensePolicy'] as Map<String, dynamic>? ?? const {},
       ),
@@ -209,9 +303,64 @@ class ExpenseDetailModel extends Equatable {
     );
   }
 
+  ExpenseDetailModel copyWith({
+    int? id,
+    int? expensePolicyId,
+    int? tripId,
+    String? tripType,
+    String? expenseName,
+    String? expenseType,
+    String? invoiceNumber,
+    double? amount,
+    double? approvedAmount,
+    DateTime? fromDate,
+    DateTime? toDate,
+    int? totalDays,
+    String? description,
+    String? settlementMode,
+    String? approvalStatus,
+    DateTime? paidDate,
+    DateTime? actionTakenAt,
+    List<ExpenseComment>? comments,
+    List<ExpenseActivity>? activity,
+    ExpensePolicyInfo? policy,
+    ExpenseRequester? requestUser,
+    List<ExpenseDocument>? documents,
+    List<ExpenseApprovalDetail>? approvals,
+  }) {
+    return ExpenseDetailModel(
+      id: id ?? this.id,
+      expensePolicyId: expensePolicyId ?? this.expensePolicyId,
+      tripId: tripId ?? this.tripId,
+      tripType: tripType ?? this.tripType,
+      expenseName: expenseName ?? this.expenseName,
+      expenseType: expenseType ?? this.expenseType,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
+      amount: amount ?? this.amount,
+      approvedAmount: approvedAmount ?? this.approvedAmount,
+      fromDate: fromDate ?? this.fromDate,
+      toDate: toDate ?? this.toDate,
+      totalDays: totalDays ?? this.totalDays,
+      description: description ?? this.description,
+      settlementMode: settlementMode ?? this.settlementMode,
+      approvalStatus: approvalStatus ?? this.approvalStatus,
+      paidDate: paidDate ?? this.paidDate,
+      actionTakenAt: actionTakenAt ?? this.actionTakenAt,
+      comments: comments ?? this.comments,
+      activity: activity ?? this.activity,
+      policy: policy ?? this.policy,
+      requestUser: requestUser ?? this.requestUser,
+      documents: documents ?? this.documents,
+      approvals: approvals ?? this.approvals,
+    );
+  }
+
   @override
   List<Object?> get props => [
     id,
+    expensePolicyId,
+    tripId,
+    tripType,
     expenseName,
     expenseType,
     invoiceNumber,
@@ -226,6 +375,7 @@ class ExpenseDetailModel extends Equatable {
     paidDate,
     actionTakenAt,
     comments,
+    activity,
     policy,
     requestUser,
     documents,

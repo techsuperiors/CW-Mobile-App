@@ -2,7 +2,9 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
+import '../../../../../../../../core/constants/app_assets.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
@@ -232,13 +234,11 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
               currentRequest,
               statusColor,
               detail,
+              comments
             )
-          else
-            const Center(child: CircularProgressIndicator()),///Add Shimmer
 
           // shown while loading
-          SizedBox(height: screenHeight * 0.02),
-          _buildCommentsSection(context, screenWidth, screenHeight, comments),
+
         ],
       ),
     );
@@ -251,6 +251,7 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
     OnDutyRequestModel currentRequest,
     Color statusColor,
     OnDutyDetail? onDutyDetail,
+      List<AttendanceRequestComment> comments
   ) {
     final dateFormat = DateFormat('dd MMM yyyy');
     final dateTimeFormat = DateFormat('dd MMM yyyy, hh:mm a');
@@ -259,6 +260,11 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
         currentRequest.toDate == null;
     final requestId = int.tryParse(widget.onDutyRequest.id) ?? 0;
     final isPending = currentRequest.status == OnDutyStatus.pending;
+    final menuActions = <Map<String, String>>[
+      if (isPending && !widget.isApprovalMode)
+        {'value': 'Withdraw', 'icon': AppAssets.withdrawIcon},
+      {'value': 'Activity', 'icon': AppAssets.activityIcon},
+    ];
 
     return Container(
       decoration: BoxDecoration(
@@ -288,47 +294,101 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
                   context,
                 ).copyWith(fontWeight: FontWeight.w700, color: statusColor),
               ),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
-                onSelected: (value) {
-                  if (value == 'Withdraw') {
-                    context.read<OnDutyDetailBloc>().add(
-                      UpdateOnDutyRequestStatus(
-                        requestId: requestId,
-                        clientId: _clientId,
-                        status: 'Withdrawn',
-                      ),
-                    );
-                  } else if (value == 'Activity') {
-                    final activity =
-                        onDutyDetail?.activity; // ← nullable access
-
-                    if (activity == null || activity.isEmpty) {
-                      // ← null check PEHLE
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('No activity found for this request.'),
-                          backgroundColor: Colors.grey,
+              if (menuActions.length >= 2)
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
+                  onSelected: (value) {
+                    if (value == 'Withdraw') {
+                      context.read<OnDutyDetailBloc>().add(
+                        UpdateOnDutyRequestStatus(
+                          requestId: requestId,
+                          clientId: _clientId,
+                          status: 'Withdrawn',
                         ),
                       );
-                      return;
-                    }
+                    } else if (value == 'Activity') {
+                      final activity = onDutyDetail?.activity;
 
-                    _showActivityBottomSheet(context, activity);
-                  }
-                },
-                itemBuilder: (context) => [
-                  if (isPending && !widget.isApprovalMode)
-                    const PopupMenuItem(
-                      value: 'Withdraw',
-                      child: Text('Withdraw'),
+                      if (activity == null || activity.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'No activity found for this request.',
+                            ),
+                            backgroundColor: Colors.grey,
+                          ),
+                        );
+                        return;
+                      }
+
+                      _showActivityBottomSheet(context, activity);
+                    }
+                  },
+                  itemBuilder: (context) {
+                    return menuActions.map((action) {
+                      return PopupMenuItem(
+                        value: action['value'],
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: screenWidth * 0.05,
+                              height: screenHeight * 0.05,
+                              child: SvgPicture.asset(action['icon']!),
+                            ),
+                            SizedBox(width: screenWidth * 0.02),
+                            Text(
+                              action['value']!,
+                              style: AppTextStyles.heading5(context).copyWith(
+                                fontWeight: FontWeight.w400,
+                                color: AppColors.textHeading,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList();
+                  },
+                )
+              else if (menuActions.length == 1)
+                InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () {
+                    final action = menuActions.first['value'];
+                    if (action == 'Withdraw') {
+                      context.read<OnDutyDetailBloc>().add(
+                        UpdateOnDutyRequestStatus(
+                          requestId: requestId,
+                          clientId: _clientId,
+                          status: 'Withdrawn',
+                        ),
+                      );
+                    } else if (action == 'Activity') {
+                      final activity = onDutyDetail?.activity;
+
+                      if (activity == null || activity.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'No activity found for this request.',
+                            ),
+                            backgroundColor: Colors.grey,
+                          ),
+                        );
+                        return;
+                      }
+
+                      _showActivityBottomSheet(context, activity);
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: SizedBox(
+                      width: screenWidth * 0.06,
+                      height: screenHeight * 0.03,
+                      child: SvgPicture.asset(menuActions.first['icon']!),
                     ),
-                  const PopupMenuItem(
-                    value: 'Activity',
-                    child: Text('Activity'),
                   ),
-                ],
-              ),
+                ),
             ],
           ),
 
@@ -453,6 +513,8 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
             currentRequest,
             requestId,
           ),
+          SizedBox(height: screenHeight * 0.02),
+          _buildCommentsSection(context, screenWidth, screenHeight, comments),
         ],
       ),
     );
@@ -834,8 +896,10 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      isDismissible: true,
       builder:
           (context) => DraggableScrollableSheet(
+            expand: false,
             initialChildSize: 0.5,
             minChildSize: 0.3,
             maxChildSize: 0.9,
@@ -980,13 +1044,14 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
   Color _getStatusColor(OnDutyStatus status) {
     switch (status) {
       case OnDutyStatus.pending:
-        return const Color(0xFF2196F3);
+        return AppColors
+            .approvalSheetPending; // 0xFF2196F3
       case OnDutyStatus.approved:
-        return const Color(0xFF4CAF50);
+        return AppColors.approvalSheetAccept; // 0xFF12B76A
       case OnDutyStatus.rejected:
-        return const Color(0xFFE53935);
+        return AppColors.approvalSheetReject; // 0xFFF04438
       case OnDutyStatus.withdrawn:
-        return const Color(0xFF667085);
+        return AppColors.approvalSheetWithdrawn; // 0xFFF79009
     }
   }
 }
@@ -1004,15 +1069,20 @@ class _OnDutyApproverAvatarStack extends StatelessWidget {
   Widget build(BuildContext context) {
     final visibleUsers = users.take(3).toList();
     final overlap = avatarSize * 0.35;
+    final edgePadding = avatarSize * 0.08;
+
     final width =
         visibleUsers.length == 1
-            ? avatarSize
-            : avatarSize + ((visibleUsers.length - 1) * (avatarSize - overlap));
+            ? avatarSize+ (edgePadding * 2)
+            : avatarSize + ((visibleUsers.length - 1) * (avatarSize - overlap))+
+            (edgePadding * 2);
 
     return SizedBox(
       width: width,
-      height: avatarSize,
+      height: avatarSize + (edgePadding * 2),
       child: Stack(
+        clipBehavior: Clip.none,
+
         children: [
           for (var i = 0; i < visibleUsers.length; i++)
             Positioned(

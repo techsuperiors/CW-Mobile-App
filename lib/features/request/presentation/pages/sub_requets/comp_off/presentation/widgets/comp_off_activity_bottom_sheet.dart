@@ -82,21 +82,36 @@ class CompOffActivityBottomSheet extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: AppColors.border),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
-                            Text(
-                              _formatAction(item),
-                              style: AppTextStyles.bodyMedium(context).copyWith(
-                                color: AppColors.textPrimary,
-                                height: 1.45,
+                            Container(
+                              width: screenWidth*0.02,
+                              height: screenHeight*0.02,
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
                               ),
                             ),
-                            SizedBox(height: screenHeight * 0.008),
-                            Text(
-                              _formatDate(item.createdAt),
-                              style: AppTextStyles.bodySmall(context).copyWith(
-                                color: AppColors.textSecondary,
+                            SizedBox(width: screenWidth * 0.025),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+
+                                  Text(
+                                    _formatAction(item),
+                                    style: AppTextStyles.bodyMediumHeading(
+                                      context,
+                                    ).copyWith(color: AppColors.textPrimary),
+                                  ),
+                                  SizedBox(height: screenHeight * 0.008),
+                                  Text(
+                                    _formatDate(item.createdAt),
+                                    style: AppTextStyles.bodySmall(context).copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],

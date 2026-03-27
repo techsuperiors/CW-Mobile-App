@@ -115,7 +115,7 @@ class AppStrings {
   // Request
   static const String requestDescription =
       'A unified system designed to efficiently manage all my service requests and organizational tasks.';
-  static const String applyLeave = 'Apply Leave';
+  static const String applyLeave = 'Leave';
   static const String leaveRequest = 'Leave Request';
   static const String wfh = 'WFH';
   static const String regularize = 'Regularize';
@@ -184,6 +184,8 @@ class AppStrings {
   static const String workingDays = 'Working Day(s)';
   static const String wfhDays = 'WFH Day(s)';
   static const String leaveDays = 'Leave Day(s)';
+  static const String regularizeDays = 'Regularize Day(s)';
+  static const String ondutyDays = 'OnDuty Day(s)';
   static const String breakTime = 'Break';
   static const String eightDays = '08 Days';
   static const String shiftTimeRange = '9:00 AM - 6:00 PM';
@@ -249,5 +251,7 @@ class AppStrings {
   //Comp-off
   static const String dayworked = 'Day Worked';
   static const String lockdurationin = 'Lock duration in';
+
+  //Expense Module
 
 }

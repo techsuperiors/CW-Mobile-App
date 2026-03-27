@@ -146,7 +146,10 @@ class _PoliciesPageState extends State<PoliciesPage> {
                     screenHeight < 600 ? 12.0 : (screenHeight < 700 ? 14.0 : 16.0);
                 return Padding(
                   padding: EdgeInsets.only(bottom: spacing),
-                  child: PolicyCard(policy: policies[index]),
+                  child: PolicyCard(
+                    policy: policies[index],
+                    onPolicyUpdated: _reloadPolicies,
+                  ),
                 );
               },
             ),

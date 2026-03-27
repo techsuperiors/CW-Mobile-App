@@ -21,6 +21,8 @@ class LeaveRequestLoading extends LeaveRequestState {
 
 /// Loaded state
 class LeaveRequestLoaded extends LeaveRequestState {
+  static const Object _unset = Object();
+
   final List<LeaveEntity> leaveRequests;
   final List<LeaveEntity> filteredLeaveRequests;
   final String? searchQuery;
@@ -47,17 +49,22 @@ class LeaveRequestLoaded extends LeaveRequestState {
   LeaveRequestLoaded copyWith({
     List<LeaveEntity>? leaveRequests,
     List<LeaveEntity>? filteredLeaveRequests,
-    String? searchQuery,
-    LeaveStatus? statusFilter,
-    String? typeFilter,
+    Object? searchQuery = _unset,
+    Object? statusFilter = _unset,
+    Object? typeFilter = _unset,
   }) {
     return LeaveRequestLoaded(
       leaveRequests: leaveRequests ?? this.leaveRequests,
       filteredLeaveRequests:
           filteredLeaveRequests ?? this.filteredLeaveRequests,
-      searchQuery: searchQuery ?? this.searchQuery,
-      statusFilter: statusFilter ?? this.statusFilter,
-      typeFilter: typeFilter ?? this.typeFilter,
+      searchQuery:
+          identical(searchQuery, _unset) ? this.searchQuery : searchQuery as String?,
+      statusFilter:
+          identical(statusFilter, _unset)
+              ? this.statusFilter
+              : statusFilter as LeaveStatus?,
+      typeFilter:
+          identical(typeFilter, _unset) ? this.typeFilter : typeFilter as String?,
     );
   }
 }

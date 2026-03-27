@@ -15,7 +15,7 @@
     },
     {
       "name": "archive",
-      "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/archive-4.0.9",
+      "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/archive-3.6.1",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
@@ -240,6 +240,12 @@
       "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/dio_web_adapter-2.1.1",
       "packageUri": "lib/",
       "languageVersion": "3.3"
+    },
+    {
+      "name": "easy_logger",
+      "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/easy_logger-0.0.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
     },
     {
       "name": "equatable",
@@ -513,9 +519,9 @@
     },
     {
       "name": "image",
-      "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/image-4.8.0",
+      "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/image-4.3.0",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "2.15"
     },
     {
       "name": "image_picker",
@@ -686,6 +692,12 @@
       "languageVersion": "3.0"
     },
     {
+      "name": "open_filex",
+      "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/open_filex-4.7.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
       "name": "package_config",
       "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/package_config-2.2.0",
       "packageUri": "lib/",
@@ -812,12 +824,6 @@
       "languageVersion": "3.4"
     },
     {
-      "name": "posix",
-      "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/posix-6.5.0",
-      "packageUri": "lib/",
-      "languageVersion": "3.0"
-    },
-    {
       "name": "printing",
       "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/printing-5.14.3",
       "packageUri": "lib/",
@@ -848,6 +854,12 @@
       "languageVersion": "3.6"
     },
     {
+      "name": "puppeteer",
+      "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/puppeteer-3.16.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
+    },
+    {
       "name": "qr",
       "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/qr-3.0.2",
       "packageUri": "lib/",
@@ -870,6 +882,18 @@
       "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/rxdart-0.28.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
+    },
+    {
+      "name": "share_plus",
+      "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/share_plus-10.1.4",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "share_plus_platform_interface",
+      "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/share_plus_platform_interface-5.0.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.18"
     },
     {
       "name": "shared_preferences",
@@ -1206,6 +1230,12 @@
       "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/web_socket_channel-3.0.3",
       "packageUri": "lib/",
       "languageVersion": "3.3"
+    },
+    {
+      "name": "webcontent_converter",
+      "rootUri": "file:///Users/tanishqkumar/.pub-cache/hosted/pub.dev/webcontent_converter-0.0.9+3",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
     },
     {
       "name": "webview_flutter",

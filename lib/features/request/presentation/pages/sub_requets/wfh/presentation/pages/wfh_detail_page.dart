@@ -240,116 +240,68 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
                 ),
               ),
               Builder(
-                builder:
-                    (menuContext) => PopupMenuButton<String>(
-                      icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
-                      onSelected: (value) {
-                        if (value == 'Edit') {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => ApplyWfhPage(
-                                    wfhRequest: widget.wfhRequest,
-                                  ),
-                            ),
-                          ).then((result) {
+                builder: (menuContext) {
+                  final isPending =
+                      widget.wfhRequest.status == WfhStatus.pending;
+                  final menuActions = <Map<String, String>>[
+                    if (isPending && !widget.isApprovalMode)
+                      {'value': 'Edit', 'icon': AppAssets.editIconwfh},
+                    if (isPending && !widget.isApprovalMode)
+                      {'value': 'Withdraw', 'icon': AppAssets.withdrawIcon},
+                    {'value': 'Activity', 'icon': AppAssets.activityIcon},
+                  ];
+
+                  void handleAction(String value) {
+                    if (value == 'Edit') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => ApplyWfhPage(
+                                wfhRequest: widget.wfhRequest,
+                              ),
+                        ),
+                      ).then((result) {
                         if (result == true && context.mounted) {
-                          Navigator.of(
-                            context,
-                          ).pop(true); // Cascade refresh
+                          Navigator.of(context).pop(true);
                         }
                       });
-                        } else if (value == 'Withdraw') {
-                          // Dispatch withdraw event using the inner context with BlocProvider
-                          final requestIdString =
-                              widget.wfhRequest.attendanceRequestId ??
-                              widget.wfhRequest.id;
-                          final requestId = int.tryParse(requestIdString) ?? 0;
-                          if (requestId > 0) {
-                            menuContext.read<WfhActionBloc>().add(
-                              UpdateWfhStatus(
-                                requestId: requestId,
-                                status: 'Withdrawn',
-                              ),
-                            );
-                          }
-                        } else if (value == 'Activity') {
-                          _showActivityBottomSheet(context);
-                        }
-                      },
+                    } else if (value == 'Withdraw') {
+                      final requestIdString =
+                          widget.wfhRequest.attendanceRequestId ??
+                          widget.wfhRequest.id;
+                      final requestId = int.tryParse(requestIdString) ?? 0;
+                      if (requestId > 0) {
+                        menuContext.read<WfhActionBloc>().add(
+                          UpdateWfhStatus(
+                            requestId: requestId,
+                            status: 'Withdrawn',
+                          ),
+                        );
+                      }
+                    } else if (value == 'Activity') {
+                      _showActivityBottomSheet(context);
+                    }
+                  }
+
+                  if (menuActions.length >= 2) {
+                    return PopupMenuButton<String>(
+                      icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
+                      onSelected: handleAction,
                       itemBuilder: (context) {
-                        final isPending =
-                            widget.wfhRequest.status == WfhStatus.pending;
-                        return [
-                          if (isPending && !widget.isApprovalMode)
-                            PopupMenuItem(
-                              value: 'Edit',
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  SizedBox(
-                                    width: screenWidth * 0.05,
-
-                                    height: screenHeight * 0.05,
-                                    child: SvgPicture.asset(
-                                      AppAssets.editIconwfh,
-                                    ),
-                                  ),
-                                  SizedBox(width: screenWidth * 0.02),
-                                  Text(
-                                    'Edit',
-                                    style: AppTextStyles.heading5(
-                                      context,
-                                    ).copyWith(
-                                      fontWeight: FontWeight.w400,
-                                      color: AppColors.textHeading,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          if (isPending && !widget.isApprovalMode)
-                            PopupMenuItem(
-                              value: 'Withdraw',
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: screenWidth * 0.05,
-
-                                    height: screenHeight * 0.05,
-                                    child: SvgPicture.asset(
-                                      AppAssets.withdrawIcon,
-                                    ),
-                                  ),
-                                  SizedBox(width: screenWidth * 0.02),
-                                  Text(
-                                    'Withdraw',
-                                    style: AppTextStyles.heading5(
-                                      context,
-                                    ).copyWith(
-                                      fontWeight: FontWeight.w400,
-                                      color: AppColors.textHeading,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          PopupMenuItem(
-                            value: 'Activity',
+                        return menuActions.map((action) {
+                          return PopupMenuItem(
+                            value: action['value'],
                             child: Row(
                               children: [
                                 SizedBox(
                                   width: screenWidth * 0.05,
-
                                   height: screenHeight * 0.05,
-                                  child: SvgPicture.asset(
-                                    AppAssets.activityIcon,
-                                  ),
+                                  child: SvgPicture.asset(action['icon']!),
                                 ),
                                 SizedBox(width: screenWidth * 0.02),
                                 Text(
-                                  'Activity',
+                                  action['value']!,
                                   style: AppTextStyles.heading5(
                                     context,
                                   ).copyWith(
@@ -359,10 +311,29 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
                                 ),
                               ],
                             ),
-                          ),
-                        ];
+                          );
+                        }).toList();
                       },
-                    ),
+                    );
+                  }
+
+                  if (menuActions.length == 1) {
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => handleAction(menuActions.first['value']!),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: SizedBox(
+                          width: screenWidth * 0.06,
+                          height: screenHeight * 0.03,
+                          child: SvgPicture.asset(menuActions.first['icon']!),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return const SizedBox.shrink();
+                },
               ),
             ],
           ),
@@ -371,7 +342,10 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
           _buildDetailRow(
             context,
             'Request Type:',
-            widget.wfhRequest.toDate == null ? 'Single Day' : 'Multiple Days',
+            (widget.wfhRequest.requestType ?? '').toLowerCase() == 'single'
+                ? 'Single Day'
+                : 'Multiple Days',
+
             screenWidth,
             screenHeight,
           ),
@@ -379,8 +353,9 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
           _buildDetailRow(
             context,
             'WFH Type:',
-            widget.wfhRequest.requestType ??
-                (widget.wfhRequest.toDate == null ? 'single' : 'multiple'),
+            ((widget.wfhRequest.requestType ?? '').toLowerCase() == 'single'
+                ? 'single'
+                : 'multiple'),
             screenWidth,
             screenHeight,
           ),
@@ -501,9 +476,7 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
                   approvers.length == 1
                       ? approvers.first.fullName
                       : '${approvers.length} approvers',
-                  style: AppTextStyles.bodySmall(
-                    context,
-                  ).copyWith(
+                  style: AppTextStyles.bodySmall(context).copyWith(
                     fontWeight: FontWeight.w500,
                     color: AppColors.primary,
                   ),
@@ -516,8 +489,6 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
       ],
     );
   }
-
-
 
   Widget _buildDetailRow(
     BuildContext context,
@@ -779,8 +750,7 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
     double screenWidth,
     double screenHeight,
     AttendanceRequestComment comment,
-  )
-  {
+  ) {
     final userName =
         comment.user?.fullName.isNotEmpty == true
             ? comment.user!.fullName
@@ -868,11 +838,13 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      isDismissible: true,
       builder:
           (context) => DraggableScrollableSheet(
             initialChildSize: 0.5, // Start at half screen
             minChildSize: 0.3, // Minimum 30% of screen
             maxChildSize: 0.9, // Maximum 90% of screen (can be dragged up)
+            expand: false,
             builder:
                 (context, scrollController) => Container(
                   decoration: const BoxDecoration(
@@ -1199,13 +1171,13 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
   Color _getStatusColor(WfhStatus status) {
     switch (status) {
       case WfhStatus.pending:
-        return const Color(0xFF2196F3); // Blue
+        return AppColors.approvalSheetPending; //
       case WfhStatus.approved:
-        return const Color(0xFF4CAF50); // Green
+        return AppColors.approvalSheetAccept; // 0xFF12B76A
       case WfhStatus.rejected:
-        return const Color(0xFFE53935); // Red
+        return AppColors.approvalSheetReject; // 0xFFF04438
       case WfhStatus.withdrawn:
-        return const Color(0xFF9E9E9E); // Grey
+        return AppColors.approvalSheetWithdrawn; // 0xFFF79009
     }
   }
 }
@@ -1318,13 +1290,11 @@ class _WfhApproverAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Color bgColor = AppColors.primary;
-    if (approver.profileColor != null && approver.profileColor!.startsWith('#')) {
+    if (approver.profileColor != null &&
+        approver.profileColor!.startsWith('#')) {
       try {
         bgColor = Color(
-          int.parse(
-            approver.profileColor!.replaceFirst('#', 'FF'),
-            radix: 16,
-          ),
+          int.parse(approver.profileColor!.replaceFirst('#', 'FF'), radix: 16),
         );
       } catch (_) {}
     }
@@ -1339,15 +1309,15 @@ class _WfhApproverAvatar extends StatelessWidget {
       child:
           approver.imageUrl == null || approver.imageUrl!.isEmpty
               ? Text(
-                  approver.firstName.isNotEmpty
-                      ? approver.firstName[0].toUpperCase()
-                      : '?',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: size * 0.45,
-                    fontWeight: FontWeight.w600,
-                  ),
-                )
+                approver.firstName.isNotEmpty
+                    ? approver.firstName[0].toUpperCase()
+                    : '?',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: size * 0.45,
+                  fontWeight: FontWeight.w600,
+                ),
+              )
               : null,
     );
   }
@@ -1366,16 +1336,20 @@ class _WfhApproverAvatarStack extends StatelessWidget {
   Widget build(BuildContext context) {
     final visibleApprovers = approvers.take(3).toList();
     final overlap = avatarSize * 0.35;
+    final edgePadding = avatarSize * 0.08;
+
     final width =
         visibleApprovers.length == 1
-            ? avatarSize
+            ? avatarSize+ (edgePadding * 2)
             : avatarSize +
-                ((visibleApprovers.length - 1) * (avatarSize - overlap));
+                ((visibleApprovers.length - 1) * (avatarSize - overlap))+
+            (edgePadding * 2);
 
     return SizedBox(
       width: width,
-      height: avatarSize,
+      height:avatarSize + (edgePadding * 2),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           for (var i = 0; i < visibleApprovers.length; i++)
             Positioned(

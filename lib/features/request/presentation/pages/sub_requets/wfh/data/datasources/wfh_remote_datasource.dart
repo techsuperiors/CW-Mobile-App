@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_urls.dart';
 import '../../../../../../../../core/error/exceptions.dart';
@@ -33,6 +34,8 @@ class WfhRemoteDataSourceImpl implements WfhRemoteDataSource {
       );
 
       final responseData = response.data;
+
+      debugPrint("WFH final payload: $responseData");
       if (responseData is! Map<String, dynamic>) {
         throw const ServerException('Invalid server response');
       }

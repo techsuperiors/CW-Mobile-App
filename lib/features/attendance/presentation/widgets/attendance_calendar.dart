@@ -173,7 +173,7 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
     // Today with no API data
     if (isToday && day == null) {
       return _DayStyle(
-        circleColor: const Color(0xFFFFCA28),
+        circleColor: const Color(0xFFE74C3C),
         textColor: Colors.white,
         showCircle: true,
         label: null,
@@ -188,7 +188,7 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
       return _DayStyle(
         circleColor:
             isToday
-                ? const Color(0xFFFFCA28)
+                ? const Color(0xFFE74C3C)
                 : AppColors.border.withOpacity(0.35),
         textColor: isToday ? Colors.white : AppColors.textSecondary,
         showCircle: true,
@@ -212,14 +212,11 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
         isLate: false,
       );
     }
-
-    final todayColor = isToday ? const Color(0xFFFFCA28) : null;
-
     // PRIORITY 2: Status (show even if isFuture=true — covers pre-planned WFH/Leave)
     switch (day.status) {
       case 'Present':
         return _DayStyle(
-          circleColor: todayColor ?? const Color(0xFF0B7F7F),
+          circleColor: const Color(0xFF0B7F7F),
           textColor: Colors.white,
           showCircle: true,
           label: day.isLateEntry ? 'Late' : null,
@@ -229,7 +226,7 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
         );
       case 'WFH':
         return _DayStyle(
-          circleColor: todayColor ?? const Color(0xFF27AE60),
+          circleColor: const Color(0xFF27AE60),
           textColor: Colors.white,
           showCircle: true,
           label: 'WFH',
@@ -239,7 +236,7 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
         );
       case 'Leave':
         return _DayStyle(
-          circleColor: todayColor ?? const Color(0xFFFF8C00),
+          circleColor: const Color(0xFFFF8C00),
           textColor: Colors.white,
           showCircle: true,
           label: day.leaveType ?? 'Leave',
@@ -249,7 +246,7 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
         );
       case 'Absent':
         return _DayStyle(
-          circleColor: todayColor ?? const Color(0xFFE74C3C),
+          circleColor: const Color(0xFFE74C3C),
           textColor: Colors.white,
           showCircle: true,
           label: null,
@@ -274,7 +271,7 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
     return _DayStyle(
       circleColor:
           isToday
-              ? const Color(0xFFFFCA28)
+              ? const Color(0xFFE74C3C)
               : AppColors.border.withOpacity(0.35),
       textColor: isToday ? Colors.white : AppColors.textSecondary,
       showCircle: true,
@@ -384,25 +381,7 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
             Positioned(
               top: cellH * 0.04,
               left: cellW * 0.08,
-              child: Container(
-                padding: const EdgeInsets.all(1),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
-                      blurRadius: 2,
-                    ),
-                  ],
-                ),
-                child: SvgPicture.asset(AppAssets.iconaLatePunchIn),
-                // Icon(
-                //   Icons.access_time_rounded,
-                //   size: circleD * 0.22,
-                //   color: AppColors.warning,
-                // ),
-              ),
+              child: SvgPicture.asset(AppAssets.iconaLatePunchIn),
             ),
         ],
       ),

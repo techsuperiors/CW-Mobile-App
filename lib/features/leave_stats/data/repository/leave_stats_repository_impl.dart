@@ -17,13 +17,19 @@ class LeaveStatsRepositoryImpl implements LeaveStatsRepository {
   });
 
   @override
-  Future<Either<Failure, LeaveStatsEntity>> getLeaveStats() async {
+  Future<Either<Failure, LeaveStatsEntity>> getLeaveStats({
+    String? startDate,
+    String? endDate,
+  }) async {
     if (!await networkInfo.isConnected) {
       return Left(NetworkFailure('No internet connection'));
     }
 
     try {
-      final stats = await remoteDataSource.getLeaveStats();
+      final stats = await remoteDataSource.getLeaveStats(
+        startDate: startDate,
+        endDate: endDate,
+      );
       return Right(stats);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));

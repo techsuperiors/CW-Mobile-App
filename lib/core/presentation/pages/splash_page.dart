@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+
 import '../../constants/app_assets.dart';
+import '../../constants/app_colors.dart';
 import '../../../features/authentication/presentation/bloc/auth_bloc/auth_bloc.dart';
 import '../../../features/authentication/presentation/bloc/auth_bloc/auth_event.dart';
 import '../../../features/authentication/presentation/bloc/auth_bloc/auth_state.dart';
 import '../../../features/authentication/presentation/pages/login_page.dart';
 import '../../../features/home/presentation/pages/home_page.dart';
 
-/// Splash screen that checks authentication and navigates accordingly
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -16,63 +16,196 @@ class SplashPage extends StatefulWidget {
   State<SplashPage> createState() => _SplashPageState();
 }
 
-class _SplashPageState extends State<SplashPage> {
+class _SplashPageState extends State<SplashPage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<Offset> _iconSlideAnimation;
+  late final Animation<double> _iconScaleAnimation;
+  late final Animation<double> _iconFadeAnimation;
+  late final Animation<Offset> _textSlideAnimation;
+  late final Animation<double> _textFadeAnimation;
+
+  AuthState? _resolvedAuthState;
+  bool _isAnimationComplete = false;
+  bool _hasNavigated = false;
+
   @override
   void initState() {
     super.initState();
-    // Check authentication status when splash screen loads
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+
+    _iconSlideAnimation =
+        Tween<Offset>(
+          begin: const Offset(0, 0.8),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.0, 0.45, curve: Curves.easeOutCubic),
+          ),
+        );
+
+    _iconScaleAnimation =
+        Tween<double>(begin: 0.78, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.08, 0.5, curve: Curves.easeOutBack),
+          ),
+        );
+
+    _iconFadeAnimation =
+        Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.0, 0.28, curve: Curves.easeOut),
+          ),
+        );
+
+    _textSlideAnimation =
+        Tween<Offset>(
+          begin: const Offset(-0.18, 0),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.48, 0.85, curve: Curves.easeOutCubic),
+          ),
+        );
+
+    _textFadeAnimation =
+        Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.48, 0.8, curve: Curves.easeOut),
+          ),
+        );
+
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _isAnimationComplete = true;
+        _tryNavigate();
+      }
+    });
+
+    _controller.forward();
     context.read<AuthBloc>().add(const AuthStatusChecked());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _tryNavigate() {
+    if (!mounted ||
+        _hasNavigated ||
+        !_isAnimationComplete ||
+        _resolvedAuthState == null) {
+      return;
+    }
+
+    _hasNavigated = true;
+
+    if (_resolvedAuthState is AuthAuthenticated) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomePage()),
+      );
+      return;
+    }
+
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginPage()));
   }
 
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;
-    final screenHeight = mediaQuery.size.height;
-    
+
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is AuthAuthenticated) {
-          // User is authenticated, navigate to home
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const HomePage()),
-          );
-        } else if (state is AuthUnauthenticated) {
-          // User is not authenticated, navigate to login
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const LoginPage()),
-          );
+        if (state is AuthAuthenticated || state is AuthUnauthenticated) {
+          _resolvedAuthState = state;
+          _tryNavigate();
+        } else if (state is AuthError) {
+          _resolvedAuthState = const AuthUnauthenticated();
+          _tryNavigate();
         }
       },
       child: Scaffold(
+        backgroundColor: AppColors.background,
         body: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFF7FBFB), Color(0xFFFFFFFF)],
+            ),
           ),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // App Logo with Name
-                Flexible(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.1),
-                    child: SvgPicture.asset(
-                      AppAssets.appNameLogo,
-                      width: screenWidth * 0.6,
-                      fit: BoxFit.contain,
+          child: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    FadeTransition(
+                      opacity: _iconFadeAnimation,
+                      child: SlideTransition(
+                        position: _iconSlideAnimation,
+                        child: ScaleTransition(
+                          scale: _iconScaleAnimation,
+                          child: Image.asset(
+                            AppAssets.splashIcon,
+                            width: screenWidth * 0.18,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    SizedBox(width: screenWidth * 0.04),
+                    FadeTransition(
+                      opacity: _textFadeAnimation,
+                      child: SlideTransition(
+                        position: _textSlideAnimation,
+                        child: RichText(
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Collective\n',
+                                style: TextStyle(
+                                  color: AppColors.textHeading,
+                                  fontSize: screenWidth * 0.082,
+                                  fontWeight: FontWeight.w800,
+                                  height: 0.96,
+                                  letterSpacing: -0.8,
+                                ),
+                              ),
+                              TextSpan(
+                                text: 'Work',
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: screenWidth * 0.082,
+                                  fontWeight: FontWeight.w800,
+                                  height: 0.96,
+                                  letterSpacing: -0.8,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(height: screenHeight * 0.04),
-                // Loading indicator
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Theme.of(context).colorScheme.onPrimary,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -80,4 +213,3 @@ class _SplashPageState extends State<SplashPage> {
     );
   }
 }
-

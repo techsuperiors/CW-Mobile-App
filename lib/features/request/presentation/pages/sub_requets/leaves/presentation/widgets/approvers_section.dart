@@ -37,9 +37,11 @@ class _ApproversSectionState extends State<ApproversSection> {
       case 'pending':
         return const Color(0xFF2196F3); // Blue
       case 'approved':
-        return const Color(0xFF4CAF50); // Green
+        return const Color(0xFF12B76A); // Green
       case 'rejected':
         return const Color(0xFFE53935); // Red
+      case 'withdrawn':
+        return const Color(0xFFF79009);
       default:
         return AppColors.warning;
     }
@@ -348,15 +350,15 @@ class _ApproversSectionState extends State<ApproversSection> {
               vertical: screenHeight * 0.006,
             ),
             decoration: BoxDecoration(
-              color: approver.statusColor.withOpacity(0.1),
+              color: approver.statusColor,
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: approver.statusColor, width: 1),
+              // border: Border.all(color: approver.statusColor, width: 1),
             ),
             child: Text(
               approver.status,
               style: AppTextStyles.bodySmall(context).copyWith(
                 fontWeight: FontWeight.w500,
-                color: approver.statusColor,
+                color:Colors.white,
               ),
             ),
           ),

@@ -1,3 +1,5 @@
+import 'package:flutter/cupertino.dart';
+
 import '../../../../core/network/api_client.dart';
 import '../../../../core/constants/app_urls.dart';
 import '../../../../core/error/exceptions.dart';
@@ -35,7 +37,6 @@ class AttendanceDetailsRemoteDataSourceImpl
         response.data as Map<String, dynamic>,
       );
 
-      print("Respone:- $apiResponse");
       if (!apiResponse.success) {
         throw ServerException(
           apiResponse.message ?? 'Failed to get attendance details',
