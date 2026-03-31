@@ -15,13 +15,18 @@ import 'package:collectivWork/features/request/presentation/pages/sub_requets/co
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/comp_off/data/datasources/comp_off_remote_datasource.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/comp_off/data/repositories/comp_off_repository_impl.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/comp_off/domain/usecases/get_comp_off_requests.dart';
+import 'package:collectivWork/features/request/presentation/pages/sub_requets/comp_off/domain/usecases/get_comp_off_request_stats.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/comp_off/domain/usecases/get_team_comp_off_requests.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/comp_off/models/comp_off_request_model.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/comp_off/presentation/pages/comp_off_detail_page.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/comp_off/presentation/widgets/comp_off_request_card.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_filter_button.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_empty_state.dart';
 import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_grouping_utils.dart';
 import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_tab_theme.dart';
+import 'package:collectivWork/features/user/presentation/bloc/user_profile_bloc.dart';
+import 'package:collectivWork/features/user/presentation/bloc/user_profile_state.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -40,6 +45,8 @@ class _CompOffApprovalPageListingState extends State<CompOffApprovalPageListing>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
+  RequestAudienceScope _selectedScope = RequestAudienceScope.allUsers;
+  static const int _pageSize = 50;
 
   final List<StatusTabDefinition<CompOffStatus>> _tabs = const [
     StatusTabDefinition(label: 'All', status: null),
@@ -98,15 +105,38 @@ class _CompOffApprovalPageListingState extends State<CompOffApprovalPageListing>
     final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
     final remoteDataSource = CompOffRemoteDataSourceImpl(apiClient: apiClient);
     final repository = CompOffRepositoryImpl(remoteDataSource: remoteDataSource);
+    final userId = _resolveUserId(context);
+    final allowAllUsers = _allowAllUsers(context);
+    final availableScopes =
+        allowAllUsers
+            ? RequestAudienceScope.values
+            : const [
+              RequestAudienceScope.myReportees,
+              RequestAudienceScope.myIndirectReportees,
+            ];
+
+    if (!allowAllUsers &&
+        _selectedScope == RequestAudienceScope.allUsers) {
+      _selectedScope = RequestAudienceScope.myReportees;
+    }
 
     return BlocProvider(
       create:
           (_) => CompOffRequestBloc(
             getCompOffRequestsUseCase: GetCompOffRequestsUseCase(repository),
+            getCompOffRequestStatsUseCase: GetCompOffRequestStatsUseCase(
+              repository,
+            ),
             getTeamCompOffRequestsUseCase: GetTeamCompOffRequestsUseCase(
               repository,
             ),
-          )..add(const LoadTeamCompOffRequests()),
+          )..add(
+            LoadTeamCompOffRequests(
+              userId: userId,
+              scope: _selectedScope,
+              limit: _pageSize,
+            ),
+          ),
       child: ResponsiveScaffold(
         backgroundColor: AppColors.backgroundLight,
         appBar: AppBar(
@@ -152,7 +182,7 @@ class _CompOffApprovalPageListingState extends State<CompOffApprovalPageListing>
           builder:
               (blocContext) => Column(
                 children: [
-                  _buildSearchSection(blocContext),
+                  _buildSearchSection(blocContext, availableScopes),
                   SizedBox(height: screenHeight * 0.01),
                   Expanded(
                     child: BlocBuilder<CompOffRequestBloc, CompOffRequestState>(
@@ -170,7 +200,13 @@ class _CompOffApprovalPageListingState extends State<CompOffApprovalPageListing>
                             onRetry:
                                 () => context
                                     .read<CompOffRequestBloc>()
-                                    .add(const LoadTeamCompOffRequests()),
+                                    .add(
+                                      LoadTeamCompOffRequests(
+                                        userId: userId,
+                                        scope: _selectedScope,
+                                        limit: _pageSize,
+                                      ),
+                                    ),
                           );
                         }
 
@@ -191,6 +227,12 @@ class _CompOffApprovalPageListingState extends State<CompOffApprovalPageListing>
                           tabs: _tabs,
                           items: items,
                           searchQuery: loaded.searchQuery?.toLowerCase() ?? '',
+                          countOverrides: {
+                            null: loaded.totalCount,
+                            CompOffStatus.pending: loaded.pendingCount,
+                            CompOffStatus.approved: loaded.approvedCount,
+                            CompOffStatus.rejected: loaded.rejectedCount,
+                          },
                           statusSelector: (item) => item.status,
                           matchesSearch: (item, query) {
                             if (query.isEmpty) return true;
@@ -204,56 +246,88 @@ class _CompOffApprovalPageListingState extends State<CompOffApprovalPageListing>
                               items: list,
                               dateSelector: (item) => item.createdAt,
                             );
-                            return ListView.builder(
-                              padding: EdgeInsets.symmetric(
-                                vertical: screenHeight * 0.012,
-                              ),
-                              itemCount: grouped.length,
-                              itemBuilder: (context, index) {
-                                final entry = grouped[index];
-                                if (entry is String) {
-                                  return Padding(
-                                    padding: EdgeInsets.only(
-                                      top:
-                                          index == 0
-                                              ? 0
-                                              : screenHeight * 0.014,
-                                      bottom: screenHeight * 0.010,
-                                    ),
-                                    child: Text(
-                                      entry,
-                                      style: AppTextStyles.bodySmall(
-                                        context,
-                                      ).copyWith(
-                                        fontWeight: FontWeight.w500,
-                                        color: AppColors.textSecondary,
-                                      ),
+                            return NotificationListener<ScrollNotification>(
+                              onNotification: (notification) {
+                                if (notification.metrics.pixels >=
+                                    notification.metrics.maxScrollExtent -
+                                        200) {
+                                  context.read<CompOffRequestBloc>().add(
+                                    LoadMoreTeamCompOffRequests(
+                                      userId: userId,
+                                      limit: _pageSize,
                                     ),
                                   );
                                 }
-
-                                final req = entry as CompOffRequestModel;
-                                return CompOffRequestCard(
-                                  request: req,
-                                  onTap: () async {
-                                    final refresh = await Navigator.push<bool>(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder:
-                                            (_) => CompOffDetailPage(
-                                              request: req,
-                                              isApprovalMode: true,
-                                            ),
+                                return false;
+                              },
+                              child: ListView.builder(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: screenHeight * 0.012,
+                                ),
+                                itemCount:
+                                    grouped.length +
+                                    (loaded.isLoadingMore ? 1 : 0),
+                                itemBuilder: (context, index) {
+                                  if (index >= grouped.length) {
+                                    return Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: screenHeight * 0.02,
+                                      ),
+                                      child: const Center(
+                                        child: CircularProgressIndicator(),
                                       ),
                                     );
-                                    if (refresh == true && context.mounted) {
-                                      context.read<CompOffRequestBloc>().add(
-                                        const LoadTeamCompOffRequests(),
+                                  }
+
+                                  final entry = grouped[index];
+                                  if (entry is String) {
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                        top:
+                                            index == 0
+                                                ? 0
+                                                : screenHeight * 0.014,
+                                        bottom: screenHeight * 0.010,
+                                      ),
+                                      child: Text(
+                                        entry,
+                                        style: AppTextStyles.bodySmall(
+                                          context,
+                                        ).copyWith(
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  final req = entry as CompOffRequestModel;
+                                  return CompOffRequestCard(
+                                    request: req,
+                                    onTap: () async {
+                                      final refresh = await Navigator.push<bool>(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => CompOffDetailPage(
+                                                request: req,
+                                                isApprovalMode: true,
+                                              ),
+                                        ),
                                       );
-                                    }
-                                  },
-                                );
-                              },
+                                      if (refresh == true && context.mounted) {
+                                        context.read<CompOffRequestBloc>().add(
+                                          LoadTeamCompOffRequests(
+                                            userId: userId,
+                                            scope: _selectedScope,
+                                            limit: _pageSize,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  );
+                                },
+                              ),
                             );
                           },
                         );
@@ -267,61 +341,107 @@ class _CompOffApprovalPageListingState extends State<CompOffApprovalPageListing>
     );
   }
 
-  Widget _buildSearchSection(BuildContext context) {
+  bool _allowAllUsers(BuildContext context) {
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is! UserProfileLoaded) {
+      return false;
+    }
+
+    return profileState.profile.allowAllUsers;
+  }
+
+  int _resolveUserId(BuildContext context) {
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is! UserProfileLoaded) {
+      return 0;
+    }
+
+    return profileState.profile.userId;
+  }
+
+  Widget _buildSearchSection(
+    BuildContext context,
+    List<RequestAudienceScope> availableScopes,
+  ) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    return Container(
-      height: screenHeight * 0.050,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F2F2),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Search',
-          hintStyle: AppTextStyles.bodyMedium(
-            context,
-          ).copyWith(color: AppColors.textTertiary),
-          prefixIcon: Padding(
-            padding: EdgeInsets.all(screenWidth * 0.03),
-            child: SvgPicture.asset(
-              AppAssets.searchIcon,
-              width: screenWidth * 0.045,
-              colorFilter: const ColorFilter.mode(
-                Colors.grey,
-                BlendMode.srcIn,
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: screenHeight * 0.050,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F2F2),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search',
+                hintStyle: AppTextStyles.bodyMedium(
+                  context,
+                ).copyWith(color: AppColors.textTertiary),
+                prefixIcon: Padding(
+                  padding: EdgeInsets.all(screenWidth * 0.03),
+                  child: SvgPicture.asset(
+                    AppAssets.searchIcon,
+                    width: screenWidth * 0.045,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.grey,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: screenHeight * 0.010,
+                ),
               ),
+              onChanged: (value) {
+                context.read<CompOffRequestBloc>().add(
+                  SearchCompOffRequests(value),
+                );
+              },
             ),
           ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: EdgeInsets.symmetric(
-            vertical: screenHeight * 0.010,
-          ),
         ),
-        onChanged: (value) {
-          context.read<CompOffRequestBloc>().add(SearchCompOffRequests(value));
-        },
-      ),
+        SizedBox(width: screenWidth * 0.03),
+        RequestAudienceFilterButton(
+          selectedScope: _selectedScope,
+          availableScopes: availableScopes,
+          onSelected: (scope) {
+            setState(() {
+              _selectedScope = scope;
+            });
+            context.read<CompOffRequestBloc>().add(
+              LoadTeamCompOffRequests(
+                userId: _resolveUserId(context),
+                scope: scope,
+                limit: _pageSize,
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

@@ -1,18 +1,21 @@
 import 'package:dartz/dartz.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 
 import '../../../../../../../../core/error/failures.dart';
 import '../../models/on_duty_request_model.dart';
 import '../repositories/on_duty_repository.dart';
 
 class GetTeamOnDutyRequestsParams {
+  final int clientId;
   final int page;
   final int limit;
-  final String requestType;
+  final RequestAudienceScope scope;
 
   const GetTeamOnDutyRequestsParams({
+    required this.clientId,
     this.page = 1,
     this.limit = 50,
-    this.requestType = 'All',
+    this.scope = RequestAudienceScope.allUsers,
   });
 }
 
@@ -25,9 +28,10 @@ class GetTeamOnDutyRequestsUseCase {
     GetTeamOnDutyRequestsParams params,
   ) {
     return repository.getTeamOnDutyRequests(
+      clientId: params.clientId,
       page: params.page,
       limit: params.limit,
-      requestType: params.requestType,
+      requestType: params.scope.attendanceRequestType,
     );
   }
 }

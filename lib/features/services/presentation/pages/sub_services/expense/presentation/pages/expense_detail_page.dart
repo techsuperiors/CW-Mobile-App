@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:collectivWork/core/constants/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
@@ -16,6 +17,7 @@ import '../../../../../../../../core/network/network_info.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
+import '../../../../../../../approval/presentation/widgets/approval_action_bar.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../../../../../../user/presentation/bloc/user_profile_bloc.dart';
 import '../../../../../../../user/presentation/bloc/user_profile_state.dart';
@@ -26,8 +28,13 @@ import 'edit_expense_page.dart';
 
 class ExpenseDetailPage extends StatefulWidget {
   final ExpenseItemModel expense;
+  final bool isApprovalMode;
 
-  const ExpenseDetailPage({super.key, required this.expense});
+  const ExpenseDetailPage({
+    super.key,
+    required this.expense,
+    this.isApprovalMode = false,
+  });
 
   @override
   State<ExpenseDetailPage> createState() => _ExpenseDetailPageState();
@@ -38,6 +45,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
   late Future<ExpenseDetailModel> _detailFuture;
   final Set<int> _expandedIndices = <int>{0};
   bool _isWithdrawing = false;
+  bool _isUpdatingApproval = false;
   bool _shouldRefreshParent = false;
 
   @override
@@ -51,6 +59,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
     );
     _detailFuture = _remoteData.getExpenseDetails(expenseId: widget.expense.id);
   }
+
   @override
   void dispose() {
     super.dispose();
@@ -62,6 +71,75 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
         expenseId: widget.expense.id,
       );
     });
+  }
+
+  Future<void> _updateApprovalStatus(String status) async {
+    if (_isUpdatingApproval) return;
+
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is! UserProfileLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User profile is not loaded yet.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    final approverId = profileState.profile.user.id;
+    ExpenseApproverInfo? targetApproval;
+    for (final approval in widget.expense.approvals) {
+      if (approval.id == approverId &&
+          approval.approvalStatus.toLowerCase() == 'pending') {
+        targetApproval = approval;
+        break;
+      }
+    }
+
+    if (targetApproval == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No pending approval found for current user.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isUpdatingApproval = true);
+    try {
+      final message = await _remoteData.updateExpenseApprovalStatus(
+        expenseId: widget.expense.id,
+        expenseApprovalId: targetApproval.approvalId,
+        approverId: approverId,
+        approvalStatus: status,
+      );
+      if (!mounted) return;
+
+      _shouldRefreshParent = true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: AppColors.success),
+      );
+      Navigator.of(context).pop(true);
+    } on ServerException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: AppColors.error),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update expense approval: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdatingApproval = false);
+      }
+    }
   }
 
   Future<void> _showWithdrawDialog(BuildContext context) async {
@@ -149,15 +227,18 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
 
   void _showActivitySheet(BuildContext context, ExpenseDetailModel detail) {
     final sw = MediaQuery.of(context).size.width;
+    final sh = MediaQuery.of(context).size.height;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      isDismissible: true,
       builder:
           (_) => DraggableScrollableSheet(
             initialChildSize: 0.5,
             minChildSize: 0.3,
             maxChildSize: 0.9,
+            expand: false,
             builder:
                 (ctx, sc) => Container(
                   decoration: const BoxDecoration(
@@ -204,6 +285,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                           (activity) => _ExpenseActivityTile(
                             activity: activity,
                             sw: sw,
+                            sh: sh,
                           ),
                         ),
                     ],
@@ -225,353 +307,381 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
         Navigator.of(context).pop(_shouldRefreshParent);
       },
       child: ResponsiveScaffold(
-      backgroundColor: AppColors.backgroundMedium,
-      appBar: AppBar(
-        elevation: 0,
-        forceMaterialTransparency: true,
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        leading: GestureDetector(
-          onTap: () => Navigator.of(context).pop(_shouldRefreshParent),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.arrow_back_ios,
-                color: Theme.of(context).colorScheme.primary,
-                size: screenWidth * 0.048,
-              ),
-              Flexible(
-                child: Text(
-                  'Back',
-                  style: AppTextStyles.bodyMedium(context).copyWith(
-                    fontWeight: FontWeight.w400,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-        leadingWidth: 110,
-        title: Text(
-          'Reimbursement',
-          style: AppTextStyles.heading4(
-            context,
-          ).copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-        ),
-        centerTitle: true,
-        actions: [
-          FutureBuilder<ExpenseDetailModel>(
-            future: _detailFuture,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox.shrink();
-
-              final detail = snapshot.data!;
-              final isPending =
-                  detail.approvalStatus.toLowerCase() == 'pending';
-
-              return PopupMenuButton<String>(
-                enabled: !_isWithdrawing,
-                icon:
-                    _isWithdrawing
-                        ? Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        )
-                        : Icon(Icons.more_vert, color: AppColors.textPrimary),
-                onSelected: (value) async {
-                  switch (value) {
-                    case 'Edit':
-                      final updated = await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                          builder: (_) => EditExpensePage(detail: detail),
-                        ),
-                      );
-                      if (updated == true && mounted) {
-                        _shouldRefreshParent = true;
-                        _reload();
-                      }
-                      break;
-                    case 'Withdraw':
-                      _showWithdrawDialog(context);
-                      break;
-                    case 'Activity':
-                      _showActivitySheet(context, detail);
-                      break;
-                  }
-                },
-                itemBuilder: (context) {
-                  return [
-                    if (widget.expense.isEditEnabled)
-                      PopupMenuItem(
-                        value: 'Edit',
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: screenWidth * 0.05,
-                              height: screenHeight * 0.05,
-                              child: SvgPicture.asset(AppAssets.editIconwfh),
-                            ),
-                            SizedBox(width: screenWidth * 0.02),
-                            Text(
-                              'Edit',
-                              style: AppTextStyles.heading5(context).copyWith(
-                                fontWeight: FontWeight.w400,
-                                color: AppColors.textHeading,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    if (isPending)
-                      PopupMenuItem(
-                        value: 'Withdraw',
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: screenWidth * 0.05,
-                              height: screenHeight * 0.05,
-                              child: SvgPicture.asset(AppAssets.withdrawIcon),
-                            ),
-                            SizedBox(width: screenWidth * 0.02),
-                            Text(
-                              'Withdraw',
-                              style: AppTextStyles.heading5(context).copyWith(
-                                fontWeight: FontWeight.w400,
-                                color: AppColors.textHeading,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    PopupMenuItem(
-                      value: 'Activity',
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: screenWidth * 0.05,
-                            height: screenHeight * 0.05,
-                            child: SvgPicture.asset(AppAssets.activityIcon),
-                          ),
-                          SizedBox(width: screenWidth * 0.02),
-                          Text(
-                            'Activity',
-                            style: AppTextStyles.heading5(context).copyWith(
-                              fontWeight: FontWeight.w400,
-                              color: AppColors.textHeading,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ];
-                },
-              );
-            },
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: 0,
-        onTap: NavigationHelper.getBottomNavHandler(context),
-      ),
-      body: FutureBuilder<ExpenseDetailModel>(
-        future: _detailFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return ApiErrorState(
-              rawMessage: snapshot.error.toString(),
-              onRetry: _reload,
-            );
-          }
-
-          final detail = snapshot.data!;
-          return SingleChildScrollView(
-            padding: EdgeInsets.zero,
-            child: Column(
+        backgroundColor: AppColors.backgroundMedium,
+        appBar: AppBar(
+          elevation: 0,
+          forceMaterialTransparency: true,
+          backgroundColor: AppColors.background,
+          foregroundColor: AppColors.textPrimary,
+          leading: GestureDetector(
+            onTap: () => Navigator.of(context).pop(_shouldRefreshParent),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _DetailCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              detail.expenseName,
-                              style: AppTextStyles.heading4(context).copyWith(
-                                color: AppColors.attendanceTeal,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      _RequestByRow(user: detail.requestUser),
-                      Divider(
-                        height: screenHeight * 0.03,
-                        color: AppColors.border,
-                      ),
-                      _InfoRow(
-                        label: 'Amount',
-                        value: NumberFormat.currency(
-                          symbol: '₹',
-                          decimalDigits: 0,
-                        ).format(detail.amount),
-                      ),
-                      Divider(
-                        height: screenHeight * 0.03,
-                        color: AppColors.border,
-                      ),
-
-                      _InfoRow(
-                        label: 'Invoice Number',
-                        value: detail.invoiceNumber ?? '—',
-                      ),
-                      Divider(
-                        height: screenHeight * 0.03,
-                        color: AppColors.border,
-                      ),
-
-                      _InfoRow(
-                        label: 'Reimbursement Policy Name',
-                        value:
-                            detail.policy.policyName.isEmpty
-                                ? '—'
-                                : detail.policy.policyName,
-                      ),
-                      Divider(
-                        height: screenHeight * 0.03,
-                        color: AppColors.border,
-                      ),
-
-                      _InfoRow(
-                        label: 'Status',
-                        valueWidget: _StatusChip(status: detail.approvalStatus),
-                      ),
-                      Divider(
-                        height: screenHeight * 0.03,
-                        color: AppColors.border,
-                      ),
-                      Text(
-                        'Description',
-                        style: AppTextStyles.bodyMediumHeading(
-                          context,
-                        ).copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      Text(
-                        (detail.description?.trim().isNotEmpty ?? false)
-                            ? detail.description!.trim()
-                            : 'No description available.',
-                        style: AppTextStyles.bodySmall(
-                          context,
-                        ).copyWith(height: 1.1, color: AppColors.textSecondary),
-                      ),
-                      Divider(
-                        height: screenHeight * 0.03,
-                        color: AppColors.border,
-                      ),
-                      Text(
-                        'Attachment',
-                        style: AppTextStyles.bodyMediumHeading(
-                          context,
-                        ).copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      if (detail.documents.isEmpty)
-                        Text(
-                          'No attachments',
-                          style: AppTextStyles.bodySmall(
-                            context,
-                          ).copyWith(color: AppColors.textSecondary),
-                        )
-                      else
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children:
-                              detail.documents
-                                  .map((doc) => _AttachmentTile(document: doc))
-                                  .toList(),
-                        ),
-                      Divider(
-                        height: screenHeight * 0.03,
-                        color: AppColors.border,
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      Text(
-                        'Levels',
-                        style: AppTextStyles.bodyMediumHeading(
-                          context,
-                        ).copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(height: screenHeight * 0.004),
-                      Text(
-                        'Configure different components and their respective limits or requirements.',
-                        style: AppTextStyles.bodySmall(
-                          context,
-                        ).copyWith(color: AppColors.textSecondary),
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      ...List.generate(
-                        detail.approvals.length,
-                        (index) => _ApprovalLevelTile(
-                          approval: detail.approvals[index],
-                          index: index,
-                          isExpanded: _expandedIndices.contains(index),
-                          onToggle: () {
-                            setState(() {
-                              if (_expandedIndices.contains(index)) {
-                                _expandedIndices.remove(index);
-                              } else {
-                                _expandedIndices.add(index);
-                              }
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
+                Icon(
+                  Icons.arrow_back_ios,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: screenWidth * 0.048,
                 ),
-                SizedBox(height: screenHeight * 0.02),
-                _ExpenseCommentsSection(
-                  expenseId: detail.id,
-                  initialComments: detail.comments,
-                  remoteData: _remoteData,
-                  screenWidth: screenWidth,
-                  screenHeight: screenHeight,
+                Flexible(
+                  child: Text(
+                    'Back',
+                    style: AppTextStyles.bodyMedium(context).copyWith(
+                      fontWeight: FontWeight.w400,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
-          );
-        },
+          ),
+          leadingWidth: 110,
+          title: Text(
+            widget.isApprovalMode ? 'Expense Approval' : 'Reimbursement',
+            style: AppTextStyles.heading4(context).copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          centerTitle: true,
+          actions: [
+            FutureBuilder<ExpenseDetailModel>(
+              future: _detailFuture,
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const SizedBox.shrink();
+
+                final detail = snapshot.data!;
+                final isPending =
+                    detail.approvalStatus.toLowerCase() == 'pending';
+
+                return PopupMenuButton<String>(
+                  enabled: !_isWithdrawing,
+                  icon:
+                      _isWithdrawing
+                          ? Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          )
+                          : Icon(Icons.more_vert, color: AppColors.textPrimary),
+                  onSelected: (value) async {
+                    switch (value) {
+                      case 'Edit':
+                        final updated = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                            builder: (_) => EditExpensePage(detail: detail),
+                          ),
+                        );
+                        if (updated == true && mounted) {
+                          _shouldRefreshParent = true;
+                          _reload();
+                        }
+                        break;
+                      case 'Withdraw':
+                        _showWithdrawDialog(context);
+                        break;
+                      case 'Activity':
+                        _showActivitySheet(context, detail);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) {
+                    return [
+                      if (!widget.isApprovalMode && widget.expense.isEditEnabled)
+                        PopupMenuItem(
+                          value: 'Edit',
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: screenWidth * 0.05,
+                                height: screenHeight * 0.05,
+                                child: SvgPicture.asset(AppAssets.editIconwfh),
+                              ),
+                              SizedBox(width: screenWidth * 0.02),
+                              Text(
+                                'Edit',
+                                style: AppTextStyles.heading5(context).copyWith(
+                                  fontWeight: FontWeight.w400,
+                                  color: AppColors.textHeading,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (!widget.isApprovalMode && isPending)
+                        PopupMenuItem(
+                          value: 'Withdraw',
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: screenWidth * 0.05,
+                                height: screenHeight * 0.05,
+                                child: SvgPicture.asset(AppAssets.withdrawIcon),
+                              ),
+                              SizedBox(width: screenWidth * 0.02),
+                              Text(
+                                'Withdraw',
+                                style: AppTextStyles.heading5(context).copyWith(
+                                  fontWeight: FontWeight.w400,
+                                  color: AppColors.textHeading,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      PopupMenuItem(
+                        value: 'Activity',
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: screenWidth * 0.05,
+                              height: screenHeight * 0.05,
+                              child: SvgPicture.asset(AppAssets.activityIcon),
+                            ),
+                            SizedBox(width: screenWidth * 0.02),
+                            Text(
+                              'Activity',
+                              style: AppTextStyles.heading5(context).copyWith(
+                                fontWeight: FontWeight.w400,
+                                color: AppColors.textHeading,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ];
+                  },
+                );
+              },
+            ),
+          ],
+        ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 0,
+          onTap: NavigationHelper.getBottomNavHandler(context),
+        ),
+        body: FutureBuilder<ExpenseDetailModel>(
+          future: _detailFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return ApiErrorState(
+                rawMessage: snapshot.error.toString(),
+                onRetry: _reload,
+              );
+            }
+
+            final detail = snapshot.data!;
+            return SingleChildScrollView(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  _DetailCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                detail.expenseName,
+                                style: AppTextStyles.heading4(context).copyWith(
+                                  color: AppColors.attendanceTeal,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: screenHeight * 0.02),
+                        _RequestByRow(user: detail.requestUser),
+                        Divider(
+                          height: screenHeight * 0.03,
+                          color: AppColors.border,
+                        ),
+                        _InfoRow(
+                          label: 'Amount',
+                          value: NumberFormat.currency(
+                            symbol: '₹',
+                            decimalDigits: 0,
+                          ).format(detail.amount),
+                        ),
+                        Divider(
+                          height: screenHeight * 0.03,
+                          color: AppColors.border,
+                        ),
+
+                        _InfoRow(
+                          label: 'Invoice Number',
+                          value: detail.invoiceNumber ?? '—',
+                        ),
+                        Divider(
+                          height: screenHeight * 0.03,
+                          color: AppColors.border,
+                        ),
+
+                        _InfoRow(
+                          label: 'Reimbursement Policy Name',
+                          value:
+                              detail.policy.policyName.isEmpty
+                                  ? '—'
+                                  : detail.policy.policyName,
+                        ),
+                        Divider(
+                          height: screenHeight * 0.03,
+                          color: AppColors.border,
+                        ),
+
+                        _InfoRow(
+                          label: 'Status',
+                          valueWidget: _StatusChip(
+                            status: detail.approvalStatus,
+                          ),
+                        ),
+                        Divider(
+                          height: screenHeight * 0.03,
+                          color: AppColors.border,
+                        ),
+                        Text(
+                          'Description',
+                          style: AppTextStyles.bodyMediumHeading(
+                            context,
+                          ).copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: screenHeight * 0.02),
+                        Text(
+                          (detail.description?.trim().isNotEmpty ?? false)
+                              ? detail.description!.trim()
+                              : 'No description available.',
+                          style: AppTextStyles.bodySmall(context).copyWith(
+                            height: 1.1,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(
+                          height: screenHeight * 0.02,
+                        ),
+
+                        if (widget.isApprovalMode &&
+                            detail.approvalStatus.toLowerCase() == 'pending' &&
+                            widget.expense.canApprove) ...[
+                          SizedBox(height: screenHeight * 0.02),
+                          ApprovalActionBar(
+                            embedded: true,
+                            onReject:
+                                _isUpdatingApproval
+                                    ? null
+                                    : () => _updateApprovalStatus('Rejected'),
+                            onApprove:
+                                _isUpdatingApproval
+                                    ? null
+                                    : () => _updateApprovalStatus('Approved'),
+                            isLoading: _isUpdatingApproval,
+                          ),
+                        ],
+
+                        SizedBox(
+                          height: screenHeight * 0.02,
+                        ),
+                        Text(
+                          'Attachment',
+                          style: AppTextStyles.bodyMediumHeading(
+                            context,
+                          ).copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: screenHeight * 0.02),
+                        if (detail.documents.isEmpty)
+                          Text(
+                            'No attachments',
+                            style: AppTextStyles.bodySmall(
+                              context,
+                            ).copyWith(color: AppColors.textSecondary),
+                          )
+                        else
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children:
+                                detail.documents
+                                    .map(
+                                      (doc) => _AttachmentTile(document: doc),
+                                    )
+                                    .toList(),
+                          ),
+                        Divider(
+                          height: screenHeight * 0.03,
+                          color: AppColors.border,
+                        ),
+                        SizedBox(height: screenHeight * 0.02),
+                        Text(
+                          'Levels',
+                          style: AppTextStyles.bodyMediumHeading(
+                            context,
+                          ).copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: screenHeight * 0.004),
+                        Text(
+                          'Configure different components and their respective limits or requirements.',
+                          style: AppTextStyles.bodySmall(
+                            context,
+                          ).copyWith(color: AppColors.textSecondary),
+                        ),
+                        SizedBox(height: screenHeight * 0.02),
+                        ...List.generate(
+                          detail.approvals.length,
+                          (index) => _ApprovalLevelTile(
+                            approval: detail.approvals[index],
+                            index: index,
+                            isExpanded: _expandedIndices.contains(index),
+                            onToggle: () {
+                              setState(() {
+                                if (_expandedIndices.contains(index)) {
+                                  _expandedIndices.remove(index);
+                                } else {
+                                  _expandedIndices.add(index);
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: screenHeight * 0.02),
+                  _ExpenseCommentsSection(
+                    expenseId: detail.id,
+                    initialComments: detail.comments,
+                    remoteData: _remoteData,
+                    screenWidth: screenWidth,
+                    screenHeight: screenHeight,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
-    ));
+    );
   }
 }
 
@@ -622,7 +732,8 @@ class _ExpenseCommentsSection extends StatefulWidget {
   });
 
   @override
-  State<_ExpenseCommentsSection> createState() => _ExpenseCommentsSectionState();
+  State<_ExpenseCommentsSection> createState() =>
+      _ExpenseCommentsSectionState();
 }
 
 class _ExpenseCommentsSectionState extends State<_ExpenseCommentsSection> {
@@ -737,9 +848,7 @@ class _ExpenseCommentsSectionState extends State<_ExpenseCommentsSection> {
             children: [
               Text(
                 'Comments',
-                style: AppTextStyles.bodyMediumHeading(
-                  context,
-                ).copyWith(
+                style: AppTextStyles.bodyMediumHeading(context).copyWith(
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
@@ -756,9 +865,7 @@ class _ExpenseCommentsSectionState extends State<_ExpenseCommentsSection> {
                 ),
                 child: Text(
                   '${_comments.length}',
-                  style: AppTextStyles.labelSmall(
-                    context,
-                  ).copyWith(
+                  style: AppTextStyles.labelSmall(context).copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w700,
                   ),
@@ -812,8 +919,9 @@ class _ExpenseCommentsSectionState extends State<_ExpenseCommentsSection> {
                                 SizedBox(height: screenHeight * 0.002),
                                 Text(
                                   comment.createdAt != null
-                                      ? DateFormat('dd MMM yyyy, hh:mm a')
-                                          .format(comment.createdAt!.toLocal())
+                                      ? DateFormat(
+                                        'dd MMM yyyy, hh:mm a',
+                                      ).format(comment.createdAt!.toLocal())
                                       : 'Just now',
                                   style: AppTextStyles.bodySmall(
                                     context,
@@ -829,10 +937,7 @@ class _ExpenseCommentsSectionState extends State<_ExpenseCommentsSection> {
                         comment.comment,
                         style: AppTextStyles.bodyMedium(
                           context,
-                        ).copyWith(
-                          color: AppColors.textPrimary,
-                          height: 1.45,
-                        ),
+                        ).copyWith(color: AppColors.textPrimary, height: 1.45),
                       ),
                     ],
                   ),
@@ -886,18 +991,19 @@ class _ExpenseCommentsSectionState extends State<_ExpenseCommentsSection> {
                       padding: EdgeInsets.zero,
                       elevation: 0,
                     ),
-                    child: _isSubmittingComment
-                        ? SizedBox(
-                            width: screenWidth * 0.045,
-                            height: screenWidth * 0.045,
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
+                    child:
+                        _isSubmittingComment
+                            ? SizedBox(
+                              width: screenWidth * 0.045,
+                              height: screenWidth * 0.045,
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
-                            ),
-                          )
-                        : const Icon(Icons.send_rounded),
+                            )
+                            : const Icon(Icons.send_rounded),
                   ),
                 ),
               ],
@@ -922,7 +1028,7 @@ class _RequestByRow extends StatelessWidget {
       children: [
         Flexible(
           child: Text(
-            'Request By',
+            AppStrings.requestedby,
             style: AppTextStyles.bodyMediumHeading(context).copyWith(
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
@@ -1008,10 +1114,13 @@ class _StatusChip extends StatelessWidget {
   Color get _color {
     switch (status.toLowerCase()) {
       case 'approved':
-        return const Color(0xFF12B76A);
+        return const Color(0xFF12B76A); // Green
       case 'rejected':
+        return const Color(0xFFF04438); // Red
       case 'withdrawn':
-        return const Color(0xFFF04438);
+        return const Color(0xFFF79009); // Orange
+      case 'pending':
+        return const Color(0xFF0086C9); // Orange
       default:
         return const Color(0xFF0086C9);
     }
@@ -1038,8 +1147,13 @@ class _StatusChip extends StatelessWidget {
 class _ExpenseActivityTile extends StatelessWidget {
   final ExpenseActivity activity;
   final double sw;
+  final double sh;
 
-  const _ExpenseActivityTile({required this.activity, required this.sw});
+  const _ExpenseActivityTile({
+    required this.activity,
+    required this.sw,
+    required this.sh,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1062,7 +1176,7 @@ class _ExpenseActivityTile extends StatelessWidget {
                 .join();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: sh * 0.02),
       padding: EdgeInsets.all(sw * 0.035),
       decoration: BoxDecoration(
         color: AppColors.backgroundLight,
@@ -1083,34 +1197,22 @@ class _ExpenseActivityTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 4,
-                height: 42,
-                margin: EdgeInsets.only(right: sw * 0.03),
+                width: sw * 0.12,
+                height: sw * 0.12,
                 decoration: BoxDecoration(
-                  color: accentColor,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
                   color: accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
                 ),
                 child: Center(
                   child: Text(
                     initials,
                     style: AppTextStyles.labelSmall(
                       context,
-                    ).copyWith(
-                      color: accentColor,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    ).copyWith(color: accentColor, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+               SizedBox(width: sw*0.04),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1118,9 +1220,7 @@ class _ExpenseActivityTile extends StatelessWidget {
                     if (actorName.isNotEmpty)
                       Text(
                         actorName,
-                        style: AppTextStyles.bodySmall(
-                          context,
-                        ).copyWith(
+                        style: AppTextStyles.bodySmall(context).copyWith(
                           color: accentColor,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1128,9 +1228,7 @@ class _ExpenseActivityTile extends StatelessWidget {
                     if (actorName.isNotEmpty) const SizedBox(height: 4),
                     Text(
                       cleanText.isEmpty ? 'Activity updated' : cleanText,
-                      style: AppTextStyles.bodyMediumHeading(
-                        context,
-                      ).copyWith(
+                      style: AppTextStyles.bodyMediumHeading(context).copyWith(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w600,
                         height: 1.35,
@@ -1141,29 +1239,9 @@ class _ExpenseActivityTile extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+           SizedBox(height: sh*0.02),
           Row(
             children: [
-              if (activity.actionType.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    activity.actionType.replaceAll('_', ' '),
-                    style: AppTextStyles.labelSmall(
-                      context,
-                    ).copyWith(
-                      color: accentColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
               const Spacer(),
               if (activity.createdAt != null)
                 Text(

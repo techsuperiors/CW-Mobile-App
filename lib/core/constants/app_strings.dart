@@ -253,5 +253,6 @@ class AppStrings {
   static const String lockdurationin = 'Lock duration in';
 
   //Expense Module
+  static const String requestedby = 'Requested By';
 
 }

@@ -155,6 +155,7 @@ class _OnDutyPageListingState extends State<OnDutyPageListing>
 
                         if (state is OnDutyRequestError) {
                           return ApiErrorState(
+                            title: 'Unable to load on duty requests',
                             rawMessage: state.message,
                             onRetry: () {
                               final bloc = context.read<OnDutyRequestBloc>();

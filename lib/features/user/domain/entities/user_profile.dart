@@ -2,6 +2,7 @@
 class UserProfile {
   final int clientId;
   final int userId;
+  final bool allowAllUsers;
   final int? departmentId;
   final String? address;
   final String? birthday;
@@ -32,6 +33,7 @@ class UserProfile {
   UserProfile({
     required this.clientId,
     required this.userId,
+    this.allowAllUsers = false,
     this.departmentId,
     this.address,
     this.birthday,

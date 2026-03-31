@@ -1,6 +1,7 @@
 import '../../../../core/network/api_client.dart';
 import '../../../../core/constants/app_urls.dart';
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/utils/data_encoder.dart';
 import '../models/user_profile_model.dart';
 import 'package:dio/dio.dart';
 
@@ -30,6 +31,7 @@ class UserProfileResponse {
 /// User Profile remote data source interface
 abstract class UserProfileRemoteDataSource {
   Future<UserProfileModel> getUserProfile();
+  Future<bool> getAllowAllUsers({required int userId});
 }
 
 /// User Profile remote data source implementation
@@ -75,5 +77,36 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
       throw ServerException('Failed to get user profile: ${e.toString()}');
     }
   }
-}
 
+  @override
+  Future<bool> getAllowAllUsers({required int userId}) async {
+    try {
+      final payload = encodeData({'user_id': userId});
+      final response = await apiClient.get(
+        '${AppUrls.getUserProfileExtended}?payload=$payload',
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      final responseData = response.data as Map<String, dynamic>;
+      if (responseData['success'] != true) {
+        throw ServerException(
+          responseData['message'] as String? ?? 'Failed to get user profile',
+        );
+      }
+
+      final data = responseData['data'] as Map<String, dynamic>?;
+      return data?['allow_all_users'] as bool? ?? false;
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      if (e is ServerException) {
+        rethrow;
+      }
+      throw ServerException('Failed to get allow_all_users: ${e.toString()}');
+    }
+  }
+}

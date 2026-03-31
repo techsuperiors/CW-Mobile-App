@@ -18,27 +18,44 @@ class AppAvatar extends StatelessWidget {
     this.icon,
   });
 
+  String _getInitials() {
+    if (name == null || name!.trim().isEmpty) return '';
+    final parts = name!.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
   @override
   Widget build(BuildContext context) {
+    final initials = _getInitials();
+
     return CircleAvatar(
       radius: radius,
       backgroundColor: backgroundColor ?? AppColors.border,
-      backgroundImage: imageUrl != null ? NetworkImage(imageUrl!) : null,
-      child: imageUrl == null
-          ? (icon != null
-              ? Icon(icon, color: AppColors.textSecondary, size: radius)
-              : (name != null && name!.isNotEmpty
-                  ? Text(
-                      name![0].toUpperCase(),
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: radius * 0.6,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : const Icon(Icons.person, color: AppColors.textSecondary)))
-          : null,
+      backgroundImage: null,
+      child: imageUrl != null
+          ? ClipOval(
+            child: Image.network(
+                    imageUrl!,
+                    width: radius * 2,
+                    height: radius * 2,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _buildFallback(initials), // load fail → fallback
+                  ),
+          )
+          : _buildFallback(initials),
     );
   }
-}
 
+  Widget _buildFallback(String initials) {
+    return initials.isNotEmpty
+        ? Text(
+      initials,
+      style: TextStyle(
+        color: AppColors.textSecondary,
+        fontSize: radius * 0.6,
+        fontWeight: FontWeight.bold,
+      ),
+    )
+        : const Icon(Icons.person, color: AppColors.textSecondary);
+  }
+}

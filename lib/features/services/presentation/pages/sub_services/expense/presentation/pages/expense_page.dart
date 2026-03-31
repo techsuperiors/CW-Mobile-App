@@ -8,14 +8,18 @@ import 'package:intl/intl.dart';
 
 import '../../../../../../../../core/constants/app_assets.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
+import '../../../../../../../../core/constants/module_permissions.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/widgets/access_denied_view.dart';
 import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../../core/widgets/status_tabbed_section.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
+import '../../../../../../../request/presentation/widgets/request_listing/request_audience_filter_button.dart';
+import '../../../../../../../request/presentation/widgets/request_listing/request_audience_scope.dart';
 import '../../../../../../../request/presentation/widgets/request_listing/request_empty_state.dart';
 import '../../../../../../../request/presentation/widgets/request_listing/request_grouping_utils.dart';
 import '../../../../../../../request/presentation/widgets/request_listing/request_tab_theme.dart';
@@ -46,7 +50,14 @@ class _ExpensePageState extends State<ExpensePage>
   );
 
   Future<List<ExpenseItemModel>>? _reimbursementFuture;
+  Future<ExpenseApprovalListPage>? _approvalFuture;
   int? _loadedUserId;
+  RequestAudienceScope _selectedApprovalScope = RequestAudienceScope.allUsers;
+  static const int _approvalPageSize = 10;
+  List<ExpenseItemModel> _approvalItems = const [];
+  int _approvalCurrentPage = 1;
+  int _approvalTotalCount = 0;
+  bool _isLoadingMoreApprovals = false;
 
   static const List<StatusTabDefinition<ExpenseApprovalStatus>> _statusTabs = [
     StatusTabDefinition(label: 'All', status: null),
@@ -108,6 +119,68 @@ class _ExpensePageState extends State<ExpensePage>
         userId: _loadedUserId!,
       );
     });
+  }
+
+  void _loadApprovals({
+    required RequestAudienceScope scope,
+    int page = 1,
+  }) {
+    final future = _remoteData.getExpenseApprovals(
+      scope: scope,
+      page: page,
+      limit: _approvalPageSize,
+    );
+
+    setState(() {
+      _selectedApprovalScope = scope;
+      _approvalCurrentPage = page;
+      _approvalItems = const [];
+      _approvalTotalCount = 0;
+      _isLoadingMoreApprovals = false;
+      _approvalFuture = future;
+    });
+
+    future.then((pageData) {
+      if (!mounted || !identical(_approvalFuture, future)) return;
+      setState(() {
+        _approvalItems = pageData.items;
+        _approvalTotalCount = pageData.totalCount;
+        _approvalCurrentPage = page;
+      });
+    }).catchError((_) {});
+  }
+
+  Future<void> _loadMoreApprovals() async {
+    if (_isLoadingMoreApprovals ||
+        _approvalItems.length >= _approvalTotalCount ||
+        _approvalFuture == null) {
+      return;
+    }
+
+    setState(() => _isLoadingMoreApprovals = true);
+
+    try {
+      final nextPage = await _remoteData.getExpenseApprovals(
+        scope: _selectedApprovalScope,
+        page: _approvalCurrentPage + 1,
+        limit: _approvalPageSize,
+      );
+      if (!mounted) return;
+
+      final existingIds = _approvalItems.map((item) => item.id).toSet();
+      setState(() {
+        _approvalItems = [
+          ..._approvalItems,
+          ...nextPage.items.where((item) => existingIds.add(item.id)),
+        ];
+        _approvalCurrentPage += 1;
+        _approvalTotalCount = nextPage.totalCount;
+        _isLoadingMoreApprovals = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingMoreApprovals = false);
+    }
   }
 
   @override
@@ -180,17 +253,19 @@ class _ExpensePageState extends State<ExpensePage>
               _ensureLoaded(state.profile.userId);
               return Column(
                 children: [
-                  _buildToolbar(context),
+                  _buildToolbar(
+                    context,
+                    showAddButton: true,
+                    showApprovalFilter: false,
+                    availableScopes: const [],
+                  ),
                   SizedBox(height: screenHeight * 0.02),
                   Expanded(
                     child: FutureBuilder<List<ExpenseItemModel>>(
                       future: _reimbursementFuture,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
                         }
                         if (snapshot.hasError) {
                           return ApiErrorState(
@@ -199,87 +274,21 @@ class _ExpensePageState extends State<ExpensePage>
                           );
                         }
                         final items = snapshot.data ?? const [];
-                        return StatusTabbedSection<
-                          ExpenseApprovalStatus,
-                          ExpenseItemModel
-                        >(
-                          controller: _statusTabController,
-                          tabs: _statusTabs,
+                        return _buildExpenseStatusSection(
+                          context: context,
                           items: items,
-                          searchQuery:
-                              _searchController.text.trim().toLowerCase(),
-                          statusSelector: (item) => item.approvalStatus,
-                          matchesSearch: (item, query) {
-                            if (query.isEmpty) return true;
-                            return item.expenseName.toLowerCase().contains(
-                                  query,
-                                ) ||
-                                item.expenseType.toLowerCase().contains(
-                                  query,
-                                ) ||
-                                (item.invoiceNumber?.toLowerCase().contains(
-                                      query,
-                                    ) ??
-                                    false);
-                          },
-                          tabColorBuilder: RequestTabTheme.colorForIndex,
-                          emptyBuilder: (context) => const RequestEmptyState(),
-                          listBuilder: (context, filteredItems) {
-                            final grouped = RequestGroupingUtils.groupByMonth(
-                              items: filteredItems,
-                              dateSelector: (item) => item.fromDate,
-                            );
-                            return ListView.builder(
-                              padding: EdgeInsets.only(
-                                bottom: screenHeight * 0.01,
+                          screenWidth: screenWidth,
+                          screenHeight: screenHeight,
+                          onTapItem: (entry) async {
+                            final shouldRefresh = await Navigator.of(context)
+                                .push<bool>(
+                              MaterialPageRoute(
+                                builder: (_) => ExpenseDetailPage(expense: entry),
                               ),
-                              itemCount: grouped.length,
-                              itemBuilder: (context, index) {
-                                final entry = grouped[index];
-                                if (entry is String) {
-                                  return Padding(
-                                    padding: EdgeInsets.only(
-                                      top: index == 0 ? 0 : 14,
-                                      bottom: 10,
-                                      left: 14,
-                                      right: 14,
-                                    ),
-                                    child: Text(
-                                      entry,
-                                      style: AppTextStyles.bodySmall(
-                                        context,
-                                      ).copyWith(
-                                        fontWeight: FontWeight.w500,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                return Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: screenWidth * 0.002,
-                                    vertical: screenHeight * 0.006,
-                                  ),
-                                  child: _ExpenseCard(
-                                    item: entry as ExpenseItemModel,
-                                    onTap: () async {
-                                      final shouldRefresh =
-                                          await Navigator.of(context).push<bool>(
-                                        MaterialPageRoute(
-                                          builder:
-                                              (_) => ExpenseDetailPage(
-                                                expense: entry,
-                                              ),
-                                        ),
-                                      );
-                                      if (shouldRefresh == true && mounted) {
-                                        _reload();
-                                      }
-                                    },
-                                  ),
-                                );
-                              },
                             );
+                            if (shouldRefresh == true && mounted) {
+                              _reload();
+                            }
                           },
                         );
                       },
@@ -289,13 +298,214 @@ class _ExpensePageState extends State<ExpensePage>
               );
             },
           ),
-          const _ApprovalPlaceholder(),
+          BlocBuilder<UserProfileBloc, UserProfileState>(
+            builder: (context, state) {
+              if (state is! UserProfileLoaded) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final permissions =
+                  state.profile.role?.permissions ?? const <String>[];
+              final hasApprovalAccess = ModulePermissions.expenseApproval.any(
+                permissions.contains,
+              );
+              final allowAllUsers = state.profile.allowAllUsers;
+              final availableScopes =
+                  allowAllUsers
+                      ? RequestAudienceScope.values
+                      : const [
+                          RequestAudienceScope.myReportees,
+                          RequestAudienceScope.myIndirectReportees,
+                        ];
+
+              if (!allowAllUsers &&
+                  _selectedApprovalScope == RequestAudienceScope.allUsers) {
+                _selectedApprovalScope = RequestAudienceScope.myReportees;
+              }
+
+              _approvalFuture ??= _remoteData
+                  .getExpenseApprovals(
+                    scope: _selectedApprovalScope,
+                    page: 1,
+                    limit: _approvalPageSize,
+                  )
+                ..then((pageData) {
+                  if (!mounted) return;
+                  setState(() {
+                    if (_approvalItems.isEmpty) {
+                      _approvalItems = pageData.items;
+                      _approvalTotalCount = pageData.totalCount;
+                      _approvalCurrentPage = 1;
+                    }
+                  });
+                }).catchError((_) {});
+
+              return Column(
+                children: [
+                  _buildToolbar(
+                    context,
+                    showAddButton: false,
+                    showApprovalFilter: hasApprovalAccess,
+                    availableScopes: availableScopes,
+                  ),
+                  SizedBox(height: screenHeight * 0.02),
+                  Expanded(
+                    child: !hasApprovalAccess
+                        ? const AccessDeniedView(
+                            title: 'Approval Access Required',
+                            message:
+                                'You do not have permission to view expense approvals.',
+                          )
+                        : FutureBuilder<ExpenseApprovalListPage>(
+                            future: _approvalFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                      ConnectionState.waiting &&
+                                  _approvalItems.isEmpty) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
+                              if (snapshot.hasError && _approvalItems.isEmpty) {
+                                return ApiErrorState(
+                                  rawMessage: snapshot.error.toString(),
+                                  onRetry: () => _loadApprovals(
+                                    scope: _selectedApprovalScope,
+                                  ),
+                                );
+                              }
+                              return _buildExpenseStatusSection(
+                                context: context,
+                                items: _approvalItems,
+                                screenWidth: screenWidth,
+                                screenHeight: screenHeight,
+                                isLoadingMore: _isLoadingMoreApprovals,
+                                onLoadMore: _loadMoreApprovals,
+                                onTapItem: (entry) async {
+                                  final shouldRefresh =
+                                      await Navigator.of(context).push<bool>(
+                                    MaterialPageRoute(
+                                      builder: (_) => ExpenseDetailPage(
+                                        expense: entry,
+                                        isApprovalMode: true,
+                                      ),
+                                    ),
+                                  );
+                                  if (shouldRefresh == true && mounted) {
+                                    _approvalItems = const [];
+                                    _approvalTotalCount = 0;
+                                    _loadApprovals(
+                                      scope: _selectedApprovalScope,
+                                    );
+                                  }
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildToolbar(BuildContext context) {
+  Widget _buildExpenseStatusSection({
+    required BuildContext context,
+    required List<ExpenseItemModel> items,
+    required double screenWidth,
+    required double screenHeight,
+    required ValueChanged<ExpenseItemModel> onTapItem,
+    bool isLoadingMore = false,
+    VoidCallback? onLoadMore,
+  }) {
+    return StatusTabbedSection<ExpenseApprovalStatus, ExpenseItemModel>(
+      controller: _statusTabController,
+      tabs: _statusTabs,
+      items: items,
+      searchQuery: _searchController.text.trim().toLowerCase(),
+      statusSelector: (item) => item.approvalStatus,
+      matchesSearch: (item, query) {
+        if (query.isEmpty) return true;
+        return item.expenseName.toLowerCase().contains(query) ||
+            item.expenseType.toLowerCase().contains(query) ||
+            (item.invoiceNumber?.toLowerCase().contains(query) ?? false) ||
+            (item.requestUser?.fullName.toLowerCase().contains(query) ?? false) ||
+            (item.requestUser?.employeeId.toLowerCase().contains(query) ?? false);
+      },
+      tabColorBuilder: RequestTabTheme.colorForIndex,
+      emptyBuilder: (context) => const RequestEmptyState(),
+      listBuilder: (context, filteredItems) {
+        final grouped = RequestGroupingUtils.groupByMonth(
+          items: filteredItems,
+          dateSelector: (item) => item.fromDate,
+        );
+        return NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (onLoadMore != null &&
+                notification.metrics.pixels >=
+                    notification.metrics.maxScrollExtent - 200) {
+              onLoadMore();
+            }
+            return false;
+          },
+          child: ListView.builder(
+            padding: EdgeInsets.only(bottom: screenHeight * 0.01),
+            itemCount: grouped.length + (isLoadingMore ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index >= grouped.length) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              final entry = grouped[index];
+              if (entry is String) {
+                return Padding(
+                  padding: EdgeInsets.only(
+                    top: index == 0 ? 0 : 14,
+                    bottom: 10,
+                    left: 14,
+                    right: 14,
+                  ),
+                  child: Text(
+                    entry,
+                    style: AppTextStyles.bodySmall(context).copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                );
+              }
+              return Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: screenWidth * 0.002,
+                  vertical: screenHeight * 0.006,
+                ),
+                child: Builder(
+                  builder: (_) {
+                    final expense = entry as ExpenseItemModel;
+                    return _ExpenseCard(
+                      item: expense,
+                      onTap: () => onTapItem(expense),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildToolbar(
+    BuildContext context, {
+    required bool showAddButton,
+    required bool showApprovalFilter,
+    required List<RequestAudienceScope> availableScopes,
+  }) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     return Row(
@@ -357,29 +567,39 @@ class _ExpensePageState extends State<ExpensePage>
           ),
         ),
         SizedBox(width: MediaQuery.of(context).size.width * 0.042),
-        SizedBox(
-          height: screenHeight * 0.060, // 5.0% of screen height
-          child: InkWell(
-            onTap: () async {
-              final state = context.read<UserProfileBloc>().state;
-              if (state is! UserProfileLoaded) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('User profile is still loading.'),
+        if (showAddButton)
+          SizedBox(
+            height: screenHeight * 0.060,
+            child: InkWell(
+              onTap: () async {
+                final state = context.read<UserProfileBloc>().state;
+                if (state is! UserProfileLoaded) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('User profile is still loading.'),
+                    ),
+                  );
+                  return;
+                }
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ExpenseFormPage(userId: state.profile.userId),
                   ),
                 );
-                return;
-              }
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ExpenseFormPage(userId: state.profile.userId),
-                ),
-              );
-            },
-            customBorder: const CircleBorder(),
-            child: SvgPicture.asset(AppAssets.addIcon),
+              },
+              customBorder: const CircleBorder(),
+              child: SvgPicture.asset(AppAssets.addIcon),
+            ),
           ),
-        ),
+        if (showApprovalFilter)
+          RequestAudienceFilterButton(
+            key: ValueKey(_selectedApprovalScope),
+            selectedScope: _selectedApprovalScope,
+            availableScopes: availableScopes,
+            onSelected: (scope) {
+              _loadApprovals(scope: scope);
+            },
+          ),
       ],
     );
   }
@@ -394,11 +614,13 @@ class _ExpenseCard extends StatelessWidget {
   Color get _accentColor {
     switch (item.approvalStatus) {
       case ExpenseApprovalStatus.approved:
-        return const Color(0xFF12B76A);
+        return AppColors.approvalSheetAccept; // 0xFF12B76A
       case ExpenseApprovalStatus.rejected:
+        return AppColors.approvalSheetReject; // 0xFFF04438
       case ExpenseApprovalStatus.withdrawn:
-        return const Color(0xFFF04438);
+        return AppColors.approvalSheetWithdrawn; // 0xFFF79009
       case ExpenseApprovalStatus.pending:
+        return AppColors.approvalSheetPending; //
       case ExpenseApprovalStatus.unknown:
         return const Color(0xFF0086C9);
     }
@@ -433,7 +655,7 @@ class _ExpenseCard extends StatelessWidget {
             children: [
               Container(
                 width: screenWidth * 0.02,
-                height: screenHeight * 0.14,
+                height: screenHeight * 0.16,
                 decoration: BoxDecoration(
                   color: _accentColor,
                   borderRadius: const BorderRadius.horizontal(
@@ -465,13 +687,13 @@ class _ExpenseCard extends StatelessWidget {
                             ),
                           ),
                           Container(
-                            padding:  EdgeInsets.symmetric(
-                              horizontal: screenWidth*0.02,
-                              vertical: screenHeight*0.003,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: screenWidth * 0.02,
+                              vertical: screenHeight * 0.003,
                             ),
                             decoration: BoxDecoration(
                               color: _accentColor,
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               _statusLabel,
@@ -483,14 +705,16 @@ class _ExpenseCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                       SizedBox(height: screenHeight*0.008),
+                      SizedBox(height: screenHeight * 0.008),
                       Text(
-                        'Amount : ${NumberFormat.currency(symbol: '₹ ', decimalDigits: 0).format(item.amount)}',
+                        item.amount > 0
+                            ? 'Amount : ${NumberFormat.currency(symbol: '₹ ', decimalDigits: 0).format(item.amount)}'
+                            : 'Type : ${item.expenseType}',
                         style: AppTextStyles.bodySmall(
                           context,
                         ).copyWith(color: AppColors.textPrimary),
                       ),
-                      SizedBox(height: screenHeight*0.004),
+                      SizedBox(height: screenHeight * 0.004),
                       Row(
                         children: [
                           Icon(
@@ -498,23 +722,27 @@ class _ExpenseCard extends StatelessWidget {
                             size: 14,
                             color: _accentColor,
                           ),
-                           SizedBox(width: screenWidth*0.02),
+                          SizedBox(width: screenWidth * 0.02),
                           Text(
-                            '${DateFormat('MMM d').format(item.fromDate)} to ${DateFormat('MMM d').format(item.toDate)}',
-                            style: AppTextStyles.bodySmall(context).copyWith(
+                            _getDateRange(
+                              item.fromDate,
+                              item.toDate,
+                            ),
+                              style: AppTextStyles.bodySmall(context).copyWith(
                               color: _accentColor,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
-                       SizedBox(height: screenHeight*0.004),
+                      SizedBox(height: screenHeight * 0.004),
                       Text(
                         'Duration : ${item.durationDays} ${item.durationDays == 1 ? 'day' : 'days'}',
                         style: AppTextStyles.bodySmall(
                           context,
                         ).copyWith(color: AppColors.textSecondary),
                       ),
+
                     ],
                   ),
                 ),
@@ -525,44 +753,35 @@ class _ExpenseCard extends StatelessWidget {
       ),
     );
   }
-}
 
-class _ApprovalPlaceholder extends StatelessWidget {
-  const _ApprovalPlaceholder();
+  String _getDateRange(DateTime fromDate, DateTime? toDate) {
+    // Basic date formatting, you might want to use DateFormat from intl here
+    final from =
+        "${fromDate.day.toString().padLeft(2, '0')} ${_getMonthName(fromDate.month)}";
+    if (toDate != null && toDate != fromDate) {
+      final to =
+          "${toDate.day.toString().padLeft(2, '0')} ${_getMonthName(toDate.month)}";
+      return "$from - $to";
+    }
+    return from;
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.approval_outlined,
-              size: 56,
-              color: AppColors.textTertiary,
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Approval tab is ready for integration.',
-              style: AppTextStyles.bodyMedium(context).copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Reimbursement listing is live. Approval data API is still needed to populate this tab.',
-              style: AppTextStyles.bodySmall(
-                context,
-              ).copyWith(color: AppColors.textSecondary),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
+  String _getMonthName(int month) {
+    const monthNames = [
+      "",
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    return monthNames[month];
   }
 }

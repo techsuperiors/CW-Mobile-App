@@ -1,11 +1,13 @@
 import 'package:collectivWork/core/network/api_client.dart';
 import 'package:collectivWork/core/constants/app_urls.dart';
 import 'package:collectivWork/core/error/exceptions.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 import 'package:dio/dio.dart';
 import '../../../../../../../../core/utils/data_encoder.dart';
 import '../models/leave_request_model.dart';
 import '../models/apply_leave_model.dart';
 import '../models/leave_history_model.dart';
+import '../models/team_leave_requests_page_model.dart';
 
 abstract class LeavesRemoteDataSource {
   /// Calls the [AppUrls.leaveRequests] endpoint.
@@ -13,8 +15,9 @@ abstract class LeavesRemoteDataSource {
   Future<List<LeaveRequestModel>> getLeaves();
 
   /// Calls the team approval list endpoint for manager/admin approvals.
-  Future<List<LeaveRequestModel>> getTeamLeaveRequests({
+  Future<TeamLeaveRequestsPageModel> getTeamLeaveRequests({
     required int clientId,
+    RequestAudienceScope scope = RequestAudienceScope.allUsers,
     int page = 1,
     int limit = 50,
   });
@@ -66,8 +69,9 @@ class LeavesRemoteDataSourceImpl implements LeavesRemoteDataSource {
   }
 
   @override
-  Future<List<LeaveRequestModel>> getTeamLeaveRequests({
+  Future<TeamLeaveRequestsPageModel> getTeamLeaveRequests({
     required int clientId,
+    RequestAudienceScope scope = RequestAudienceScope.allUsers,
     int page = 1,
     int limit = 50,
   }) async {
@@ -78,7 +82,7 @@ class LeavesRemoteDataSourceImpl implements LeavesRemoteDataSource {
         'approved_by': <dynamic>[],
         'leave_between': <dynamic>[],
         'status': <dynamic>[],
-        'request_type': 'Admin',
+        'request_type': scope.leaveRequestType,
         'limit': limit,
         'page': page,
       });
@@ -96,13 +100,7 @@ class LeavesRemoteDataSourceImpl implements LeavesRemoteDataSource {
         );
       }
 
-      final List<dynamic> requestsList = data['data'] as List<dynamic>? ?? [];
-
-      return requestsList
-          .map(
-            (item) => LeaveRequestModel.fromJson(item as Map<String, dynamic>),
-          )
-          .toList();
+      return TeamLeaveRequestsPageModel.fromJson(data);
     } on DioException catch (e) {
       throw ServerException(
         e.response?.data['message'] ?? e.message ?? 'Server error occurred',
@@ -124,7 +122,6 @@ class LeavesRemoteDataSourceImpl implements LeavesRemoteDataSource {
       );
 
       final responseData = response.data as Map<String, dynamic>;
-print("Data:-$responseData");
       if (responseData['success'] == true || response.statusCode == 200) {
         return ApplyLeaveResponseModel.fromJson(responseData);
       } else {

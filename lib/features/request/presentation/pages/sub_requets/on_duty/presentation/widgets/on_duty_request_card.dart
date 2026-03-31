@@ -87,7 +87,10 @@ class OnDutyRequestCard extends StatelessWidget {
                                 SizedBox(width: screenWidth * 0.016),
                                 Flexible(
                                   child: Text(
-                                    onDutyRequest.dateRange,
+                                    _getDateRange(
+                                      onDutyRequest.fromDate,
+                                      onDutyRequest.toDate,
+                                    ),
                                     style: AppTextStyles.bodySmall(
                                       context,
                                     ).copyWith(
@@ -146,6 +149,41 @@ class OnDutyRequestCard extends StatelessWidget {
         ),
       ),
     );
+  }
+  String _getDateRange(DateTime fromDate, DateTime? toDate) {
+    final from =
+        "${fromDate.day.toString().padLeft(2, '0')} ${_getMonthName(fromDate.month)}";
+    if (toDate != null && !_isSameCalendarDay(fromDate, toDate)) {
+      final to =
+          "${toDate.day.toString().padLeft(2, '0')} ${_getMonthName(toDate.month)}";
+      return "$from - $to";
+    }
+    return from;
+  }
+
+  bool _isSameCalendarDay(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
+  }
+
+  String _getMonthName(int month) {
+    const monthNames = [
+      "",
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    return monthNames[month];
   }
 
   Color _getStatusColor(OnDutyStatus status) {

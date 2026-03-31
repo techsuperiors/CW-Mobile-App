@@ -80,89 +80,102 @@ class UpcomingEvents extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.042),
       // ~4.2% of screen width
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(height: screenHeight * 0.02),
-          AppSectionHeader(title: AppStrings.upcomingEvents),
-          SizedBox(
-            height:
-                MediaQuery.of(context).size.height *
-                0.02, // 2% of screen height
-          ),
-          if (isLoading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (errorMessage != null)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    Text(
-                      errorMessage!,
-                      style: AppTextStyles.bodyMedium(
-                        context,
-                      ).copyWith(color: AppColors.error),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (onRefresh != null) ...[
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: onRefresh,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            )
-          else if (_convertToWidgetEvents(events).isEmpty)
-            Container(
-              height:
-                  MediaQuery.of(context).size.height *
-                  0.25, // Fixed height for consistency
-              alignment: Alignment.center,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  'No upcoming events',
-                  style: AppTextStyles.bodyMedium(
-                    context,
-                  ).copyWith(color: AppColors.textSecondary),
-                ),
-              ),
-            )
-          else
-            Container(
-              height:
-                  MediaQuery.of(context).size.height *
-                  0.28, // Fixed height to show 2-3 events
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: ListView.separated(
-                padding: EdgeInsets.zero,
-                scrollDirection: Axis.vertical,
-                physics: const BouncingScrollPhysics(),
-                itemCount: _convertToWidgetEvents(events).length,
-                separatorBuilder:
-                    (context, index) => SizedBox(
-                      height:
-                          MediaQuery.of(context).size.height *
-                          0.015, // 1.5% of screen height
-                    ),
-                itemBuilder: (context, index) {
-                  final widgetEvents = _convertToWidgetEvents(events);
-                  return _buildEventCard(context, widgetEvents[index]);
-                },
-              ),
+      child: Container(
+        padding: EdgeInsets.all(screenWidth * 0.032), // ~5.3% of screen width
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.textPrimary.withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-        ],
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppSectionHeader(title: AppStrings.upcomingEvents),
+            SizedBox(
+              height:
+                  MediaQuery.of(context).size.height *
+                  0.02, // 2% of screen height
+            ),
+            if (isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (errorMessage != null)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      Text(
+                        errorMessage!,
+                        style: AppTextStyles.bodyMedium(
+                          context,
+                        ).copyWith(color: AppColors.error),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (onRefresh != null) ...[
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: onRefresh,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              )
+            else if (_convertToWidgetEvents(events).isEmpty)
+              Container(
+                height:
+                    MediaQuery.of(context).size.height *
+                    0.25, // Fixed height for consistency
+                alignment: Alignment.center,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'No upcoming events',
+                    style: AppTextStyles.bodyMedium(
+                      context,
+                    ).copyWith(color: AppColors.textSecondary),
+                  ),
+                ),
+              )
+            else
+              Container(
+                height:
+                    MediaQuery.of(context).size.height *
+                    0.36, // Fixed height to show 2-3 events
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ListView.separated(
+                  padding: EdgeInsets.zero,
+                  scrollDirection: Axis.vertical,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _convertToWidgetEvents(events).length,
+                  separatorBuilder:
+                      (context, index) => SizedBox(
+                        height:
+                            MediaQuery.of(context).size.height *
+                            0.015, // 1.5% of screen height
+                      ),
+                  itemBuilder: (context, index) {
+                    final widgetEvents = _convertToWidgetEvents(events);
+                    return _buildEventCard(context, widgetEvents[index]);
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -177,11 +190,11 @@ class UpcomingEvents extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.attendanceAlmostWhite,
+        color: AppColors.backgroundLight.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: tealColor, width: 1),
+        border: Border.all(color: tealColor.withValues(alpha: 0.5), width: 1),
       ),
-      padding: EdgeInsets.all(screenWidth * 0.04), // 4% of screen width
+      padding: EdgeInsets.all(screenWidth * 0.02), // 4% of screen width
       child: Row(
         children: [
           // User icon in square with rounded corners
@@ -190,7 +203,7 @@ class UpcomingEvents extends StatelessWidget {
             height: smallerDimension * 0.133,
             decoration: BoxDecoration(
               color: Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
+              shape: BoxShape.circle,
             ),
             clipBehavior: Clip.antiAlias,
             child:

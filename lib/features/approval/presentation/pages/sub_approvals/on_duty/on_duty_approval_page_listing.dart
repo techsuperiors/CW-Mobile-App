@@ -15,13 +15,18 @@ import 'package:collectivWork/features/request/presentation/pages/sub_requets/on
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/on_duty/data/datasources/on_duty_remote_datasource.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/on_duty/data/repositories/on_duty_repository_impl.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/on_duty/domain/usecases/get_on_duty_requests.dart';
+import 'package:collectivWork/features/request/presentation/pages/sub_requets/on_duty/domain/usecases/get_on_duty_request_stats.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/on_duty/domain/usecases/get_team_on_duty_requests.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/on_duty/models/on_duty_request_model.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/on_duty/presentation/pages/on_duty_detail_page.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/on_duty/presentation/widgets/on_duty_request_card.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_filter_button.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_empty_state.dart';
 import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_grouping_utils.dart';
 import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_tab_theme.dart';
+import 'package:collectivWork/features/user/presentation/bloc/user_profile_bloc.dart';
+import 'package:collectivWork/features/user/presentation/bloc/user_profile_state.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -40,6 +45,8 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
     with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
+  RequestAudienceScope _selectedScope = RequestAudienceScope.allUsers;
+  static const int _pageSize = 50;
 
   static const List<StatusTabDefinition<OnDutyStatus>> _tabs = [
     StatusTabDefinition(label: 'All', status: null),
@@ -95,6 +102,21 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
       );
     }
 
+    final clientId = _resolveClientId(context);
+    final allowAllUsers = _allowAllUsers(context);
+    final availableScopes =
+        allowAllUsers
+            ? RequestAudienceScope.values
+            : const [
+              RequestAudienceScope.myReportees,
+              RequestAudienceScope.myIndirectReportees,
+            ];
+
+    if (!allowAllUsers &&
+        _selectedScope == RequestAudienceScope.allUsers) {
+      _selectedScope = RequestAudienceScope.myReportees;
+    }
+
     return BlocProvider(
       create: (_) {
         final networkInfo = NetworkInfoImpl(Connectivity());
@@ -108,8 +130,17 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
 
         return OnDutyRequestBloc(
           getOnDutyRequestsUseCase: GetOnDutyRequestsUseCase(repository),
+          getOnDutyRequestStatsUseCase: GetOnDutyRequestStatsUseCase(
+            repository,
+          ),
           getTeamOnDutyRequestsUseCase: GetTeamOnDutyRequestsUseCase(repository),
-        )..add(const LoadTeamOnDutyRequests());
+        )..add(
+          LoadTeamOnDutyRequests(
+            clientId: clientId,
+            scope: _selectedScope,
+            limit: _pageSize,
+          ),
+        );
       },
       child: ResponsiveScaffold(
         backgroundColor: AppColors.backgroundLight,
@@ -156,7 +187,7 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
           builder:
               (blocContext) => Column(
                 children: [
-                  _buildSearchSection(blocContext),
+                  _buildSearchSection(blocContext, availableScopes),
                   SizedBox(height: screenHeight * 0.01),
                   Expanded(
                     child: BlocBuilder<OnDutyRequestBloc, OnDutyRequestState>(
@@ -174,7 +205,13 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
                             onRetry:
                                 () => context
                                     .read<OnDutyRequestBloc>()
-                                    .add(const LoadTeamOnDutyRequests()),
+                                    .add(
+                                      LoadTeamOnDutyRequests(
+                                        clientId: clientId,
+                                        scope: _selectedScope,
+                                        limit: _pageSize,
+                                      ),
+                                    ),
                           );
                         }
 
@@ -195,6 +232,12 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
                           tabs: _tabs,
                           items: items,
                           searchQuery: loaded.searchQuery?.toLowerCase() ?? '',
+                          countOverrides: {
+                            null: loaded.totalCount,
+                            OnDutyStatus.pending: loaded.pendingCount,
+                            OnDutyStatus.approved: loaded.approvedCount,
+                            OnDutyStatus.rejected: loaded.rejectedCount,
+                          },
                           statusSelector: (item) => item.status,
                           matchesSearch: (item, query) {
                             if (query.isEmpty) return true;
@@ -211,59 +254,91 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
                               items: list,
                               dateSelector: (item) => item.appliedDate,
                             );
-                            return ListView.builder(
-                              padding: EdgeInsets.symmetric(
-                                vertical: screenHeight * 0.012,
-                              ),
-                              itemCount: grouped.length,
-                              itemBuilder: (context, index) {
-                                final entry = grouped[index];
-                                if (entry is String) {
-                                  return Padding(
-                                    padding: EdgeInsets.only(
-                                      top:
-                                          index == 0
-                                              ? 0
-                                              : screenHeight * 0.014,
-                                      bottom: screenHeight * 0.010,
-                                    ),
-                                    child: Text(
-                                      entry,
-                                      style: AppTextStyles.bodySmall(
-                                        context,
-                                      ).copyWith(
-                                        fontWeight: FontWeight.w500,
-                                        color: AppColors.textSecondary,
-                                      ),
+                            return NotificationListener<ScrollNotification>(
+                              onNotification: (notification) {
+                                if (notification.metrics.pixels >=
+                                    notification.metrics.maxScrollExtent -
+                                        200) {
+                                  context.read<OnDutyRequestBloc>().add(
+                                    LoadMoreTeamOnDutyRequests(
+                                      clientId: clientId,
+                                      limit: _pageSize,
                                     ),
                                   );
                                 }
-
-                                final req = entry as OnDutyRequestModel;
-                                return OnDutyRequestCard(
-                                  onDutyRequest: req,
-                                  onTap: () async {
-                                    final shouldRefresh = await Navigator.push<
-                                      bool
-                                    >(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder:
-                                            (context) => OnDutyDetailPage(
-                                              onDutyRequest: req,
-                                              isApprovalMode: true,
-                                            ),
+                                return false;
+                              },
+                              child: ListView.builder(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: screenHeight * 0.012,
+                                ),
+                                itemCount:
+                                    grouped.length +
+                                    (loaded.isLoadingMore ? 1 : 0),
+                                itemBuilder: (context, index) {
+                                  if (index >= grouped.length) {
+                                    return Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: screenHeight * 0.02,
+                                      ),
+                                      child: const Center(
+                                        child: CircularProgressIndicator(),
                                       ),
                                     );
-                                    if (shouldRefresh == true &&
-                                        context.mounted) {
-                                      context.read<OnDutyRequestBloc>().add(
-                                        const LoadTeamOnDutyRequests(),
+                                  }
+
+                                  final entry = grouped[index];
+                                  if (entry is String) {
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                        top:
+                                            index == 0
+                                                ? 0
+                                                : screenHeight * 0.014,
+                                        bottom: screenHeight * 0.010,
+                                      ),
+                                      child: Text(
+                                        entry,
+                                        style: AppTextStyles.bodySmall(
+                                          context,
+                                        ).copyWith(
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  final req = entry as OnDutyRequestModel;
+                                  return OnDutyRequestCard(
+                                    onDutyRequest: req,
+                                    onTap: () async {
+                                      final shouldRefresh = await Navigator.push<
+                                        bool
+                                      >(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => OnDutyDetailPage(
+                                                onDutyRequest: req,
+                                                isApprovalMode: true,
+                                              ),
+                                        ),
                                       );
-                                    }
-                                  },
-                                );
-                              },
+                                      if (shouldRefresh == true &&
+                                          context.mounted) {
+                                        context.read<OnDutyRequestBloc>().add(
+                                          LoadTeamOnDutyRequests(
+                                            clientId: clientId,
+                                            scope: _selectedScope,
+                                            limit: _pageSize,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  );
+                                },
+                              ),
                             );
                           },
                         );
@@ -277,7 +352,28 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
     );
   }
 
-  Widget _buildSearchSection(BuildContext context) {
+  bool _allowAllUsers(BuildContext context) {
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is! UserProfileLoaded) {
+      return false;
+    }
+
+    return profileState.profile.allowAllUsers;
+  }
+
+  int _resolveClientId(BuildContext context) {
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is! UserProfileLoaded) {
+      return 0;
+    }
+
+    return profileState.profile.clientId;
+  }
+
+  Widget _buildSearchSection(
+    BuildContext context,
+    List<RequestAudienceScope> availableScopes,
+  ) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
@@ -339,6 +435,23 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
               },
             ),
           ),
+        ),
+        SizedBox(width: screenWidth * 0.03),
+        RequestAudienceFilterButton(
+          selectedScope: _selectedScope,
+          availableScopes: availableScopes,
+          onSelected: (scope) {
+            setState(() {
+              _selectedScope = scope;
+            });
+            context.read<OnDutyRequestBloc>().add(
+              LoadTeamOnDutyRequests(
+                clientId: _resolveClientId(context),
+                scope: scope,
+                limit: _pageSize,
+              ),
+            );
+          },
         ),
       ],
     );

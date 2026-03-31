@@ -8,6 +8,7 @@ import '../../../../../../../../core/utils/data_encoder.dart';
 import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
 import '../../../../../../../attendance/data/models/attendance_request_comment_model.dart';
 import '../../models/on_duty_request_model.dart';
+import '../../models/on_duty_request_stats_model.dart';
 import '../../domain/entities/on_duty_detail.dart';
 import '../models/on_duty_detail_model.dart';
 
@@ -15,9 +16,15 @@ abstract class OnDutyRemoteDataSource {
   Future<List<OnDutyRequestModel>> getOnDutyRequests();
 
   Future<List<OnDutyRequestModel>> getTeamOnDutyRequests({
+    required int clientId,
     int page = 1,
     int limit = 50,
     String requestType = 'All',
+  });
+
+  Future<OnDutyRequestStatsModel> getOnDutyRequestStats({
+    required int clientId,
+    String requestType = 'User',
   });
 
   Future<OnDutyDetail> getOnDutyRequestDetail(int requestId);
@@ -96,11 +103,19 @@ class OnDutyRemoteDataSourceImpl implements OnDutyRemoteDataSource {
 
   @override
   Future<List<OnDutyRequestModel>> getTeamOnDutyRequests({
+    required int clientId,
     int page = 1,
     int limit = 50,
     String requestType = 'All',
   }) async {
     final encodedData = encodeData({
+      'client_id': clientId,
+      'request_for': [],
+      'users': [],
+      'date': DateTime.now().toIso8601String().split('T').first,
+      'approved_by': [],
+      'rejected_by': [],
+      'status': [],
       'request_type': requestType,
       'page': page,
       'limit': limit,
@@ -127,6 +142,48 @@ class OnDutyRemoteDataSourceImpl implements OnDutyRemoteDataSource {
           .whereType<Map<String, dynamic>>()
           .map(OnDutyRequestModel.fromJson)
           .toList();
+    } on AppException {
+      rethrow;
+    } on DioException catch (e) {
+      _throwMappedDioException(e);
+    } catch (_) {
+      throw const ServerException(AppStrings.unknownError);
+    }
+  }
+
+  @override
+  Future<OnDutyRequestStatsModel> getOnDutyRequestStats({
+    required int clientId,
+    String requestType = 'User',
+  }) async {
+    final encodedData = encodeData({
+      'client_id': clientId,
+      'requested_to': [],
+      'requested_by': [],
+      'approved_by': [],
+      'rejected_by': [],
+      'request_type': requestType,
+      'status': [],
+    });
+
+    try {
+      final response = await apiClient.get(
+        '${AppUrls.onDutyRequestStats}?payload=$encodedData',
+        options: Options(headers: const {'Content-Type': 'application/json'}),
+      );
+
+      final data = response.data as Map<String, dynamic>?;
+      if (data == null) {
+        throw const ServerException('Invalid server response');
+      }
+      if (data['success'] != true) {
+        throw ServerException(
+          data['message'] as String? ?? 'Failed to load On-Duty stats',
+        );
+      }
+
+      final stats = data['data'] as Map<String, dynamic>? ?? const {};
+      return OnDutyRequestStatsModel.fromJson(stats);
     } on AppException {
       rethrow;
     } on DioException catch (e) {

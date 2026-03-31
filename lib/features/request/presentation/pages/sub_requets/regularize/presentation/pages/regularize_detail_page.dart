@@ -7,9 +7,11 @@ import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/constants/app_urls.dart';
 import '../../../../../../../../core/utils/data_encoder.dart';
+import '../../../../../../../../core/utils/error_message_mapper.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/utils/token_storage.dart';
 import '../../../../../../../../core/utils/app_navigator.dart';
+import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../../core/network/api_service.dart';
 import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
@@ -112,6 +114,14 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     return BlocProvider.value(
       value: _regularizeDetailBloc,
       child: BlocConsumer<RegularizeDetailBloc, RegularizeDetailState>(
+        listenWhen: (previous, current) {
+          if (current is! RegularizeDetailError) return true;
+          final isInitialLoadFailure =
+              current.detail == null &&
+              (previous is RegularizeDetailInitial ||
+                  previous is RegularizeDetailLoading);
+          return !isInitialLoadFailure;
+        },
         listener: (context, state) {
           if (state is RegularizeDetailStatusUpdated) {
             _shouldRefreshListing = true;
@@ -122,11 +132,11 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
               ),
             );
           } else if (state is RegularizeDetailError) {
-            debugPrint('--- Regularize Detail Error ---');
-            debugPrint('Error Message: ${state.message}');
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.message),
+                content: Text(
+                  ErrorMessageMapper.toUserFriendlyMessage(state.message),
+                ),
                 backgroundColor: AppColors.error,
               ),
             );
@@ -208,20 +218,37 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                               )
                               : null)
                           : BottomNavBar(
-                            currentIndex: 3,
-                            onTap: NavigationHelper.getBottomNavHandler(
-                              context,
+                              currentIndex: 3,
+                              onTap: NavigationHelper.getBottomNavHandler(
+                                context,
+                              ),
                             ),
+                  body:
+                      state is RegularizeDetailError && state.detail == null
+                          ? ApiErrorState(
+                            title: 'Unable to load regularize details',
+                            rawMessage: state.message,
+                            onRetry:
+                                () => context.read<RegularizeDetailBloc>().add(
+                                  LoadRegularizeDetail(
+                                    requestId:
+                                        int.tryParse(
+                                          widget.regularizeRequest.id,
+                                        ) ??
+                                        0,
+                                    clientId: _clientId,
+                                  ),
+                                ),
+                          )
+                          : _buildDetailsContent(
+                            context,
+                            screenWidth,
+                            screenHeight,
+                            detail,
+                            currentRequest,
+                            comments,
+                            state,
                           ),
-                  body: _buildDetailsContent(
-                    context,
-                    screenWidth,
-                    screenHeight,
-                    detail,
-                    currentRequest,
-                    comments,
-                    state,
-                  ),
                 ),
                 if (isBusy)
                   Container(

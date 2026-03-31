@@ -9,6 +9,7 @@ import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../../../../../../user/presentation/bloc/user_profile_bloc.dart';
@@ -115,7 +116,7 @@ class _AssignedAssetsPageState extends State<AssignedAssetsPage>
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error loading data: ${e.toString()}';
+        _errorMessage = e.toString();
         _isLoading = false;
       });
     }
@@ -219,26 +220,10 @@ class _AssignedAssetsPageState extends State<AssignedAssetsPage>
     }
 
     if (_errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, color: AppColors.error, size: 48),
-            const SizedBox(height: 16),
-            Text(
-              _errorMessage!,
-              style: AppTextStyles.bodyMedium(
-                context,
-              ).copyWith(color: AppColors.textSecondary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _userId != null ? () => _loadAll(_userId!) : null,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
+      return ApiErrorState(
+        title: 'Unable to load assets',
+        rawMessage: _errorMessage!,
+        onRetry: _userId != null ? () => _loadAll(_userId!) : null,
       );
     }
 

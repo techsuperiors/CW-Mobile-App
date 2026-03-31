@@ -13,8 +13,10 @@ import '../../../../../../../../core/network/api_service.dart';
 import '../../../../../../../../core/constants/app_urls.dart';
 import '../../../../../../../../core/utils/app_navigator.dart';
 import '../../../../../../../../core/utils/data_encoder.dart';
+import '../../../../../../../../core/utils/error_message_mapper.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/utils/token_storage.dart';
+import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../approval/presentation/widgets/approval_action_bar.dart';
 import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
@@ -104,6 +106,14 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
     return BlocProvider.value(
       value: _onDutyDetailBloc,
       child: BlocConsumer<OnDutyDetailBloc, OnDutyDetailState>(
+        listenWhen: (previous, current) {
+          if (current is! OnDutyDetailError) return true;
+          final isInitialLoadFailure =
+              current.detail == null &&
+              (previous is OnDutyDetailInitial ||
+                  previous is OnDutyDetailLoading);
+          return !isInitialLoadFailure;
+        },
         listener: (context, state) {
           if (state is OnDutyDetailStatusUpdated) {
             _shouldRefreshListing = true;
@@ -116,7 +126,9 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
           } else if (state is OnDutyDetailError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.message),
+                content: Text(
+                  ErrorMessageMapper.toUserFriendlyMessage(state.message),
+                ),
                 backgroundColor: AppColors.error,
               ),
             );
@@ -189,14 +201,29 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
                             currentIndex: 3,
                             onTap: NavigationHelper.getBottomNavHandler(context),
                           ),
-                  body: _buildDetailsContent(
-                    context,
-                    screenWidth,
-                    screenHeight,
-                    currentRequest,
-                    comments,
-                    detail,
-                  ),
+                  body:
+                      state is OnDutyDetailError && state.detail == null
+                          ? ApiErrorState(
+                            title: 'Unable to load on duty details',
+                            rawMessage: state.message,
+                            onRetry:
+                                () => context.read<OnDutyDetailBloc>().add(
+                                  LoadOnDutyDetail(
+                                    requestId:
+                                        int.tryParse(widget.onDutyRequest.id) ??
+                                        0,
+                                    clientId: _clientId,
+                                  ),
+                                ),
+                          )
+                          : _buildDetailsContent(
+                            context,
+                            screenWidth,
+                            screenHeight,
+                            currentRequest,
+                            comments,
+                            detail,
+                          ),
                 ),
                 if (isBusy)
                   Container(

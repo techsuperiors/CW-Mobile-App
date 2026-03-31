@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webcontent_converter/webcontent_converter.dart';
 
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/utils/error_message_mapper.dart';
 import '../../domain/models/payslip_model.dart';
 
 /// Payslip preview page with HTML rendering and PDF download support.
@@ -60,19 +62,17 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
           encoding: utf8,
         ),
       );
-    } else {
+    } else
+    {
       _isPageLoading = false;
     }
   }
 
   Future<void> _downloadPdf() async {
     if (_htmlContent.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Payslip template is not available yet.'),
-          backgroundColor: AppColors.error,
-        ),
+      _showSnack(
+        'Payslip template is not available yet.',
+        isError: true,
       );
       return;
     }
@@ -82,8 +82,15 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
     });
 
     try {
+      final hasPermission = await _ensureDownloadPermission();
+      if (!hasPermission) {
+        if (!mounted) return;
+        await _showPermissionDeniedDialog();
+        return;
+      }
+
       final fileName =
-          'Payslip_${widget.payslip.displayName.replaceAll(' ', '_')}.pdf';
+          'Payslip_${_sanitizeFileName(widget.payslip.displayName, '.pdf')}';
       final directory = await _resolveDownloadDirectory();
       await directory.create(recursive: true);
       final filePath = path.join(directory.path, fileName);
@@ -97,24 +104,19 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
         throw Exception('Could not generate payslip PDF.');
       }
       final file = File(savedPath);
+      if (!await file.exists()) {
+        throw Exception('Downloaded file could not be found.');
+      }
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Payslip Successfully downloaded'),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 3),
-        ),
+      _showSnack(
+        Platform.isIOS
+            ? 'Payslip saved to Files in the Payslips folder.'
+            : 'Payslip downloaded to your Downloads folder.',
+        isError: false,
       );
       await OpenFilex.open(file.path);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error downloading PDF: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      _showSnack(e.toString(), isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -124,9 +126,39 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
     }
   }
 
+  Future<bool> _ensureDownloadPermission() async {
+    if (!Platform.isAndroid) {
+      return true;
+    }
+
+    final storageStatus = await Permission.storage.status;
+    if (storageStatus.isGranted) {
+      return true;
+    }
+
+    final storageResult = await Permission.storage.request();
+    if (storageResult.isGranted) {
+      return true;
+    }
+
+    final manageStatus = await Permission.manageExternalStorage.status;
+    if (manageStatus.isGranted) {
+      return true;
+    }
+
+    final manageResult = await Permission.manageExternalStorage.request();
+    return manageResult.isGranted;
+  }
+
   Future<Directory> _resolveDownloadDirectory() async {
     if (Platform.isIOS) {
-      return getApplicationDocumentsDirectory();
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      return Directory(path.join(documentsDirectory.path, 'Payslips'));
+    }
+
+    final publicDownloadDir = Directory('/storage/emulated/0/Download');
+    if (await publicDownloadDir.exists()) {
+      return publicDownloadDir;
     }
 
     final scopedDownloadDirs = await getExternalStorageDirectories(
@@ -136,12 +168,59 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
       return scopedDownloadDirs.first;
     }
 
-    final externalDir = await getExternalStorageDirectory();
-    if (externalDir != null) {
-      return externalDir;
-    }
+    return (await getExternalStorageDirectory()) ??
+        await getApplicationDocumentsDirectory();
+  }
 
-    return getApplicationDocumentsDirectory();
+  String _sanitizeFileName(String rawName, String extension) {
+    final normalizedName =
+        rawName.trim().isEmpty ? 'payslip' : rawName.trim();
+    final sanitized = normalizedName
+        .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
+        .replaceAll(RegExp(r'\s+'), '_');
+    return sanitized.endsWith(extension) ? sanitized : '$sanitized$extension';
+  }
+
+  void _showSnack(String message, {required bool isError}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isError ? ErrorMessageMapper.toUserFriendlyMessage(message) : message,
+        ),
+        backgroundColor: isError ? AppColors.error : AppColors.success,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _showPermissionDeniedDialog() async {
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Storage Permission Needed'),
+          content: const Text(
+            'Allow storage access to save the payslip PDF to your device.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await openAppSettings();
+              },
+              child: const Text('Open Settings'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   String _buildHtmlDocument(String rawHtml) {

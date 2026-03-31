@@ -18,6 +18,22 @@ class CalendarDayModel extends CalendarDayEntity {
     super.punchIn,
     super.punchOut,
     super.isLateEntry,
+    super.punchInMode,
+    super.punchOutMode,
+    super.actualGrossHours,
+    super.actualEffectiveHours,
+    super.actualBreakHours,
+    super.shiftDay,
+    super.shiftPunchIn,
+    super.shiftPunchOut,
+    super.shiftBreakTime,
+    super.shiftGrossHours,
+    super.shiftEffectiveHours,
+    super.overtimeHours,
+    super.lateBySeconds,
+    super.earlyBySeconds,
+    super.firstHalf,
+    super.secondHalf,
   });
 
   /// Factory constructor to create a [CalendarDayModel] from the new API JSON.
@@ -46,6 +62,9 @@ class CalendarDayModel extends CalendarDayEntity {
       }
     }
 
+    final shiftTiming = json['shift_timing'];
+    final overtime = json['over_time'];
+
     return CalendarDayModel(
       date: localDateStr,
       status: json['status'] as String? ?? '',
@@ -57,6 +76,43 @@ class CalendarDayModel extends CalendarDayEntity {
       punchIn: json['punch_in'] as String?,
       punchOut: json['punch_out'] as String?,
       isLateEntry: json['is_late_entries'] as bool? ?? false,
+      punchInMode: json['punch_in_mode'] as String?,
+      punchOutMode: json['punch_out_mode'] as String?,
+      actualGrossHours: json['actual_gross_hrs']?.toString(),
+      actualEffectiveHours: json['actual_effective_hrs']?.toString(),
+      actualBreakHours: json['actual_break_time']?.toString(),
+      shiftDay:
+          shiftTiming is Map<String, dynamic>
+              ? shiftTiming['day'] as String?
+              : null,
+      shiftPunchIn:
+          shiftTiming is Map<String, dynamic>
+              ? shiftTiming['punch_in'] as String?
+              : null,
+      shiftPunchOut:
+          shiftTiming is Map<String, dynamic>
+              ? shiftTiming['punch_out'] as String?
+              : null,
+      shiftBreakTime:
+          shiftTiming is Map<String, dynamic>
+              ? shiftTiming['break_time'] as String?
+              : null,
+      shiftGrossHours:
+          shiftTiming is Map<String, dynamic>
+              ? shiftTiming['gross_hours'] as String?
+              : null,
+      shiftEffectiveHours:
+          shiftTiming is Map<String, dynamic>
+              ? shiftTiming['effective_hours'] as String?
+              : null,
+      overtimeHours:
+          overtime is Map<String, dynamic>
+              ? overtime['total']?.toString()
+              : overtime?.toString(),
+      lateBySeconds: json['lateInSeconds'] as int?,
+      earlyBySeconds: json['earlyInSeconds'] as int?,
+      firstHalf: json['first_half'] as bool? ?? false,
+      secondHalf: json['second_half'] as bool? ?? false,
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 import '../../domain/entities/leave_entity.dart';
 
 /// Leave request events
@@ -16,17 +17,32 @@ class LoadLeaveRequests extends LeaveRequestEvent {
 
 class LoadTeamLeaveRequests extends LeaveRequestEvent {
   final int clientId;
+  final RequestAudienceScope scope;
   final int page;
   final int limit;
 
   const LoadTeamLeaveRequests({
     required this.clientId,
+    this.scope = RequestAudienceScope.allUsers,
     this.page = 1,
     this.limit = 50,
   });
 
   @override
-  List<Object> get props => [clientId, page, limit];
+  List<Object> get props => [clientId, scope, page, limit];
+}
+
+class LoadMoreTeamLeaveRequests extends LeaveRequestEvent {
+  final int clientId;
+  final int limit;
+
+  const LoadMoreTeamLeaveRequests({
+    required this.clientId,
+    this.limit = 5,
+  });
+
+  @override
+  List<Object> get props => [clientId, limit];
 }
 
 /// Search leave requests event

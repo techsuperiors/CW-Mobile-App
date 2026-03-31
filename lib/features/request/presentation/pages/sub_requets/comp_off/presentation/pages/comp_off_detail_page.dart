@@ -10,7 +10,9 @@ import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../../core/utils/error_message_mapper.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../approval/presentation/widgets/approval_action_bar.dart';
 import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
@@ -84,6 +86,14 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
       child: BlocProvider.value(
         value: _bloc,
         child: BlocConsumer<CompOffDetailBloc, CompOffDetailState>(
+          listenWhen: (previous, current) {
+            if (current is! CompOffDetailError) return true;
+            final isInitialLoadFailure =
+                current.detail == null &&
+                (previous is CompOffDetailInitial ||
+                    previous is CompOffDetailLoading);
+            return !isInitialLoadFailure;
+          },
           listener: (context, state) {
             if (state is CompOffDetailStatus) {
               _shouldRefresh = true;
@@ -99,7 +109,9 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
             } else if (state is CompOffDetailError) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(state.message),
+                  content: Text(
+                    ErrorMessageMapper.toUserFriendlyMessage(state.message),
+                  ),
                   backgroundColor: AppColors.error,
                 ),
               );
@@ -167,13 +179,25 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
                               context,
                             ),
                           ),
-                  body: _buildBody(
-                    context,
-                    detail,
-                    comments,
-                    currentRequest.status,
-                    currentRequest,
-                  ),
+                  body:
+                      state is CompOffDetailError && state.detail == null
+                          ? ApiErrorState(
+                            title: 'Unable to load comp-off details',
+                            rawMessage: state.message,
+                            onRetry:
+                                () => context.read<CompOffDetailBloc>().add(
+                                  LoadCompOffDetail(
+                                    int.tryParse(widget.request.id) ?? 0,
+                                  ),
+                                ),
+                          )
+                          : _buildBody(
+                            context,
+                            detail,
+                            comments,
+                            currentRequest.status,
+                            currentRequest,
+                          ),
                 ),
                 if (isBusy)
                   const Positioned.fill(

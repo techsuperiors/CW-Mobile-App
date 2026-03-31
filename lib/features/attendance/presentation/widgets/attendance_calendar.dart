@@ -27,6 +27,8 @@ class AttendanceCalendar extends StatefulWidget {
 
 class _AttendanceCalendarState extends State<AttendanceCalendar> {
   late DateTime _currentDate;
+  static const Color _shortLeaveColor = Color(0xFFFFE38E);
+  static const Color _halfDayLeaveColor = Color(0xFFFFC94D);
 
   static const _headers = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
@@ -240,6 +242,26 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
           textColor: Colors.white,
           showCircle: true,
           label: day.leaveType ?? 'Leave',
+          isHoliday: false,
+          isWeekend: false,
+          isLate: false,
+        );
+      case 'Short Leave':
+        return _DayStyle(
+          circleColor: _shortLeaveColor,
+          textColor: Colors.white,
+          showCircle: true,
+          label: 'Short Leave',
+          isHoliday: false,
+          isWeekend: false,
+          isLate: false,
+        );
+      case 'Half Day Leave':
+        return _DayStyle(
+          circleColor: _halfDayLeaveColor,
+          textColor: Colors.white,
+          showCircle: true,
+          label: 'Half Day Leave',
           isHoliday: false,
           isWeekend: false,
           isLate: false,
@@ -522,24 +544,20 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
                   }),
                 ),
 
-              SizedBox(height: availableW * 0.03),
+              SizedBox(height: availableW * 0.08),
 
               // Legend
               Wrap(
                 spacing: availableW * 0.04,
-                runSpacing: 4,
+                runSpacing:16,
+                alignment: WrapAlignment.center,
                 children: [
                   _legend('Present', const Color(0xFF0B7F7F)),
                   _legend('WFH', const Color(0xFF27AE60)),
                   _legend('Leave', const Color(0xFFFF8C00)),
                   _legend('Absent', const Color(0xFFE74C3C)),
-                ],
-              ),
-              SizedBox(height: availableW * 0.04),
-              Wrap(
-                spacing: availableW * 0.04,
-                runSpacing: 4,
-                children: [
+                  _legend('Short Leave', _shortLeaveColor),
+                  _legend('Half Day Leave', _halfDayLeaveColor),
                   _legend('Holiday', const Color(0xFFFF6B6B)),
                   _legend(
                     'Late',
@@ -548,6 +566,19 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
                   ),
                 ],
               ),
+              SizedBox(height: availableW * 0.04),
+              // Wrap(
+              //   spacing: availableW * 0.04,
+              //   runSpacing: 4,
+              //   children: [
+              //     _legend('Holiday', const Color(0xFFFF6B6B)),
+              //     _legend(
+              //       'Late',
+              //       const Color(0xFFFF6B6B),
+              //       AppAssets.iconaLatePunchIn,
+              //     ),
+              //   ],
+              // ),
             ],
           ),
         );

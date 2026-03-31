@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 
 import '../models/overtime_request_model.dart';
 
@@ -14,18 +15,33 @@ class LoadOvertimeRequests extends OvertimeRequestEvent {
 }
 
 class LoadTeamOvertimeRequests extends OvertimeRequestEvent {
+  final int clientId;
   final int page;
   final int limit;
-  final String requestType;
+  final RequestAudienceScope scope;
 
   const LoadTeamOvertimeRequests({
+    required this.clientId,
     this.page = 1,
-    this.limit = 20,
-    this.requestType = 'All',
+    this.limit = 50,
+    this.scope = RequestAudienceScope.allUsers,
   });
 
   @override
-  List<Object?> get props => [page, limit, requestType];
+  List<Object?> get props => [clientId, page, limit, scope];
+}
+
+class LoadMoreTeamOvertimeRequests extends OvertimeRequestEvent {
+  final int clientId;
+  final int limit;
+
+  const LoadMoreTeamOvertimeRequests({
+    required this.clientId,
+    this.limit = 50,
+  });
+
+  @override
+  List<Object?> get props => [clientId, limit];
 }
 
 class SearchOvertimeRequests extends OvertimeRequestEvent {

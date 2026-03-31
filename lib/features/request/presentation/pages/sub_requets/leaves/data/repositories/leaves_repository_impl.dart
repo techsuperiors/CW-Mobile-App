@@ -3,9 +3,11 @@ import 'package:collectivWork/core/error/exceptions.dart';
 import 'package:collectivWork/core/constants/app_strings.dart';
 import 'package:collectivWork/core/error/failures.dart';
 import 'package:collectivWork/core/network/network_info.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 import '../../domain/entities/leave_entity.dart';
 import '../../domain/entities/apply_leave_entity.dart';
 import '../../domain/entities/leave_history_entity.dart';
+import '../../domain/entities/team_leave_requests_page_entity.dart';
 import '../../domain/repositories/leaves_repository.dart';
 import '../datasources/leaves_remote_datasource.dart';
 import '../models/apply_leave_model.dart';
@@ -38,8 +40,9 @@ class LeavesRepositoryImpl implements LeavesRepository {
   }
 
   @override
-  Future<Either<Failure, List<LeaveEntity>>> getTeamLeaveRequests({
+  Future<Either<Failure, TeamLeaveRequestsPageEntity>> getTeamLeaveRequests({
     required int clientId,
+    RequestAudienceScope scope = RequestAudienceScope.allUsers,
     int page = 1,
     int limit = 50,
   }) async {
@@ -47,6 +50,7 @@ class LeavesRepositoryImpl implements LeavesRepository {
       try {
         final remoteLeaves = await remoteDataSource.getTeamLeaveRequests(
           clientId: clientId,
+          scope: scope,
           page: page,
           limit: limit,
         );

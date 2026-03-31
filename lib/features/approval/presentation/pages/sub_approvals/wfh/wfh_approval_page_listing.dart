@@ -15,10 +15,15 @@ import 'package:collectivWork/features/request/presentation/pages/sub_requets/wf
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/wfh/data/datasources/wfh_remote_datasource.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/wfh/data/repositories/wfh_repository_impl.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/wfh/domain/usecases/get_team_wfh_requests.dart';
+import 'package:collectivWork/features/request/presentation/pages/sub_requets/wfh/domain/usecases/get_wfh_request_stats.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/wfh/domain/usecases/get_wfh_requests.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/wfh/models/wfh_request_model.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/wfh/presentation/pages/wfh_detail_page.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/wfh/presentation/widgets/wfh_request_card.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_filter_button.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
+import 'package:collectivWork/features/user/presentation/bloc/user_profile_bloc.dart';
+import 'package:collectivWork/features/user/presentation/bloc/user_profile_state.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -37,6 +42,8 @@ class _WfhApprovalPageListingState extends State<WfhApprovalPageListing>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
+  RequestAudienceScope _selectedScope = RequestAudienceScope.allUsers;
+  static const int _pageSize = 50;
 
   static const List<StatusTabDefinition<WfhStatus>> _tabs = [
     StatusTabDefinition(label: 'All', status: null),
@@ -97,16 +104,38 @@ class _WfhApprovalPageListingState extends State<WfhApprovalPageListing>
     final remoteDataSource = WfhRemoteDataSourceImpl(apiClient: apiClient);
     final repository = WfhRepositoryImpl(remoteDataSource: remoteDataSource);
     final getWfhRequestsUseCase = GetWfhRequestsUseCase(repository);
+    final getWfhRequestStatsUseCase = GetWfhRequestStatsUseCase(repository);
+    final clientId = _resolveClientId(context);
+    final allowAllUsers = _allowAllUsers(context);
+    final availableScopes =
+        allowAllUsers
+            ? RequestAudienceScope.values
+            : const [
+              RequestAudienceScope.myReportees,
+              RequestAudienceScope.myIndirectReportees,
+            ];
+
+    if (!allowAllUsers &&
+        _selectedScope == RequestAudienceScope.allUsers) {
+      _selectedScope = RequestAudienceScope.myReportees;
+    }
 
     return BlocProvider(
       create:
           (_) =>
               WfhRequestBloc(
                 getWfhRequestsUseCase: getWfhRequestsUseCase,
+                getWfhRequestStatsUseCase: getWfhRequestStatsUseCase,
                 getTeamWfhRequestsUseCase: GetTeamWfhRequestsUseCase(
                   repository,
                 ),
-              )..add(const LoadTeamWfhRequests()),
+              )..add(
+                LoadTeamWfhRequests(
+                  clientId: clientId,
+                  scope: _selectedScope,
+                  limit: _pageSize,
+                ),
+              ),
       child: ResponsiveScaffold(
         backgroundColor: AppColors.backgroundLight,
         appBar: AppBar(
@@ -152,7 +181,10 @@ class _WfhApprovalPageListingState extends State<WfhApprovalPageListing>
           builder:
               (blocContext) => Column(
                 children: [
-                  _buildSearchSection(blocContext),
+                  _buildSearchSection(
+                    blocContext,
+                    availableScopes,
+                  ),
                   SizedBox(height: screenHeight * 0.01),
                   Expanded(
                     child: BlocBuilder<WfhRequestBloc, WfhRequestState>(
@@ -170,7 +202,13 @@ class _WfhApprovalPageListingState extends State<WfhApprovalPageListing>
                             onRetry:
                                 () => context
                                     .read<WfhRequestBloc>()
-                                    .add(const LoadTeamWfhRequests()),
+                                    .add(
+                                      LoadTeamWfhRequests(
+                                        clientId: clientId,
+                                        scope: _selectedScope,
+                                        limit: _pageSize,
+                                      ),
+                                    ),
                           );
                         }
 
@@ -180,6 +218,12 @@ class _WfhApprovalPageListingState extends State<WfhApprovalPageListing>
                           tabs: _tabs,
                           items: loaded.wfhRequests,
                           searchQuery: loaded.searchQuery?.toLowerCase() ?? '',
+                          countOverrides: {
+                            null: loaded.totalCount,
+                            WfhStatus.pending: loaded.pendingCount,
+                            WfhStatus.approved: loaded.approvedCount,
+                            WfhStatus.rejected: loaded.rejectedCount,
+                          },
                           statusSelector: (item) => item.status,
                           matchesSearch: (item, query) {
                             if (query.isEmpty) return true;
@@ -197,55 +241,87 @@ class _WfhApprovalPageListingState extends State<WfhApprovalPageListing>
                           ),
                           listBuilder: (context, list) {
                             final grouped = _groupByMonth(list);
-                            return ListView.builder(
-                              padding: EdgeInsets.symmetric(
-                                vertical: screenHeight * 0.012,
-                              ),
-                              itemCount: grouped.length,
-                              itemBuilder: (context, index) {
-                                final entry = grouped[index];
-                                if (entry is String) {
-                                  return Padding(
-                                    padding: EdgeInsets.only(
-                                      top:
-                                          index == 0
-                                              ? 0
-                                              : screenHeight * 0.014,
-                                      bottom: screenHeight * 0.010,
-                                    ),
-                                    child: Text(
-                                      entry,
-                                      style: AppTextStyles.bodySmall(context)
-                                          .copyWith(
-                                            fontWeight: FontWeight.w500,
-                                            color: AppColors.textSecondary,
-                                          ),
+                            return NotificationListener<ScrollNotification>(
+                              onNotification: (notification) {
+                                if (notification.metrics.pixels >=
+                                    notification.metrics.maxScrollExtent -
+                                        200) {
+                                  context.read<WfhRequestBloc>().add(
+                                    LoadMoreTeamWfhRequests(
+                                      clientId: clientId,
+                                      limit: _pageSize,
                                     ),
                                   );
                                 }
+                                return false;
+                              },
+                              child: ListView.builder(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: screenHeight * 0.012,
+                                ),
+                                itemCount:
+                                    grouped.length +
+                                    (loaded.isLoadingMore ? 1 : 0),
+                                itemBuilder: (context, index) {
+                                  if (index >= grouped.length) {
+                                    return Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: screenHeight * 0.02,
+                                      ),
+                                      child: const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    );
+                                  }
 
-                                final req = entry as WfhRequestModel;
-                                return WfhRequestCard(
-                                  wfhRequest: req,
-                                  onTap: () async {
-                                    final result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder:
-                                            (_) => WfhDetailPage(
-                                              wfhRequest: req,
-                                              isApprovalMode: true,
+                                  final entry = grouped[index];
+                                  if (entry is String) {
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                        top:
+                                            index == 0
+                                                ? 0
+                                                : screenHeight * 0.014,
+                                        bottom: screenHeight * 0.010,
+                                      ),
+                                      child: Text(
+                                        entry,
+                                        style: AppTextStyles.bodySmall(context)
+                                            .copyWith(
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.textSecondary,
                                             ),
                                       ),
                                     );
-                                    if (result == true && context.mounted) {
-                                      context.read<WfhRequestBloc>().add(
-                                        const LoadTeamWfhRequests(),
+                                  }
+
+                                  final req = entry as WfhRequestModel;
+                                  return WfhRequestCard(
+                                    wfhRequest: req,
+                                    onTap: () async {
+                                      final result = await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => WfhDetailPage(
+                                                wfhRequest: req,
+                                                isApprovalMode: true,
+                                              ),
+                                        ),
                                       );
-                                    }
-                                  },
-                                );
-                              },
+                                      if (result == true && context.mounted) {
+                                        context.read<WfhRequestBloc>().add(
+                                          LoadTeamWfhRequests(
+                                            clientId: clientId,
+                                            scope: _selectedScope,
+                                            limit: _pageSize,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  );
+                                },
+                              ),
                             );
                           },
                         );
@@ -316,7 +392,28 @@ class _WfhApprovalPageListingState extends State<WfhApprovalPageListing>
     }
   }
 
-  Widget _buildSearchSection(BuildContext context) {
+  bool _allowAllUsers(BuildContext context) {
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is! UserProfileLoaded) {
+      return false;
+    }
+
+    return profileState.profile.allowAllUsers;
+  }
+
+  int _resolveClientId(BuildContext context) {
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is! UserProfileLoaded) {
+      return 0;
+    }
+
+    return profileState.profile.clientId;
+  }
+
+  Widget _buildSearchSection(
+    BuildContext context,
+    List<RequestAudienceScope> availableScopes,
+  ) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
@@ -377,6 +474,23 @@ class _WfhApprovalPageListingState extends State<WfhApprovalPageListing>
               },
             ),
           ),
+        ),
+        SizedBox(width: screenWidth * 0.03),
+        RequestAudienceFilterButton(
+          selectedScope: _selectedScope,
+          availableScopes: availableScopes,
+          onSelected: (scope) {
+            setState(() {
+              _selectedScope = scope;
+            });
+            context.read<WfhRequestBloc>().add(
+              LoadTeamWfhRequests(
+                clientId: _resolveClientId(context),
+                scope: scope,
+                limit: _pageSize,
+              ),
+            );
+          },
         ),
       ],
     );

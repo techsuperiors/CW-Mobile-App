@@ -344,7 +344,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
     }
 
     // Default — generic message
-    return 'Something went wrong. Syncing latest status...';
+    return serverMessage;
   }
 
   @override

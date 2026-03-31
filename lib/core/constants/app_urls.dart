@@ -21,6 +21,7 @@ class AppUrls {
 
   // User endpoints
   static const String getUserProfile = '/api/mobile/app/users/profile';
+  static const String getUserProfileExtended = '/api/users/profile';
 
   // static const String updateUserProfile = '/api/api/mobile/app/users/profile';
   // https://app.collectivwork.com/api/attendance/punchOut
@@ -41,6 +42,7 @@ class AppUrls {
   // Leave/Request endpoints
   static const String leaveTypesList = '/api/leaves/type/list';
   static const String applyLeave = '/api/leaves/request';
+
 
   // static const String leaveHistory = '/api/api/mobile/app/leaves/history';
   // static const String leaveRequests = '/api/api/mobile/app/leaves/requests';
@@ -105,15 +107,17 @@ class AppUrls {
   static const String regularizeList =
       '/api/mobile/app/users/attendance/regularize/list';
   static const String regularizeTeamList = '/api/attendance/request/team';
+  static const String regularizeRequestStats = '/api/attendance/request/stats';
   static const String regularizeRequestDetails =
       '/api/attendance/request/details';
   static const String regularizeRequestStatus =
       '/api/attendance/request/status';
 
   // WFH request endpoints
-  static const String wfhRequests =
-      '/api/mobile/app/users/wfh/requests'; // This causes error in the mobile
+  // static const String wfhRequests = '/api/mobile/app/users/wfh/requests'; // This causes error in the mobile
+  static const String wfhRequests = '/api/attendance/wfh/request'; // This causes error in the mobile
   static const String wfhTeamRequests = '/api/attendance/wfh/request/team';
+  static const String wfhRequestStats = '/api/attendance/wfh/request/stats';
   static const String wfhRequestRaise = '/api/attendance/wfh/request';
   static const String wfhRequestStatus = '/api/attendance/wfh/request/status';
   static const String wfhRequestDetails = '/api/attendance/wfh/request/details';
@@ -124,6 +128,8 @@ class AppUrls {
 
   static const String onDutyTeamRequests =
       '/api/attendance/onDuty/request/team';
+  static const String onDutyRequestStats =
+      '/api/attendance/onDuty/request/stats';
   static const String onDutyRequestDetails =
       '/api/attendance/onDuty/request/details';
   static const String onDutyRequestStatus =
@@ -133,6 +139,7 @@ class AppUrls {
   // Overtime request endpoints
   static const String overtimeRequests = '/api/overtime/request/user/list';
   static const String overtimeTeamRequests = '/api/overtime/request/team/list';
+  static const String overtimeRequestStats = '/api/overtime/request/stats';
   static const String overtimeRequestDetails = '/api/overtime/request/details';
   static const String overtimeRequestCreate = '/api/overtime/request/create';
   static const String overtimeRequestUpdate = '/api/overtime/request/update';
@@ -141,6 +148,7 @@ class AppUrls {
   // Comp-off endpoints
   static const String compOffList = '/api/leaves/compoff/list';
   static const String compOffTeamList = '/api/leaves/team/compoff/list';
+  static const String compOffTeamStats = '/api/leaves/team/compoff/stats';
   static const String compOffDetails = '/api/leaves/compoff/details';
   static const String compOffRequest = '/api/leaves/compoff/request';
   static const String compOffStatus = '/api/leaves/compoff/status';
@@ -158,7 +166,10 @@ class AppUrls {
 
   // Expense endpoints
   static const String expenseList = '/api/expense/list';
+  static const String expenseApprovalList = '/api/expense/approval/list';
   static const String expenseDetails = '/api/expense/details';
+  static const String expenseBulkStatusUpdate =
+      '/api/expense/bulk/status/update';
   static const String expenseComments = '/api/expense/comments';
   static const String expenseWithdraw = '/api/expense/request/withdraw';
   static const String expenseCreate = '/api/expense/create';

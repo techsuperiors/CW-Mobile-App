@@ -91,7 +91,11 @@ class WfhRequestCard extends StatelessWidget {
                                   SizedBox(width: screenWidth * 0.014),
                                   Flexible(
                                     child: Text(
-                                      wfhRequest.dateRange,
+                                      // wfhRequest.dateRange,
+                                      _getDateRange(
+                                        wfhRequest.fromDate,
+                                        wfhRequest.toDate,
+                                      ),
                                       style: AppTextStyles.bodySmall(context).copyWith(
                                         fontWeight: FontWeight.w500,
                                         color: statusColor,
@@ -145,6 +149,35 @@ class WfhRequestCard extends StatelessWidget {
         ),
       ),
     );
+  }
+  String _getDateRange(DateTime fromDate, DateTime? toDate) {
+    // Basic date formatting, you might want to use DateFormat from intl here
+    final from =
+        "${fromDate.day.toString().padLeft(2, '0')} ${_getMonthName(fromDate.month)}";
+    if (toDate != null && toDate != fromDate) {
+      final to =
+          "${toDate.day.toString().padLeft(2, '0')} ${_getMonthName(toDate.month)}";
+      return "$from - $to";
+    }
+    return from;
+  }
+  String _getMonthName(int month) {
+    const monthNames = [
+      "",
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    return monthNames[month];
   }
 
   Color _getStatusColor(WfhStatus status) {

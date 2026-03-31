@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../../../../../core/utils/date_pareser.dart';
+
 class ExpenseDocument extends Equatable {
   final String id;
   final String url;
@@ -106,7 +108,7 @@ class ExpenseApprovalDetail extends Equatable {
       approvalMandatory: json['approval_mandatory'] as bool? ?? false,
       remarks: json['remarks']?.toString(),
       approvedAmount: (json['approved_amount'] as num?)?.toDouble(),
-      actionTakenAt: DateTime.tryParse(json['action_taken_at']?.toString() ?? ''),
+      actionTakenAt: parseApiDateNullable(json['action_taken_at']),
       assignee: ExpenseRequester.fromJson(
         json['ExpenseRequestAssignee'] as Map<String, dynamic>? ?? const {},
       ),
@@ -143,7 +145,7 @@ class ExpenseComment extends Equatable {
     return ExpenseComment(
       id: json['id']?.toString() ?? '',
       comment: json['comment']?.toString() ?? '',
-      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
+      createdAt: parseApiDateNullable(json['created_at']),
       createdBy: ExpenseRequester.fromJson(
         json['commentCreatedBy'] as Map<String, dynamic>? ?? const {},
       ),
@@ -190,7 +192,7 @@ class ExpenseActivity extends Equatable {
       actionType: json['action_type']?.toString() ?? '',
       firstName: json['first_name']?.toString() ?? '',
       lastName: json['last_name']?.toString() ?? '',
-      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
+      createdAt: parseApiDateNullable(json['created_at']),
     );
   }
 
@@ -222,6 +224,7 @@ class ExpenseDetailModel extends Equatable {
   final ExpenseRequester requestUser;
   final List<ExpenseDocument> documents;
   final List<ExpenseApprovalDetail> approvals;
+  final bool canApprove;
 
   const ExpenseDetailModel({
     required this.id,
@@ -247,6 +250,7 @@ class ExpenseDetailModel extends Equatable {
     required this.requestUser,
     required this.documents,
     required this.approvals,
+    this.canApprove = false,
   });
 
   factory ExpenseDetailModel.fromJson(Map<String, dynamic> json) {
@@ -282,14 +286,14 @@ class ExpenseDetailModel extends Equatable {
       invoiceNumber: data['invoice_number']?.toString(),
       amount: (data['amount'] as num?)?.toDouble() ?? 0,
       approvedAmount: (data['approved_amount'] as num?)?.toDouble() ?? 0,
-      fromDate: DateTime.tryParse(data['from']?.toString() ?? '') ?? DateTime.now(),
-      toDate: DateTime.tryParse(data['to']?.toString() ?? '') ?? DateTime.now(),
+      fromDate: parseApiDate(data['from']),
+      toDate: parseApiDate(data['to']),
       totalDays: (data['total_days'] as num?)?.toInt() ?? 0,
       description: data['description']?.toString(),
       settlementMode: data['settlement_mode']?.toString(),
       approvalStatus: data['approval_status']?.toString() ?? 'Pending',
-      paidDate: DateTime.tryParse(data['paid_date']?.toString() ?? ''),
-      actionTakenAt: DateTime.tryParse(data['action_taken_at']?.toString() ?? ''),
+      paidDate: parseApiDateNullable(data['paid_date']),
+      actionTakenAt: parseApiDateNullable(data['action_taken_at']),
       comments: comments,
       activity: activity,
       policy: ExpensePolicyInfo.fromJson(
@@ -300,6 +304,7 @@ class ExpenseDetailModel extends Equatable {
       ),
       documents: documents,
       approvals: approvals,
+      canApprove: data['canApprove'] as bool? ?? false,
     );
   }
 
@@ -327,6 +332,7 @@ class ExpenseDetailModel extends Equatable {
     ExpenseRequester? requestUser,
     List<ExpenseDocument>? documents,
     List<ExpenseApprovalDetail>? approvals,
+    bool? canApprove,
   }) {
     return ExpenseDetailModel(
       id: id ?? this.id,
@@ -352,6 +358,7 @@ class ExpenseDetailModel extends Equatable {
       requestUser: requestUser ?? this.requestUser,
       documents: documents ?? this.documents,
       approvals: approvals ?? this.approvals,
+      canApprove: canApprove ?? this.canApprove,
     );
   }
 
@@ -380,5 +387,6 @@ class ExpenseDetailModel extends Equatable {
     requestUser,
     documents,
     approvals,
+    canApprove,
   ];
 }

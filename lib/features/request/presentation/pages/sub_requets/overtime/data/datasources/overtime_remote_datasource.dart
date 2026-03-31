@@ -9,6 +9,7 @@ import '../../../../../../../attendance/data/models/attendance_request_comment_m
 import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
 import '../../domain/entities/overtime_detail.dart';
 import '../../models/overtime_request_model.dart';
+import '../../models/overtime_request_stats_model.dart';
 import '../models/overtime_detail_model.dart';
 
 abstract class OvertimeRemoteDataSource {
@@ -21,6 +22,11 @@ abstract class OvertimeRemoteDataSource {
     int page = 1,
     int limit = 20,
     String requestType = 'All',
+  });
+
+  Future<OvertimeRequestStatsModel> getOvertimeRequestStats({
+    required int clientId,
+    String requestType = 'User',
   });
 
   Future<OvertimeDetail> getOvertimeRequestDetail(int requestId);
@@ -123,6 +129,42 @@ class OvertimeRemoteDataSourceImpl implements OvertimeRemoteDataSource {
           .whereType<Map<String, dynamic>>()
           .map(OvertimeRequestModel.fromJson)
           .toList();
+    } on AppException {
+      rethrow;
+    } on DioException catch (e) {
+      _throwMappedDioException(e);
+    } catch (_) {
+      throw const ServerException(AppStrings.unknownError);
+    }
+  }
+
+  @override
+  Future<OvertimeRequestStatsModel> getOvertimeRequestStats({
+    required int clientId,
+    String requestType = 'User',
+  }) async {
+    try {
+      final payload = encodeData({
+        'client_id': clientId,
+        'users': <dynamic>[],
+        'status': <dynamic>[],
+        'date': <dynamic>[],
+        'approved_by': <dynamic>[],
+        'rejected_by': <dynamic>[],
+        'request_type': requestType,
+      });
+      final response = await apiClient.get(
+        '${AppUrls.overtimeRequestStats}?payload=$payload',
+        options: Options(headers: const {'Content-Type': 'application/json'}),
+      );
+      final data = response.data as Map<String, dynamic>?;
+      if (data == null) throw const ServerException('Invalid server response');
+      if (data['success'] != true) {
+        throw ServerException(
+          data['message'] as String? ?? 'Failed to load overtime stats',
+        );
+      }
+      return OvertimeRequestStatsModel.fromJson(data);
     } on AppException {
       rethrow;
     } on DioException catch (e) {

@@ -299,10 +299,10 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
     return BlocListener<AttendancePunchBloc, AttendancePunchState>(
       listener: _onPunchStateChanged,
       child: Container(
-        margin: EdgeInsets.symmetric(horizontal: screenWidth * 0.020),
+        margin: EdgeInsets.symmetric(horizontal: screenWidth * 0.0020),
         padding: EdgeInsets.all(screenWidth * 0.042),
         decoration: BoxDecoration(
-          color: AppColors.backgroundLight,
+          color: AppColors.background,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(

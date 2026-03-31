@@ -143,6 +143,7 @@ class _RegularizePageListingState extends State<RegularizePageListing>
                         if (state is RegularizeRequestError) {
                           return
                             ApiErrorState(
+                              title: 'Unable to load regularize requests',
                               rawMessage: state.message,
                               onRetry: () {
                                 final bloc =

@@ -11,8 +11,10 @@ import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
 import '../../../../../../../../core/utils/data_encoder.dart';
+import '../../../../../../../../core/utils/error_message_mapper.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/utils/token_storage.dart';
+import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../approval/presentation/widgets/approval_action_bar.dart';
 import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
@@ -99,6 +101,14 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
     return BlocProvider.value(
       value: _overtimeDetailBloc,
       child: BlocConsumer<OvertimeDetailBloc, OvertimeDetailState>(
+        listenWhen: (previous, current) {
+          if (current is! OvertimeDetailError) return true;
+          final isInitialLoadFailure =
+              current.detail == null &&
+              (previous is OvertimeDetailInitial ||
+                  previous is OvertimeDetailLoading);
+          return !isInitialLoadFailure;
+        },
         listener: (context, state) {
           if (state is OvertimeDetailStatusUpdated) {
             _shouldRefreshListing = true;
@@ -114,7 +124,9 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
           } else if (state is OvertimeDetailError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.message),
+                content: Text(
+                  ErrorMessageMapper.toUserFriendlyMessage(state.message),
+                ),
                 backgroundColor: AppColors.error,
               ),
             );
@@ -180,7 +192,22 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
                           currentIndex: 3,
                           onTap: NavigationHelper.getBottomNavHandler(context),
                         ),
-                body: _buildContent(context, currentRequest, comments),
+                body:
+                    state is OvertimeDetailError && state.detail == null
+                        ? ApiErrorState(
+                          title: 'Unable to load overtime details',
+                          rawMessage: state.message,
+                          onRetry:
+                              () => context.read<OvertimeDetailBloc>().add(
+                                LoadOvertimeDetail(
+                                  requestId:
+                                      int.tryParse(widget.overtimeRequest.id) ??
+                                      0,
+                                  clientId: _clientId,
+                                ),
+                              ),
+                        )
+                        : _buildContent(context, currentRequest, comments),
               ),
               if (isBusy)
                 Container(
@@ -231,8 +258,8 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
     final menuActions = <Map<String, String>>[
       if (isPending && !widget.isApprovalMode)
         {'value': 'Edit', 'icon': AppAssets.editIconwfh},
-      if (isPending && !widget.isApprovalMode)
-        {'value': 'Withdraw', 'icon': AppAssets.withdrawIcon},
+      // if (isPending && !widget.isApprovalMode)
+      //   {'value': 'Withdraw', 'icon': AppAssets.withdrawIcon},
       {'value': 'Activity', 'icon': AppAssets.activityIcon},
     ];
 
@@ -280,15 +307,17 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
                           ),
                         );
                       }
-                    } else if (value == 'Withdraw') {
-                      context.read<OvertimeDetailBloc>().add(
-                        UpdateOvertimeRequestStatus(
-                          requestId: requestId,
-                          clientId: _clientId,
-                          status: 'Withdrawn',
-                        ),
-                      );
-                    } else if (value == 'Activity') {
+                    }
+                    // else if (value == 'Withdraw') {
+                    //   context.read<OvertimeDetailBloc>().add(
+                    //     UpdateOvertimeRequestStatus(
+                    //       requestId: requestId,
+                    //       clientId: _clientId,
+                    //       status: 'Withdrawn',
+                    //     ),
+                    //   );
+                    // }
+                    else if (value == 'Activity') {
                       _showActivityBottomSheet(
                         context,
                         detail?.activity ?? const [],
@@ -345,15 +374,17 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
                           ),
                         );
                       }
-                    } else if (action == 'Withdraw') {
-                      context.read<OvertimeDetailBloc>().add(
-                        UpdateOvertimeRequestStatus(
-                          requestId: requestId,
-                          clientId: _clientId,
-                          status: 'Withdrawn',
-                        ),
-                      );
-                    } else if (action == 'Activity') {
+                    }
+                    // else if (action == 'Withdraw') {
+                    //   context.read<OvertimeDetailBloc>().add(
+                    //     UpdateOvertimeRequestStatus(
+                    //       requestId: requestId,
+                    //       clientId: _clientId,
+                    //       status: 'Withdrawn',
+                    //     ),
+                    //   );
+                    // }
+                    else if (action == 'Activity') {
                       _showActivityBottomSheet(
                         context,
                         detail?.activity ?? const [],

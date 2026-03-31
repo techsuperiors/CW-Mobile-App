@@ -3,15 +3,22 @@ import 'package:dartz/dartz.dart';
 import '../../../../../../../../core/error/failures.dart';
 import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
 import '../../models/on_duty_request_model.dart';
+import '../../models/on_duty_request_stats_model.dart';
 import '../entities/on_duty_detail.dart';
 
 abstract class OnDutyRepository {
   Future<Either<Failure, List<OnDutyRequestModel>>> getOnDutyRequests();
 
   Future<Either<Failure, List<OnDutyRequestModel>>> getTeamOnDutyRequests({
+    required int clientId,
     int page = 1,
     int limit = 50,
     String requestType = 'All',
+  });
+
+  Future<Either<Failure, OnDutyRequestStatsModel>> getOnDutyRequestStats({
+    required int clientId,
+    String requestType = 'User',
   });
 
   Future<Either<Failure, OnDutyDetail>> getOnDutyRequestDetail(int requestId);

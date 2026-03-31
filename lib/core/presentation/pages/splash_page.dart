@@ -35,7 +35,7 @@ class _SplashPageState extends State<SplashPage>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 1200),
     );
 
     _iconSlideAnimation =
@@ -145,7 +145,7 @@ class _SplashPageState extends State<SplashPage>
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFFF7FBFB), Color(0xFFFFFFFF)],
+              colors: [AppColors.splashbackgroundLight, Color(0xFFFFFFFF)],
             ),
           ),
           child: SafeArea(
@@ -179,7 +179,7 @@ class _SplashPageState extends State<SplashPage>
                           text: TextSpan(
                             children: [
                               TextSpan(
-                                text: 'Collective\n',
+                                text: 'Collectiv\n',
                                 style: TextStyle(
                                   color: AppColors.textHeading,
                                   fontSize: screenWidth * 0.082,

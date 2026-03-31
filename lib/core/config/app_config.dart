@@ -5,7 +5,6 @@ class AppConfig {
   // Base URLs
   static const String devBaseUrl = 'https://dev.collectivwork.com';
   static const String productionBaseUrl = 'https://app.collectivwork.com';
-
   static const String environment = String.fromEnvironment(
     'ENV',
     defaultValue: 'production',

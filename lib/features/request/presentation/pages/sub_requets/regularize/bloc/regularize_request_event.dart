@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 
 import '../models/regularize_request_model.dart';
 
@@ -16,18 +17,31 @@ class LoadRegularizeRequests extends RegularizeRequestEvent {
 }
 
 class LoadTeamRegularizeRequests extends RegularizeRequestEvent {
+  final int clientId;
   final int page;
   final int limit;
-  final String requestType;
+  final RequestAudienceScope scope;
 
   const LoadTeamRegularizeRequests({
+    required this.clientId,
     this.page = 1,
     this.limit = 50,
-    this.requestType = 'All',
+    this.scope = RequestAudienceScope.allUsers,
   });
 
   @override
-  List<Object> get props => [page, limit, requestType];
+  List<Object> get props => [clientId, page, limit, scope];
+}
+
+class LoadMoreTeamRegularizeRequests extends RegularizeRequestEvent {
+  final int limit;
+
+  const LoadMoreTeamRegularizeRequests({
+    this.limit = 50,
+  });
+
+  @override
+  List<Object> get props => [limit];
 }
 
 /// Search regularize requests event

@@ -15,13 +15,18 @@ import 'package:collectivWork/features/request/presentation/pages/sub_requets/ov
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/overtime/data/datasources/overtime_remote_datasource.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/overtime/data/repositories/overtime_repository_impl.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/overtime/domain/usecases/get_overtime_requests.dart';
+import 'package:collectivWork/features/request/presentation/pages/sub_requets/overtime/domain/usecases/get_overtime_request_stats.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/overtime/domain/usecases/get_team_overtime_requests.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/overtime/models/overtime_request_model.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/overtime/presentation/pages/overtime_detail_page.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/overtime/presentation/widgets/overtime_request_card.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_filter_button.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_empty_state.dart';
 import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_grouping_utils.dart';
 import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_tab_theme.dart';
+import 'package:collectivWork/features/user/presentation/bloc/user_profile_bloc.dart';
+import 'package:collectivWork/features/user/presentation/bloc/user_profile_state.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -41,6 +46,8 @@ class _OvertimeApprovalPageListingState
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
+  RequestAudienceScope _selectedScope = RequestAudienceScope.allUsers;
+  static const int _pageSize = 50;
 
   static const List<StatusTabDefinition<OvertimeStatus>> _tabs = [
     StatusTabDefinition(label: 'All', status: null),
@@ -100,15 +107,38 @@ class _OvertimeApprovalPageListingState
     final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
     final remoteDataSource = OvertimeRemoteDataSourceImpl(apiClient: apiClient);
     final repository = OvertimeRepositoryImpl(remoteDataSource: remoteDataSource);
+    final clientId = _resolveClientId(context);
+    final allowAllUsers = _allowAllUsers(context);
+    final availableScopes =
+        allowAllUsers
+            ? RequestAudienceScope.values
+            : const [
+              RequestAudienceScope.myReportees,
+              RequestAudienceScope.myIndirectReportees,
+            ];
+
+    if (!allowAllUsers &&
+        _selectedScope == RequestAudienceScope.allUsers) {
+      _selectedScope = RequestAudienceScope.myReportees;
+    }
 
     return BlocProvider(
       create:
           (_) => OvertimeRequestBloc(
             getOvertimeRequestsUseCase: GetOvertimeRequestsUseCase(repository),
+            getOvertimeRequestStatsUseCase: GetOvertimeRequestStatsUseCase(
+              repository,
+            ),
             getTeamOvertimeRequestsUseCase: GetTeamOvertimeRequestsUseCase(
               repository,
             ),
-          )..add(const LoadTeamOvertimeRequests()),
+          )..add(
+            LoadTeamOvertimeRequests(
+              clientId: clientId,
+              scope: _selectedScope,
+              limit: _pageSize,
+            ),
+          ),
       child: ResponsiveScaffold(
         backgroundColor: AppColors.backgroundLight,
         appBar: AppBar(
@@ -154,7 +184,7 @@ class _OvertimeApprovalPageListingState
           builder:
               (blocContext) => Column(
                 children: [
-                  _buildSearchSection(blocContext),
+                  _buildSearchSection(blocContext, availableScopes),
                   SizedBox(height: screenHeight * 0.01),
                   Expanded(
                     child: BlocBuilder<OvertimeRequestBloc, OvertimeRequestState>(
@@ -172,7 +202,13 @@ class _OvertimeApprovalPageListingState
                             onRetry:
                                 () => context
                                     .read<OvertimeRequestBloc>()
-                                    .add(const LoadTeamOvertimeRequests()),
+                                    .add(
+                                      LoadTeamOvertimeRequests(
+                                        clientId: clientId,
+                                        scope: _selectedScope,
+                                        limit: _pageSize,
+                                      ),
+                                    ),
                           );
                         }
 
@@ -193,6 +229,12 @@ class _OvertimeApprovalPageListingState
                           tabs: _tabs,
                           items: items,
                           searchQuery: loaded.searchQuery?.toLowerCase() ?? '',
+                          countOverrides: {
+                            null: loaded.totalCount,
+                            OvertimeStatus.pending: loaded.pendingCount,
+                            OvertimeStatus.approved: loaded.approvedCount,
+                            OvertimeStatus.rejected: loaded.rejectedCount,
+                          },
                           statusSelector: (item) => item.status,
                           matchesSearch: (item, query) {
                             if (query.isEmpty) return true;
@@ -205,56 +247,88 @@ class _OvertimeApprovalPageListingState
                               items: list,
                               dateSelector: (item) => item.appliedDate,
                             );
-                            return ListView.builder(
-                              padding: EdgeInsets.symmetric(
-                                vertical: screenHeight * 0.012,
-                              ),
-                              itemCount: grouped.length,
-                              itemBuilder: (context, index) {
-                                final entry = grouped[index];
-                                if (entry is String) {
-                                  return Padding(
-                                    padding: EdgeInsets.only(
-                                      top:
-                                          index == 0
-                                              ? 0
-                                              : screenHeight * 0.014,
-                                      bottom: screenHeight * 0.010,
-                                    ),
-                                    child: Text(
-                                      entry,
-                                      style: AppTextStyles.bodySmall(
-                                        context,
-                                      ).copyWith(
-                                        fontWeight: FontWeight.w500,
-                                        color: AppColors.textSecondary,
-                                      ),
+                            return NotificationListener<ScrollNotification>(
+                              onNotification: (notification) {
+                                if (notification.metrics.pixels >=
+                                    notification.metrics.maxScrollExtent -
+                                        200) {
+                                  context.read<OvertimeRequestBloc>().add(
+                                    LoadMoreTeamOvertimeRequests(
+                                      clientId: clientId,
+                                      limit: _pageSize,
                                     ),
                                   );
                                 }
-
-                                final req = entry as OvertimeRequestModel;
-                                return OvertimeRequestCard(
-                                  request: req,
-                                  onTap: () async {
-                                    final result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder:
-                                            (_) => OvertimeDetailPage(
-                                              overtimeRequest: req,
-                                              isApprovalMode: true,
-                                            ),
+                                return false;
+                              },
+                              child: ListView.builder(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: screenHeight * 0.012,
+                                ),
+                                itemCount:
+                                    grouped.length +
+                                    (loaded.isLoadingMore ? 1 : 0),
+                                itemBuilder: (context, index) {
+                                  if (index >= grouped.length) {
+                                    return Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: screenHeight * 0.02,
+                                      ),
+                                      child: const Center(
+                                        child: CircularProgressIndicator(),
                                       ),
                                     );
-                                    if (result == true && context.mounted) {
-                                      context.read<OvertimeRequestBloc>().add(
-                                        const LoadTeamOvertimeRequests(),
+                                  }
+
+                                  final entry = grouped[index];
+                                  if (entry is String) {
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                        top:
+                                            index == 0
+                                                ? 0
+                                                : screenHeight * 0.014,
+                                        bottom: screenHeight * 0.010,
+                                      ),
+                                      child: Text(
+                                        entry,
+                                        style: AppTextStyles.bodySmall(
+                                          context,
+                                        ).copyWith(
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  final req = entry as OvertimeRequestModel;
+                                  return OvertimeRequestCard(
+                                    request: req,
+                                    onTap: () async {
+                                      final result = await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => OvertimeDetailPage(
+                                                overtimeRequest: req,
+                                                isApprovalMode: true,
+                                              ),
+                                        ),
                                       );
-                                    }
-                                  },
-                                );
-                              },
+                                      if (result == true && context.mounted) {
+                                        context.read<OvertimeRequestBloc>().add(
+                                          LoadTeamOvertimeRequests(
+                                            clientId: clientId,
+                                            scope: _selectedScope,
+                                            limit: _pageSize,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  );
+                                },
+                              ),
                             );
                           },
                         );
@@ -268,63 +342,109 @@ class _OvertimeApprovalPageListingState
     );
   }
 
-  Widget _buildSearchSection(BuildContext context) {
+  bool _allowAllUsers(BuildContext context) {
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is! UserProfileLoaded) {
+      return false;
+    }
+
+    return profileState.profile.allowAllUsers;
+  }
+
+  int _resolveClientId(BuildContext context) {
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is! UserProfileLoaded) {
+      return 0;
+    }
+
+    return profileState.profile.clientId;
+  }
+
+  Widget _buildSearchSection(
+    BuildContext context,
+    List<RequestAudienceScope> availableScopes,
+  ) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    return Container(
-      height: screenHeight * 0.050,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F2F2),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: _searchController,
-        textAlignVertical: TextAlignVertical.center,
-        style: AppTextStyles.bodyMedium(context),
-        decoration: InputDecoration(
-          hintText: 'Search',
-          hintStyle: AppTextStyles.bodyMedium(
-            context,
-          ).copyWith(color: AppColors.textTertiary),
-          prefixIcon: Padding(
-            padding: EdgeInsets.all(screenWidth * 0.03),
-            child: SvgPicture.asset(
-              AppAssets.searchIcon,
-              width: screenWidth * 0.045,
-              colorFilter: const ColorFilter.mode(
-                Colors.grey,
-                BlendMode.srcIn,
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: screenHeight * 0.050,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F2F2),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              textAlignVertical: TextAlignVertical.center,
+              style: AppTextStyles.bodyMedium(context),
+              decoration: InputDecoration(
+                hintText: 'Search',
+                hintStyle: AppTextStyles.bodyMedium(
+                  context,
+                ).copyWith(color: AppColors.textTertiary),
+                prefixIcon: Padding(
+                  padding: EdgeInsets.all(screenWidth * 0.03),
+                  child: SvgPicture.asset(
+                    AppAssets.searchIcon,
+                    width: screenWidth * 0.045,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.grey,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: screenHeight * 0.010,
+                ),
               ),
+              onChanged: (value) {
+                context.read<OvertimeRequestBloc>().add(
+                  SearchOvertimeRequests(value),
+                );
+              },
             ),
           ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: EdgeInsets.symmetric(
-            vertical: screenHeight * 0.010,
-          ),
         ),
-        onChanged: (value) {
-          context.read<OvertimeRequestBloc>().add(SearchOvertimeRequests(value));
-        },
-      ),
+        SizedBox(width: screenWidth * 0.03),
+        RequestAudienceFilterButton(
+          selectedScope: _selectedScope,
+          availableScopes: availableScopes,
+          onSelected: (scope) {
+            setState(() {
+              _selectedScope = scope;
+            });
+            context.read<OvertimeRequestBloc>().add(
+              LoadTeamOvertimeRequests(
+                clientId: _resolveClientId(context),
+                scope: scope,
+                limit: _pageSize,
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

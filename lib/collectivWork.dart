@@ -53,7 +53,6 @@ class _CollectivWorkAppState extends State<CollectivWorkApp> {
       await _initializeApp();
     });
   }
-
   Future<void> _initializeApp() async {
     try {
       // Initialize SharedPreferences (async operation)
@@ -128,8 +127,12 @@ class _CollectivWorkAppState extends State<CollectivWorkApp> {
     );
 
     // Payslip bloc
-    final payslipRemoteDataSource = PayslipRemoteDataSourceImpl(apiClient: apiClient);
-    final payslipRepository = PayslipRepositoryImpl(remoteDataSource: payslipRemoteDataSource);
+    final payslipRemoteDataSource = PayslipRemoteDataSourceImpl(
+      apiClient: apiClient,
+    );
+    final payslipRepository = PayslipRepositoryImpl(
+      remoteDataSource: payslipRemoteDataSource,
+    );
     final payslipBloc = PayslipBloc(repository: payslipRepository);
 
     final authRepository = AuthRepository(apiService);
@@ -144,7 +147,6 @@ class _CollectivWorkAppState extends State<CollectivWorkApp> {
       title: AppStrings.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      // darkTheme: AppTheme.darkTheme, // Disabled for now
       themeMode: ThemeMode.light,
       // Force light mode only
       home:

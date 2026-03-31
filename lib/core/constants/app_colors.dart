@@ -38,6 +38,7 @@ class AppColors {
   static const Color backgroundMedium = Color(0xFFF2F2F7);
   static const Color backgroundLight = Color(0xFFF5F5F5);
   static const Color backgroundDark = Color(0xFF121212);
+  static const Color splashbackgroundLight = Color(0xFFb7d9d9);
 
   // Border Colors
   static const Color border = Color(0xFFE0E0E0);

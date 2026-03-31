@@ -3,18 +3,44 @@ import '../../domain/entities/attendance_day_detail.dart';
 class AttendanceDayLogModel {
   final String? punchIn;
   final String? punchOut;
+  final String? activityAction;
+  final String? activityType;
+  final String? time;
+  final String? activityBy;
+  final String? location;
 
-  const AttendanceDayLogModel({this.punchIn, this.punchOut});
+  const AttendanceDayLogModel({
+    this.punchIn,
+    this.punchOut,
+    this.activityAction,
+    this.activityType,
+    this.time,
+    this.activityBy,
+    this.location,
+  });
 
   factory AttendanceDayLogModel.fromJson(Map<String, dynamic> json) {
     return AttendanceDayLogModel(
       punchIn: json['punch_in']?.toString(),
       punchOut: json['punch_out']?.toString(),
+      activityAction: json['activity_action']?.toString(),
+      activityType: json['activity_type']?.toString(),
+      time: json['time']?.toString(),
+      activityBy: json['activity_by']?.toString(),
+      location: json['location']?.toString(),
     );
   }
 
   AttendanceDayLog toEntity() {
-    return AttendanceDayLog(punchIn: punchIn, punchOut: punchOut);
+    return AttendanceDayLog(
+      punchIn: punchIn,
+      punchOut: punchOut,
+      activityAction: activityAction,
+      activityType: activityType,
+      time: time,
+      activityBy: activityBy,
+      location: location,
+    );
   }
 }
 

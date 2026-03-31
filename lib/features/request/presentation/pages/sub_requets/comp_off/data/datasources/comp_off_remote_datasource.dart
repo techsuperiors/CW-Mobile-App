@@ -9,14 +9,18 @@ import '../../../../../../../attendance/data/models/attendance_request_comment_m
 import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
 import '../../domain/entities/comp_off_detail.dart';
 import '../../models/comp_off_request_model.dart';
+import '../../models/comp_off_request_stats_model.dart';
 import '../models/comp_off_detail_model.dart';
 
 abstract class CompOffRemoteDataSource {
   Future<List<CompOffRequestModel>> getCompOffRequests();
-  Future<List<CompOffRequestModel>> getTeamCompOffRequests({
+  Future<CompOffTeamPageData> getTeamCompOffRequests({
     int page = 1,
     int limit = 20,
     String requestType = 'All',
+  });
+  Future<CompOffRequestStatsModel> getCompOffRequestStats({
+    required int userId,
   });
   Future<CompOffDetail> getCompOffDetail(int compOffId);
   Future<String> createCompOffRequest({
@@ -50,6 +54,16 @@ abstract class CompOffRemoteDataSource {
   Future<String> addComment({
     required int compOffId,
     required String comment,
+  });
+}
+
+class CompOffTeamPageData {
+  final List<CompOffRequestModel> requests;
+  final int totalCount;
+
+  const CompOffTeamPageData({
+    required this.requests,
+    required this.totalCount,
   });
 }
 
@@ -88,16 +102,17 @@ class CompOffRemoteDataSourceImpl implements CompOffRemoteDataSource {
   }
 
   @override
-  Future<List<CompOffRequestModel>> getTeamCompOffRequests({
+  Future<CompOffTeamPageData> getTeamCompOffRequests({
     int page = 1,
     int limit = 20,
     String requestType = 'All',
   }) async {
     try {
       final payload = encodeData({
+        'current': page,
+        'pageSize': limit,
+        'is_compoff': true,
         'request_type': requestType,
-        'page': page,
-        'limit': limit,
       });
       final response = await apiClient.get(
         '${AppUrls.compOffTeamList}?payload=$payload',
@@ -112,10 +127,42 @@ class CompOffRemoteDataSourceImpl implements CompOffRemoteDataSource {
         );
       }
       final rawList = data['data'] as List<dynamic>? ?? const [];
-      return rawList
+      final requests = rawList
           .whereType<Map<String, dynamic>>()
           .map(CompOffRequestModel.fromJson)
           .toList();
+      final badgeCount =
+          (data['badge_count'] as Map<String, dynamic>?)?['team_compoff'];
+      final totalCount =
+          badgeCount is num ? badgeCount.toInt() : requests.length;
+      return CompOffTeamPageData(requests: requests, totalCount: totalCount);
+    } on AppException {
+      rethrow;
+    } on DioException catch (e) {
+      _throwMappedDioException(e);
+    } catch (_) {
+      throw const ServerException(AppStrings.unknownError);
+    }
+  }
+
+  @override
+  Future<CompOffRequestStatsModel> getCompOffRequestStats({
+    required int userId,
+  }) async {
+    try {
+      final payload = encodeData({'user_id': userId});
+      final response = await apiClient.get(
+        '${AppUrls.compOffTeamStats}?payload=$payload',
+        options: Options(headers: const {'Content-Type': 'application/json'}),
+      );
+      final data = response.data as Map<String, dynamic>?;
+      if (data == null) throw const ServerException('Invalid server response');
+      if (data['success'] != true) {
+        throw ServerException(
+          data['message'] as String? ?? 'Failed to load comp-off stats',
+        );
+      }
+      return CompOffRequestStatsModel.fromJson(data);
     } on AppException {
       rethrow;
     } on DioException catch (e) {

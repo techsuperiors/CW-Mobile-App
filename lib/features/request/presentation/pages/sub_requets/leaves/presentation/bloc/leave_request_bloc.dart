@@ -2,9 +2,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:collectivWork/core/usecase/usecase.dart';
 import '../../domain/entities/leave_entity.dart';
 import '../../domain/entities/apply_leave_entity.dart';
+import '../../domain/usecases/apply_leave_usecase.dart';
 import '../../domain/usecases/get_leaves_usecase.dart';
 import '../../domain/usecases/get_team_leave_requests_usecase.dart';
-import '../../domain/usecases/apply_leave_usecase.dart';
 import 'leave_request_event.dart';
 import 'leave_request_state.dart';
 
@@ -21,6 +21,7 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
   }) : super(const LeaveRequestInitial()) {
     on<LoadLeaveRequests>(_onLoadLeaveRequests);
     on<LoadTeamLeaveRequests>(_onLoadTeamLeaveRequests);
+    on<LoadMoreTeamLeaveRequests>(_onLoadMoreTeamLeaveRequests);
     on<SearchLeaveRequests>(_onSearchLeaveRequests);
     on<FilterLeaveRequestsByStatus>(_onFilterLeaveRequestsByStatus);
     on<FilterLeaveRequestsByType>(_onFilterLeaveRequestsByType);
@@ -43,6 +44,7 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
     final failureOrLeaves = await teamUseCase(
       GetTeamLeaveRequestsParams(
         clientId: event.clientId,
+        scope: event.scope,
         page: event.page,
         limit: event.limit,
       ),
@@ -50,12 +52,73 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
 
     failureOrLeaves.fold(
       (failure) => emit(LeaveRequestError(failure.message)),
-      (leaveRequests) => emit(
+      (pageData) => emit(
         LeaveRequestLoaded(
-          leaveRequests: leaveRequests,
-          filteredLeaveRequests: leaveRequests,
+          leaveRequests: pageData.requests,
+          filteredLeaveRequests: pageData.requests,
+          isTeamRequestMode: true,
+          hasMore: pageData.requests.length < pageData.totalLeaveRequest,
+          currentPage: event.page,
+          totalLeaveRequest: pageData.totalLeaveRequest,
+          approvedListCount: pageData.approvedListCount,
+          pendingListCount: pageData.pendingListCount,
+          rejectListCount: pageData.rejectListCount,
+          selectedScope: event.scope,
         ),
       ),
+    );
+  }
+
+  Future<void> _onLoadMoreTeamLeaveRequests(
+    LoadMoreTeamLeaveRequests event,
+    Emitter<LeaveRequestState> emit,
+  ) async {
+    final teamUseCase = getTeamLeaveRequestsUseCase;
+    if (teamUseCase == null || state is! LeaveRequestLoaded) {
+      return;
+    }
+
+    final currentState = state as LeaveRequestLoaded;
+    if (!currentState.isTeamRequestMode ||
+        currentState.isLoadingMore ||
+        !currentState.hasMore) {
+      return;
+    }
+
+    emit(currentState.copyWith(isLoadingMore: true));
+
+    final failureOrLeaves = await teamUseCase(
+      GetTeamLeaveRequestsParams(
+        clientId: event.clientId,
+        scope: currentState.selectedScope,
+        page: currentState.currentPage + 1,
+        limit: event.limit,
+      ),
+    );
+
+    failureOrLeaves.fold(
+      (_) => emit(currentState.copyWith(isLoadingMore: false)),
+      (pageData) {
+        final merged = _mergeUniqueById(
+          currentState.leaveRequests,
+          pageData.requests,
+        );
+
+        emit(
+          _buildLoadedState(
+            currentState.copyWith(
+              leaveRequests: merged,
+              isLoadingMore: false,
+              hasMore: merged.length < pageData.totalLeaveRequest,
+              currentPage: currentState.currentPage + 1,
+              totalLeaveRequest: pageData.totalLeaveRequest,
+              approvedListCount: pageData.approvedListCount,
+              pendingListCount: pageData.pendingListCount,
+              rejectListCount: pageData.rejectListCount,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -121,40 +184,9 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
       final query = event.query.trim().toLowerCase();
 
       if (query.isEmpty) {
-        // If search is cleared, apply only status/type filters
-        final filtered = _applyFilters(
-          currentState.leaveRequests,
-          currentState.statusFilter,
-          currentState.typeFilter,
-        );
-        emit(
-          currentState.copyWith(
-            filteredLeaveRequests: filtered,
-            searchQuery: null,
-          ),
-        );
+        emit(_buildLoadedState(currentState.copyWith(searchQuery: null)));
       } else {
-        // Search in loaded data, then apply filters
-        final searched =
-            currentState.leaveRequests
-                .where(
-                  (request) =>
-                      request.reason.toLowerCase().contains(query) ||
-                      request.leaveType.toLowerCase().contains(query) ||
-                      (request.subject?.toLowerCase().contains(query) ?? false),
-                )
-                .toList();
-        final filtered = _applyFilters(
-          searched,
-          currentState.statusFilter,
-          currentState.typeFilter,
-        );
-        emit(
-          currentState.copyWith(
-            filteredLeaveRequests: filtered,
-            searchQuery: query,
-          ),
-        );
+        emit(_buildLoadedState(currentState.copyWith(searchQuery: query)));
       }
     }
   }
@@ -165,35 +197,7 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
   ) {
     if (state is LeaveRequestLoaded) {
       final currentState = state as LeaveRequestLoaded;
-      final baseList =
-          currentState.searchQuery != null
-              ? currentState.leaveRequests
-                  .where(
-                    (r) =>
-                        r.reason.toLowerCase().contains(
-                          currentState.searchQuery!,
-                        ) ||
-                        r.leaveType.toLowerCase().contains(
-                          currentState.searchQuery!,
-                        ) ||
-                        (r.subject?.toLowerCase().contains(
-                              currentState.searchQuery!,
-                            ) ??
-                            false),
-                  )
-                  .toList()
-              : currentState.leaveRequests;
-      final filtered = _applyFilters(
-        baseList,
-        event.status,
-        currentState.typeFilter,
-      );
-      emit(
-        currentState.copyWith(
-          filteredLeaveRequests: filtered,
-          statusFilter: event.status,
-        ),
-      );
+      emit(_buildLoadedState(currentState.copyWith(statusFilter: event.status)));
     }
   }
 
@@ -203,67 +207,63 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
   ) {
     if (state is LeaveRequestLoaded) {
       final currentState = state as LeaveRequestLoaded;
-      final baseList =
-          currentState.searchQuery != null
-              ? currentState.leaveRequests
-                  .where(
-                    (r) =>
-                        r.reason.toLowerCase().contains(
-                          currentState.searchQuery!,
-                        ) ||
-                        r.leaveType.toLowerCase().contains(
-                          currentState.searchQuery!,
-                        ) ||
-                        (r.subject?.toLowerCase().contains(
-                              currentState.searchQuery!,
-                            ) ??
-                            false),
-                  )
-                  .toList()
-              : currentState.leaveRequests;
-      final filtered = _applyFilters(
-        baseList,
-        currentState.statusFilter,
-        event.leaveType,
-      );
-      emit(
-        currentState.copyWith(
-          filteredLeaveRequests: filtered,
-          typeFilter: event.leaveType,
-        ),
-      );
+      emit(_buildLoadedState(currentState.copyWith(typeFilter: event.leaveType)));
     }
   }
 
   void _onClearFilters(ClearFilters event, Emitter<LeaveRequestState> emit) {
     if (state is LeaveRequestLoaded) {
       final currentState = state as LeaveRequestLoaded;
-      final filtered =
-          currentState.searchQuery != null
-              ? currentState.leaveRequests
-                  .where(
-                    (r) =>
-                        r.reason.toLowerCase().contains(
-                          currentState.searchQuery!,
-                        ) ||
-                        r.leaveType.toLowerCase().contains(
-                          currentState.searchQuery!,
-                        ) ||
-                        (r.subject?.toLowerCase().contains(
-                              currentState.searchQuery!,
-                            ) ??
-                            false),
-                  )
-                  .toList()
-              : currentState.leaveRequests;
       emit(
-        currentState.copyWith(
-          filteredLeaveRequests: filtered,
-          statusFilter: null,
-          typeFilter: null,
+        _buildLoadedState(
+          currentState.copyWith(statusFilter: null, typeFilter: null),
         ),
       );
     }
+  }
+
+  LeaveRequestLoaded _buildLoadedState(LeaveRequestLoaded state) {
+    final searchedList = _applySearch(state.leaveRequests, state.searchQuery);
+    final filtered = _applyFilters(
+      searchedList,
+      state.statusFilter,
+      state.typeFilter,
+    );
+
+    return state.copyWith(filteredLeaveRequests: filtered);
+  }
+
+  List<LeaveEntity> _applySearch(List<LeaveEntity> requests, String? query) {
+    final normalizedQuery = query?.trim().toLowerCase();
+    if (normalizedQuery == null || normalizedQuery.isEmpty) {
+      return requests;
+    }
+
+    return requests
+        .where(
+          (request) =>
+              request.reason.toLowerCase().contains(normalizedQuery) ||
+              request.leaveType.toLowerCase().contains(normalizedQuery) ||
+              (request.subject?.toLowerCase().contains(normalizedQuery) ??
+                  false),
+        )
+        .toList();
+  }
+
+  List<LeaveEntity> _mergeUniqueById(
+    List<LeaveEntity> existing,
+    List<LeaveEntity> incoming,
+  ) {
+    final merged = <LeaveEntity>[...existing];
+    final seenIds = existing.map((item) => item.id).toSet();
+
+    for (final item in incoming) {
+      if (seenIds.add(item.id)) {
+        merged.add(item);
+      }
+    }
+
+    return merged;
   }
 
   List<LeaveEntity> _applyFilters(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import '../../features/authentication/presentation/bloc/auth_bloc/auth_bloc.dart';
 import '../../features/authentication/presentation/bloc/auth_bloc/auth_event.dart';
 import '../../features/authentication/presentation/bloc/auth_bloc/auth_state.dart';
@@ -60,7 +61,7 @@ class AppDrawer extends StatelessWidget {
                         name: profile?.user.fullName,
                         radius: 30,
                         backgroundColor: AppColors.background,
-                        icon: Icons.person,
+                        // icon: Icons.person,  ← yeh hata do
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -194,18 +195,20 @@ class AppDrawer extends StatelessWidget {
                           children: infoItems.asMap().entries.map((entry) {
                             final index = entry.key;
                             final item = entry.value;
-
+                            final widget = item.label == 'Phone No'
+                                ? _buildPhoneRow(context, item.value)
+                                : _buildProfileInfoRow(
+                              context,
+                              item.icon,
+                              item.label,
+                              item.value,
+                            );
                             return Padding(
                                   padding: EdgeInsets.only(
                                     bottom:
                                         index == infoItems.length - 1 ? 0 : 14,
                                   ),
-                                  child: _buildProfileInfoRow(
-                                    context,
-                                    item.icon,
-                                    item.label,
-                                    item.value,
-                                  ),
+                                  child: widget
                                 );
                           }).toList(),
                         ),
@@ -314,6 +317,38 @@ class AppDrawer extends StatelessWidget {
           SizedBox(height: MediaQuery.of(context).padding.bottom),
         ],
       ),
+    );
+  }
+  Future<String> formatPhone(String phone) async {
+    final trimmed = phone.trim();
+    if (trimmed.isEmpty) return phone;
+
+    try {
+      final number = await PhoneNumber.getRegionInfoFromPhoneNumber(trimmed, 'IN');
+      final formatted = number.phoneNumber ?? trimmed;
+
+      final match = RegExp(r'^\+91(\d{5})(\d{5})$').firstMatch(formatted.replaceAll(' ', ''));
+      if (match != null) {
+        return '+91 ${match.group(1)} ${match.group(2)}';
+      }
+
+      return formatted;
+    } catch (_) {
+      return trimmed;
+    }
+  }
+  Widget _buildPhoneRow(BuildContext context, String phone) {
+    return FutureBuilder<String>(
+      future: formatPhone(phone),
+      builder: (context, snapshot) {
+        final displayPhone = snapshot.data ?? phone;
+        return _buildProfileInfoRow(
+          context,
+          Icons.call_outlined,
+          'Phone No',
+          displayPhone,
+        );
+      },
     );
   }
 

@@ -61,6 +61,11 @@ class ModulePermissions {
     'Approvals:Team Comp-Off:Write',
   ];
 
+  static const expenseApproval = [
+    'Expense Management:Reimbursements:Approvals:Read',
+    'Expense Management:Reimbursements:Approvals:Write',
+  ];
+
   static const anyApprovalAccess = [
     ...leaveApproval,
     ...wfhApproval,
@@ -68,5 +73,6 @@ class ModulePermissions {
     ...onDutyApproval,
     ...overtimeApproval,
     ...compOffApproval,
+    ...expenseApproval,
   ];
 }

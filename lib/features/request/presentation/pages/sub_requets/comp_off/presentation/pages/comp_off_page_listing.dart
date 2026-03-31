@@ -146,6 +146,7 @@ class _CompOffPageListingState extends State<CompOffPageListing>
                         }
                         if (state is CompOffRequestError) {
                           return ApiErrorState(
+                            title: 'Unable to load comp-off requests',
                             rawMessage: state.message,
                             onRetry: () {
                               context.read<CompOffRequestBloc>().add(

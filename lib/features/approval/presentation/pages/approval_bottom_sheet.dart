@@ -1,9 +1,11 @@
 import 'dart:ui';
 import 'package:collectivWork/core/constants/module_permissions.dart';
-import 'package:collectivWork/core/widgets/permission_guard.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../user/presentation/bloc/user_profile_bloc.dart';
+import '../../../user/presentation/bloc/user_profile_state.dart';
 import '../pages/sub_approvals/comp_off/comp_off_approval_page_listing.dart';
 import '../pages/sub_approvals/leaves/leave_approval_page_listing.dart';
 import '../pages/sub_approvals/on_duty/on_duty_approval_page_listing.dart';
@@ -42,7 +44,7 @@ class ApprovalBottomSheet extends StatelessWidget {
               onTap: () => Navigator.of(context).pop(),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(color: Colors.black.withOpacity(0.3)),
+                child: Container(color: Colors.black.withValues(alpha: 0.3)),
               ),
             ),
           ),
@@ -146,146 +148,120 @@ class ApprovalBottomSheet extends StatelessWidget {
     required double buttonSize,
     required double spacing,
   }) {
-    return Column(
-      children: [
-        // First row
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            PermissionGuard(
-              anyOf: ModulePermissions.leaveApproval,
-              child: _buildRequestButton(
-                context: context,
-                title: AppStrings.applyLeave,
-                icon: Icons.calendar_today_outlined,
-                color: const Color(0xFFE91E63),
-                // Hot pink
-                size: buttonSize,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LeaveApprovalPageListing(),
-                    ),
-                  );
-                },
+    final actions = <_ApprovalAction>[
+      _ApprovalAction(
+        title: AppStrings.applyLeave,
+        permissions: ModulePermissions.leaveApproval,
+        icon: Icons.calendar_today_outlined,
+        color: const Color(0xFFE91E63),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const LeaveApprovalPageListing(),
               ),
             ),
-            SizedBox(width: spacing),
-            PermissionGuard(
-              anyOf: ModulePermissions.wfhApproval,
-              child: _buildRequestButton(
-                context: context,
-                title: AppStrings.wfh,
-                icon: Icons.home_outlined,
-                color: const Color(0xFF1976D2),
-                // Royal blue
-                size: buttonSize,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const WfhApprovalPageListing(),
-                    ),
-                  );
-                },
+      ),
+      _ApprovalAction(
+        title: AppStrings.wfh,
+        permissions: ModulePermissions.wfhApproval,
+        icon: Icons.home_outlined,
+        color: const Color(0xFF1976D2),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const WfhApprovalPageListing(),
               ),
             ),
-            SizedBox(width: spacing),
-            PermissionGuard(
-              anyOf: ModulePermissions.regularizeApproval,
-              child: _buildRequestButton(
-                context: context,
-                title: AppStrings.regularize,
-                icon: Icons.check_circle_outline,
-                color: const Color(0xFF9C27B0),
-                // Vibrant purple
-                size: buttonSize,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) => const RegularizeApprovalPageListing(),
-                    ),
-                  );
-                },
+      ),
+      _ApprovalAction(
+        title: AppStrings.regularize,
+        permissions: ModulePermissions.regularizeApproval,
+        icon: Icons.check_circle_outline,
+        color: const Color(0xFF9C27B0),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const RegularizeApprovalPageListing(),
               ),
             ),
-          ],
-        ),
-        SizedBox(height: spacing),
-        // Second row
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            PermissionGuard(
-              anyOf: ModulePermissions.onDutyApproval,
-              child: _buildRequestButton(
-                context: context,
-                title: AppStrings.onDuty,
-                icon: Icons.directions_walk,
-                color: const Color(0xFFFF5722),
-                // Orange-red
-                size: buttonSize,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const OnDutyApprovalPageListing(),
-                    ),
-                  );
-                },
+      ),
+      _ApprovalAction(
+        title: AppStrings.onDuty,
+        permissions: ModulePermissions.onDutyApproval,
+        icon: Icons.directions_walk,
+        color: const Color(0xFFFF5722),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const OnDutyApprovalPageListing(),
               ),
             ),
-            SizedBox(width: spacing),
-            PermissionGuard(
-              anyOf: ModulePermissions.overtimeApproval,
-              child: _buildRequestButton(
-                context: context,
-                title: AppStrings.overtime,
-                icon: Icons.access_time_outlined,
-                color: const Color(0xFF9C27B0),
-                // Vibrant purple
-                size: buttonSize,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const OvertimeApprovalPageListing(),
-                    ),
-                  );
-                },
+      ),
+      _ApprovalAction(
+        title: AppStrings.overtime,
+        permissions: ModulePermissions.overtimeApproval,
+        icon: Icons.access_time_outlined,
+        color: const Color(0xFF9C27B0),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const OvertimeApprovalPageListing(),
               ),
             ),
-            SizedBox(width: spacing),
-            PermissionGuard(
-              anyOf: ModulePermissions.compOffApproval,
-              child: _buildRequestButton(
-                context: context,
-                title: AppStrings.compOff,
-                icon: Icons.schedule,
-                color: const Color(0xFF4CAF50),
-                size: buttonSize,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const CompOffApprovalPageListing(),
-                    ),
-                  );
-                },
+      ),
+      _ApprovalAction(
+        title: AppStrings.compOff,
+        permissions: ModulePermissions.compOffApproval,
+        icon: Icons.schedule,
+        color: const Color(0xFF4CAF50),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CompOffApprovalPageListing(),
               ),
             ),
-          ],
-        ),
-      ],
+      ),
+    ];
+
+    return BlocBuilder<UserProfileBloc, UserProfileState>(
+      builder: (context, state) {
+        final permissions =
+            state is UserProfileLoaded
+                ? (state.profile.role?.permissions ?? const <String>[])
+                : const <String>[];
+        final visibleActions =
+            actions
+                .where((action) => action.permissions.any(permissions.contains))
+                .toList();
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children:
+              visibleActions.map((action) {
+                return SizedBox(
+                  width: buttonSize,
+                  child: _buildRequestButton(
+                    context: context,
+                    title: action.title,
+                    icon: action.icon,
+                    color: action.color,
+                    size: buttonSize,
+                    onTap: () {
+                      Navigator.pop(context);
+                      action.onTap();
+                    },
+                  ),
+                );
+              }).toList(),
+        );
+      },
     );
   }
 
@@ -329,4 +305,20 @@ class ApprovalBottomSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ApprovalAction {
+  final String title;
+  final List<String> permissions;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ApprovalAction({
+    required this.title,
+    required this.permissions,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
 }

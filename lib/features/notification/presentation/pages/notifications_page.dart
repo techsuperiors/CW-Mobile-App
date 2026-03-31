@@ -117,7 +117,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 itemCount: state.notifications.length,
                 shrinkWrap: true,
                 separatorBuilder:
-                    (context, index) => SizedBox(height: screenHeight * 0.016),
+                    (context, index) => SizedBox(height: screenHeight * 0.008),
                 itemBuilder: (context, index) {
                   final notification = state.notifications[index];
                   return NotificationCard(notification: notification);

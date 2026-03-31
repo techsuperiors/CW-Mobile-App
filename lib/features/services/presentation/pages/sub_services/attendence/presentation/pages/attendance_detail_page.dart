@@ -23,7 +23,6 @@ import '../../../../../../../attendance/domain/usecases/get_attendance_details_u
 import '../../../../../../../user/presentation/bloc/user_profile_bloc.dart';
 import '../../../../../../../user/presentation/bloc/user_profile_state.dart';
 import '../widgets/time_utilization_card.dart';
-import '../widgets/attendance_detail_calendar.dart';
 import '../widgets/day_details_card.dart';
 
 /// Attendance detail page opened from Services.
@@ -42,9 +41,7 @@ class _AttendanceDetailPageState extends State<AttendanceDetailPage> {
   AttendanceDetails? _attendanceDetails;
   AttendanceDayDetail? _selectedDayDetail;
   bool _isLoading = true;
-  bool _isSelectedDayLoading = false;
   String? _errorMessage;
-  String? _selectedDayErrorMessage;
 
   late final CalendarBloc _calendarBloc;
 
@@ -148,11 +145,6 @@ class _AttendanceDetailPageState extends State<AttendanceDetailPage> {
     required int userId,
     GetAttendanceDayDetailUseCase? useCase,
   }) async {
-    setState(() {
-      _isSelectedDayLoading = true;
-      _selectedDayErrorMessage = null;
-    });
-
     try {
       developer.log(
         'Loading selected day detail for userId=$userId date=${_dateOnly(_selectedDate).toUtc().toIso8601String()}',
@@ -172,9 +164,7 @@ class _AttendanceDetailPageState extends State<AttendanceDetailPage> {
           );
           if (!mounted) return;
           setState(() {
-            _selectedDayErrorMessage = failure.message;
             _selectedDayDetail = null;
-            _isSelectedDayLoading = false;
           });
         },
         (dayDetail) {
@@ -185,17 +175,13 @@ class _AttendanceDetailPageState extends State<AttendanceDetailPage> {
           if (!mounted) return;
           setState(() {
             _selectedDayDetail = dayDetail;
-            _isSelectedDayLoading = false;
           });
         },
       );
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _selectedDayErrorMessage =
-            'Error loading selected day details: ${e.toString()}';
         _selectedDayDetail = null;
-        _isSelectedDayLoading = false;
       });
     }
   }
@@ -225,16 +211,12 @@ class _AttendanceDetailPageState extends State<AttendanceDetailPage> {
     return _attendanceDetails?.userId;
   }
 
-  /// Called when user navigates to a different month in the calendar.
-  void _onMonthChanged(DateTime newMonth) {
-    _loadCalendarData(newMonth);
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return ResponsiveScaffold(
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         elevation: 0,
         forceMaterialTransparency: true,
@@ -290,52 +272,27 @@ class _AttendanceDetailPageState extends State<AttendanceDetailPage> {
               onRefresh: _loadAttendanceDetails,
             ),
             SizedBox(height: screenHeight * 0.02),
-            // Calendar with API data
+            // Day Details
             PermissionGuard(
               requiredPermission: "Attendance:My Attendance:Read",
               child: BlocBuilder<CalendarBloc, CalendarState>(
                 bloc: _calendarBloc,
                 builder: (context, state) {
-                  List<CalendarDayEntity> days = [];
-                  bool calendarLoading = false;
-
-                  if (state is CalendarLoading) {
-                    calendarLoading = true;
-                  } else if (state is CalendarLoaded) {
-                    days = state.days;
-                  } else if (state is CalendarError) {
-                    // Show calendar with no data (empty) and optionally log error
-                    days = [];
-                  }
-
-                  return AttendanceDetailCalendar(
+                  final days =
+                      state is CalendarLoaded
+                          ? state.days
+                          : <CalendarDayEntity>[];
+                  return DayDetailsCard(
                     selectedDate: _selectedDate,
-                    onDateSelected: _onDateSelected,
+                    onDateChanged: _onDateSelected,
+                    attendanceDetails: _attendanceDetails,
+                    selectedDayDetail: _selectedDayDetail,
+                    isLoading: _isLoading,
+                    errorMessage: _errorMessage,
                     calendarDays: days,
-                    onMonthChanged: _onMonthChanged,
-                    isLoading: calendarLoading,
                   );
                 },
               ),
-            ),
-            SizedBox(height: screenHeight * 0.02),
-            // Day Details
-            BlocBuilder<CalendarBloc, CalendarState>(
-              bloc: _calendarBloc,
-              builder: (context, state) {
-                final days =
-                    state is CalendarLoaded
-                        ? state.days
-                        : <CalendarDayEntity>[];
-                return DayDetailsCard(
-                  selectedDate: _selectedDate,
-                  attendanceDetails: _attendanceDetails,
-                  selectedDayDetail: _selectedDayDetail,
-                  isLoading: _isLoading || _isSelectedDayLoading,
-                  errorMessage: _selectedDayErrorMessage ?? _errorMessage,
-                  calendarDays: days, // ADD THIS
-                );
-              },
             ),
             SizedBox(height: screenHeight * 0.02),
           ],

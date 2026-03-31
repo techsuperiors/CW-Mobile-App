@@ -3,6 +3,7 @@ import 'package:dartz/dartz.dart';
 import '../../../../../../../../core/error/failures.dart';
 import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
 import '../../models/overtime_request_model.dart';
+import '../../models/overtime_request_stats_model.dart';
 import '../entities/overtime_detail.dart';
 
 abstract class OvertimeRepository {
@@ -15,6 +16,11 @@ abstract class OvertimeRepository {
     int page = 1,
     int limit = 20,
     String requestType = 'All',
+  });
+
+  Future<Either<Failure, OvertimeRequestStatsModel>> getOvertimeRequestStats({
+    required int clientId,
+    String requestType = 'User',
   });
 
   Future<Either<Failure, OvertimeDetail>> getOvertimeRequestDetail(int requestId);

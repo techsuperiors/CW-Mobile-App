@@ -6,6 +6,8 @@ import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../../core/utils/error_message_mapper.dart';
+import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../user/presentation/bloc/user_profile_bloc.dart';
 import '../../../../../../../user/presentation/bloc/user_profile_state.dart';
 import '../../data/datasource/asset_remote_datasource.dart';
@@ -107,7 +109,9 @@ class _CreateAssetRequestPageState extends State<CreateAssetRequestPage> {
   void _showSnack(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          isError ? ErrorMessageMapper.toUserFriendlyMessage(message) : message,
+        ),
         backgroundColor: isError ? AppColors.error : Colors.green,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -188,26 +192,10 @@ class _CreateAssetRequestPageState extends State<CreateAssetRequestPage> {
   }
 
   Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, color: AppColors.error, size: 48),
-          const SizedBox(height: 16),
-          Text(
-            _categoryError!,
-            style: AppTextStyles.bodyMedium(
-              context,
-            ).copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _userId != null ? () => _loadCategories(_userId!) : null,
-            child: const Text('Retry'),
-          ),
-        ],
-      ),
+    return ApiErrorState(
+      title: 'Unable to load asset categories',
+      rawMessage: _categoryError!,
+      onRetry: _userId != null ? () => _loadCategories(_userId!) : null,
     );
   }
 

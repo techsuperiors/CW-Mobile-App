@@ -173,13 +173,13 @@ class LeaveRequestCard extends StatelessWidget {
   Color _getStatusColor(LeaveStatus status) {
     switch (status) {
       case LeaveStatus.pending:
-        return const Color(0xFF0086C9); // Blue
+        return AppColors.approvalSheetPending; //
       case LeaveStatus.approved:
-        return const Color(0xFF12B76A); // Green
+        return AppColors.approvalSheetAccept; // 0xFF12B76A
       case LeaveStatus.rejected:
-        return const Color(0xFFF04438); // Red
+        return AppColors.approvalSheetReject; // 0xFFF04438
       case LeaveStatus.withdrawn:
-        return const Color(0xFFF79009); // Orange
+        return AppColors.approvalSheetWithdrawn; // 0xFFF79009
     }
   }
 

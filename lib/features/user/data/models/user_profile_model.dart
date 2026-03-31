@@ -2,6 +2,7 @@
 class UserProfileModel {
   final int clientId;
   final int userId;
+  final bool allowAllUsers;
   final int? departmentId;
   final String? address;
   final List<dynamic>? contactDetails;
@@ -40,6 +41,7 @@ class UserProfileModel {
   UserProfileModel({
     required this.clientId,
     required this.userId,
+    this.allowAllUsers = false,
     this.departmentId,
     this.address,
     this.contactDetails,
@@ -80,6 +82,7 @@ class UserProfileModel {
     return UserProfileModel(
       clientId: _asInt(json['client_id']) ?? 0,
       userId: _asInt(json['user_id']) ?? 0,
+      allowAllUsers: json['allow_all_users'] as bool? ?? false,
       departmentId: _asInt(json['department_id']),
       address: _parseAddress(json['address']),
       contactDetails: json['contact_details'] as List<dynamic>?,

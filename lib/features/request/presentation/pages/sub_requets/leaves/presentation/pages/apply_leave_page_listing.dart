@@ -20,7 +20,6 @@ import '../../../../../../../../core/widgets/status_tabbed_section.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../../../../widgets/request_listing/request_empty_state.dart';
 import '../../../../../widgets/request_listing/request_grouping_utils.dart';
-import '../../../wfh/models/wfh_request_model.dart';
 import '../../domain/entities/leave_entity.dart';
 import '../../data/datasources/leaves_remote_datasource.dart';
 import '../../data/repositories/leaves_repository_impl.dart';
@@ -42,7 +41,6 @@ class ApplyLeavePageListing extends StatefulWidget {
 class _ApplyLeavePageListingState extends State<ApplyLeavePageListing>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
-  LeaveStatus? _selectedStatusFilter;
   late TabController _tabController;
   static const List<StatusTabDefinition<LeaveStatus>> _tabs = [
     StatusTabDefinition(label: 'All', status: null),
@@ -160,6 +158,7 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing>
                         if (state is LeaveRequestError) {
                           return ApiErrorState(
                             rawMessage: state.message,
+                            title: 'Unable to load leave requests',
                             onRetry: () {
                               final bloc = context.read<LeaveRequestBloc>();
                               bloc.add(const LoadLeaveRequests());
@@ -268,7 +267,7 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -352,173 +351,6 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing>
           ),
         ),
       ],
-    );
-  }
-
-  void _showFilterBottomSheet(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    // Get current filter state from bloc using the context that has BlocProvider
-    final bloc = context.read<LeaveRequestBloc>();
-    final currentState = bloc.state;
-    LeaveStatus? currentFilter;
-    if (currentState is LeaveRequestLoaded) {
-      currentFilter = currentState.statusFilter;
-      // Sync local state with bloc state
-      _selectedStatusFilter = currentFilter;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder:
-          (bottomSheetContext) => StatefulBuilder(
-            builder:
-                (bottomSheetContext, setModalState) => Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                  ),
-                  padding: EdgeInsets.all(screenWidth * 0.042),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Filter by Status',
-                        style: AppTextStyles.heading4(bottomSheetContext),
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      // Filter options
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'All',
-                        null,
-                        _selectedStatusFilter == null,
-                        () {
-                          setModalState(() {
-                            _selectedStatusFilter = null;
-                          });
-                        },
-                      ),
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'Pending',
-                        LeaveStatus.pending,
-                        _selectedStatusFilter == LeaveStatus.pending,
-                        () {
-                          setModalState(() {
-                            _selectedStatusFilter = LeaveStatus.pending;
-                          });
-                        },
-                      ),
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'Approved',
-                        LeaveStatus.approved,
-                        _selectedStatusFilter == LeaveStatus.approved,
-                        () {
-                          setModalState(() {
-                            _selectedStatusFilter = LeaveStatus.approved;
-                          });
-                        },
-                      ),
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'Rejected',
-                        LeaveStatus.rejected,
-                        _selectedStatusFilter == LeaveStatus.rejected,
-                        () {
-                          setModalState(() {
-                            _selectedStatusFilter = LeaveStatus.rejected;
-                          });
-                        },
-                      ),
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'Withdrawn',
-                        LeaveStatus.withdrawn,
-                        _selectedStatusFilter == LeaveStatus.withdrawn,
-                        () {
-                          setModalState(() {
-                            _selectedStatusFilter = LeaveStatus.withdrawn;
-                          });
-                        },
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      // Apply button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(bottomSheetContext);
-                            // Use the bloc instance from the outer context
-                            bloc.add(
-                              FilterLeaveRequestsByStatus(
-                                _selectedStatusFilter,
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            padding: EdgeInsets.symmetric(
-                              vertical: screenHeight * 0.018,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text(
-                            'Apply Filter',
-                            style: AppTextStyles.buttonMedium(
-                              bottomSheetContext,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-          ),
-    );
-  }
-
-  Widget _buildFilterOption(
-    BuildContext context,
-    String label,
-    LeaveStatus? status,
-    bool isSelected,
-    VoidCallback onTap,
-  ) {
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: screenHeight * 0.015),
-        child: Row(
-          children: [
-            Icon(
-              isSelected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-            SizedBox(width: MediaQuery.of(context).size.width * 0.032),
-            Text(
-              label,
-              style: AppTextStyles.bodyMedium(context).copyWith(
-                color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

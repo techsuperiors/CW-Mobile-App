@@ -22,6 +22,7 @@ class StatusTabbedSection<TStatus, TItem> extends StatelessWidget {
   listBuilder;
   final Widget Function(BuildContext context)? emptyBuilder;
   final EdgeInsetsGeometry? margin;
+  final Map<TStatus?, int>? countOverrides;
 
   const StatusTabbedSection({
     super.key,
@@ -35,6 +36,7 @@ class StatusTabbedSection<TStatus, TItem> extends StatelessWidget {
     required this.listBuilder,
     this.emptyBuilder,
     this.margin,
+    this.countOverrides,
   });
 
   Color _getAnimatedColor() {
@@ -63,12 +65,14 @@ class StatusTabbedSection<TStatus, TItem> extends StatelessWidget {
     );
 
     final counts = <TStatus?, int>{};
-    counts[null] = searchScopedItems.length;
+    counts[null] = countOverrides?[null] ?? searchScopedItems.length;
     for (final tab in tabs) {
       if (tab.status != null) {
-        counts[tab.status] = searchScopedItems
-            .where((item) => statusSelector(item) == tab.status)
-            .length;
+        counts[tab.status] =
+            countOverrides?[tab.status] ??
+            searchScopedItems
+                .where((item) => statusSelector(item) == tab.status)
+                .length;
       }
     }
 

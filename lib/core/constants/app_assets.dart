@@ -38,6 +38,7 @@ class AppAssets {
   static const String iconOvertime = 'assets/icons/overtime_icon.svg';
   static const String iconcalender = 'assets/icons/calender_icon.svg';
   static const String iconnotification = 'assets/icons/notification_icno.svg';
+  static const String iconnotificationteal = 'assets/icons/notif_icon_unread.png';
   static const String iconattendencehome = 'assets/icons/attendence_cal_icon.svg';
   static const String iconaLatePunchIn = 'assets/icons/latePunchInIcon.svg';
 

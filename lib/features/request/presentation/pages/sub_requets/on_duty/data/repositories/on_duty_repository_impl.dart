@@ -7,6 +7,7 @@ import '../../../../../../../attendance/domain/entities/attendance_request_comme
 import '../../domain/entities/on_duty_detail.dart';
 import '../../domain/repositories/on_duty_repository.dart';
 import '../../models/on_duty_request_model.dart';
+import '../../models/on_duty_request_stats_model.dart';
 import '../datasources/on_duty_remote_datasource.dart';
 
 class OnDutyRepositoryImpl implements OnDutyRepository {
@@ -28,17 +29,37 @@ class OnDutyRepositoryImpl implements OnDutyRepository {
 
   @override
   Future<Either<Failure, List<OnDutyRequestModel>>> getTeamOnDutyRequests({
+    required int clientId,
     int page = 1,
     int limit = 50,
     String requestType = 'All',
   }) async {
     try {
       final requests = await remoteDataSource.getTeamOnDutyRequests(
+        clientId: clientId,
         page: page,
         limit: limit,
         requestType: requestType,
       );
       return Right(requests);
+    } on AppException catch (e) {
+      return Left(ErrorHandler.handleException(e));
+    } catch (e) {
+      return Left(ErrorHandler.handleException(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, OnDutyRequestStatsModel>> getOnDutyRequestStats({
+    required int clientId,
+    String requestType = 'User',
+  }) async {
+    try {
+      final stats = await remoteDataSource.getOnDutyRequestStats(
+        clientId: clientId,
+        requestType: requestType,
+      );
+      return Right(stats);
     } on AppException catch (e) {
       return Left(ErrorHandler.handleException(e));
     } catch (e) {

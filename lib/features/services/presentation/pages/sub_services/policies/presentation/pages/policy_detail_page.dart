@@ -11,6 +11,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../domain/models/policy_model.dart';
@@ -110,31 +111,10 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
             }
 
             if (snapshot.hasError && !snapshot.hasData) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: AppColors.error,
-                        size: MediaQuery.of(context).size.width * 0.12,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        snapshot.error.toString(),
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.bodyMedium(context),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _reloadPolicy,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                ),
+              return ApiErrorState(
+                title: 'Unable to load policy details',
+                rawMessage: snapshot.error.toString(),
+                onRetry: _reloadPolicy,
               );
             }
             return RefreshIndicator(

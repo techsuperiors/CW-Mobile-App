@@ -1,6 +1,8 @@
+import 'package:collectivWork/core/constants/app_assets.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -13,7 +15,7 @@ class NotificationCard extends StatefulWidget {
   final NotificationEntity notification;
 
   const NotificationCard({Key? key, required this.notification})
-      : super(key: key);
+    : super(key: key);
 
   @override
   State<NotificationCard> createState() => _NotificationCardState();
@@ -49,7 +51,6 @@ class _NotificationCardState extends State<NotificationCard>
       _isExpanded = !_isExpanded;
       if (_isExpanded) {
         _animationController.forward();
-        // Agar message unread hai aur user expand kare toh read mark karo
         if (!widget.notification.isRead) {
           context.read<NotificationBloc>().add(
             ReadSingleNotification(widget.notification.id),
@@ -73,13 +74,14 @@ class _NotificationCardState extends State<NotificationCard>
 
     return Container(
       padding: EdgeInsets.symmetric(
-        vertical: screenHeight * 0.008,
+        vertical: screenHeight * 0.016,
         horizontal: screenWidth * 0.02,
       ),
       decoration: BoxDecoration(
-        color: isUnread
-            ? AppColors.attendanceTeal.withOpacity(0.05)
-            : Colors.white,
+        color:
+            isUnread
+                ? AppColors.attendanceTeal.withOpacity(0.05)
+                : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isUnread ? AppColors.attendanceTeal : AppColors.border,
@@ -93,34 +95,47 @@ class _NotificationCardState extends State<NotificationCard>
           Padding(
             padding: EdgeInsets.only(top: screenHeight * 0.006),
             child: CircleAvatar(
-              backgroundColor: Color(int.parse(
-                widget.notification.sentByNotifications.profileColor
-                    .replaceAll('#', '0xff'),
-              )).withOpacity(0.1),
-              backgroundImage: (widget.notification.sentByNotifications
-                  .imageUrl !=
-                  null &&
-                  widget.notification.sentByNotifications.imageUrl!
-                      .isNotEmpty)
-                  ? NetworkImage(
-                  widget.notification.sentByNotifications.imageUrl!)
-                  : null,
-              child: (widget.notification.sentByNotifications.imageUrl ==
-                  null ||
-                  widget.notification.sentByNotifications.imageUrl!
-                      .isEmpty)
-                  ? Text(
-                widget.notification.sentByNotifications.firstName[0]
-                    .toUpperCase(),
-                style: TextStyle(
-                  color: Color(int.parse(
-                    widget.notification.sentByNotifications.profileColor
-                        .replaceAll('#', '0xff'),
-                  )),
-                  fontWeight: FontWeight.bold,
+              backgroundColor: Color(
+                int.parse(
+                  widget.notification.sentByNotifications.profileColor
+                      .replaceAll('#', '0xff'),
                 ),
-              )
-                  : null,
+              ).withOpacity(0.1),
+              backgroundImage:
+                  (widget.notification.sentByNotifications.imageUrl != null &&
+                          widget
+                              .notification
+                              .sentByNotifications
+                              .imageUrl!
+                              .isNotEmpty)
+                      ? NetworkImage(
+                        widget.notification.sentByNotifications.imageUrl!,
+                      )
+                      : null,
+              child:
+                  (widget.notification.sentByNotifications.imageUrl == null ||
+                          widget
+                              .notification
+                              .sentByNotifications
+                              .imageUrl!
+                              .isEmpty)
+                      ? Text(
+                        widget.notification.sentByNotifications.firstName[0]
+                            .toUpperCase(),
+                        style: TextStyle(
+                          color: Color(
+                            int.parse(
+                              widget
+                                  .notification
+                                  .sentByNotifications
+                                  .profileColor
+                                  .replaceAll('#', '0xff'),
+                            ),
+                          ),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                      : null,
             ),
           ),
 
@@ -138,9 +153,11 @@ class _NotificationCardState extends State<NotificationCard>
                     Expanded(
                       child: Text(
                         widget.notification.title,
-                        style: AppTextStyles.bodyLarge(context).copyWith(
+                        style: AppTextStyles.bodyMediumHeading(
+                          context,
+                        ).copyWith(
                           fontWeight:
-                          isUnread ? FontWeight.w600 : FontWeight.w500,
+                              isUnread ? FontWeight.w600 : FontWeight.w500,
                           color: AppColors.textPrimary,
                         ),
                       ),
@@ -153,24 +170,17 @@ class _NotificationCardState extends State<NotificationCard>
                           GestureDetector(
                             onTap: () {
                               context.read<NotificationBloc>().add(
-                                ReadSingleNotification(
-                                    widget.notification.id),
+                                ReadSingleNotification(widget.notification.id),
                               );
                             },
                             child: Container(
-                              height: MediaQuery.sizeOf(context).height * 0.03,
-                              width: MediaQuery.sizeOf(context).height * 0.03,
+                              height: MediaQuery.sizeOf(context).height * 0.06,
+                              width: MediaQuery.sizeOf(context).height * 0.06,
                               padding: EdgeInsets.all(
                                 MediaQuery.sizeOf(context).width * 0.01,
                               ),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color:
-                                AppColors.attendanceTeal.withOpacity(0.3),
-                              ),
-                              child: const CircleAvatar(
-                                backgroundColor: AppColors.attendanceTeal,
-                                radius: 4,
+                              child: Image.asset(
+                                AppAssets.iconnotificationteal,
                               ),
                             ),
                           ),
@@ -187,9 +197,10 @@ class _NotificationCardState extends State<NotificationCard>
                             child: Icon(
                               Icons.keyboard_arrow_down_rounded,
                               size: 20,
-                              color: isUnread
-                                  ? AppColors.attendanceTeal
-                                  : AppColors.textSecondary,
+                              color:
+                                  isUnread
+                                      ? AppColors.attendanceTeal
+                                      : AppColors.textSecondary,
                             ),
                           ),
                         ),
@@ -210,9 +221,10 @@ class _NotificationCardState extends State<NotificationCard>
                           fontSize: FontSize(13),
                           margin: Margins.zero,
                           padding: HtmlPaddings.zero,
-                          color: isUnread
-                              ? AppColors.textPrimary
-                              : AppColors.textSecondary,
+                          color:
+                              isUnread
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary,
                         ),
                         "b": Style(fontWeight: FontWeight.bold),
                         "strong": Style(fontWeight: FontWeight.bold),
@@ -223,10 +235,9 @@ class _NotificationCardState extends State<NotificationCard>
                 SizedBox(height: screenHeight * 0.005),
                 Text(
                   formattedDate,
-                  style: AppTextStyles.bodySmall(context).copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 11,
-                  ),
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(color: AppColors.textSecondary, fontSize: 11),
                 ),
               ],
             ),

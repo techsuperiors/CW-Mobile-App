@@ -1,4 +1,5 @@
 import 'package:collectivWork/core/widgets/permission_guard.dart';
+import 'package:collectivWork/features/attendance/presentation/pages/face_verification/face_verification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dio/dio.dart';
@@ -182,7 +183,8 @@ class _AttendancePageState extends State<AttendancePage> {
 
   DateTime _monthStart(DateTime month) => DateTime(month.year, month.month, 1);
 
-  DateTime _monthEnd(DateTime month) => DateTime(month.year, month.month + 1, 0);
+  DateTime _monthEnd(DateTime month) =>
+      DateTime(month.year, month.month + 1, 0);
 
   Future<void> _refreshAttendanceSummaryOnly() async {
     final networkInfo = NetworkInfoImpl(Connectivity());
@@ -219,7 +221,7 @@ class _AttendancePageState extends State<AttendancePage> {
 
     final isLeavesReady =
         leaveTypesState is LeaveTypesLoaded ||
-        leaveTypesState is LeaveTypesError;
+            leaveTypesState is LeaveTypesError;
     return !_isLoadingProfile &&
         !_isLoadingAttendance &&
         !_isLoadingEvents &&
@@ -271,10 +273,8 @@ class _AttendancePageState extends State<AttendancePage> {
     }
   }
 
-  Future<void> _loadUserProfile(
-    ApiClient apiClient,
-    NetworkInfo networkInfo,
-  ) async {
+  Future<void> _loadUserProfile(ApiClient apiClient,
+      NetworkInfo networkInfo,) async {
     try {
       final remoteDataSource = UserProfileRemoteDataSourceImpl(apiClient);
       final repository = UserProfileRepositoryImpl(
@@ -286,13 +286,13 @@ class _AttendancePageState extends State<AttendancePage> {
       final result = await getUserProfileUseCase();
 
       result.fold(
-        (failure) {
+            (failure) {
           setState(() {
             _profileError = failure.message;
             _isLoadingProfile = false;
           });
         },
-        (profile) {
+            (profile) {
           setState(() {
             _userProfile = profile;
             _isLoadingProfile = false;
@@ -313,10 +313,8 @@ class _AttendancePageState extends State<AttendancePage> {
     }
   }
 
-  Future<void> _loadAttendanceDetails(
-    ApiClient apiClient,
-    NetworkInfo networkInfo,
-  ) async {
+  Future<void> _loadAttendanceDetails(ApiClient apiClient,
+      NetworkInfo networkInfo,) async {
     try {
       final remoteDataSource = AttendanceDetailsRemoteDataSourceImpl(apiClient);
       final repository = AttendanceDetailsRepositoryImpl(
@@ -330,13 +328,13 @@ class _AttendancePageState extends State<AttendancePage> {
       final result = await getAttendanceDetailsUseCase();
 
       result.fold(
-        (failure) {
+            (failure) {
           setState(() {
             _attendanceError = failure.message;
             _isLoadingAttendance = false;
           });
         },
-        (attendanceDetails) {
+            (attendanceDetails) {
           setState(() {
             _attendanceDetails = attendanceDetails;
             _isLoadingAttendance = false;
@@ -351,10 +349,8 @@ class _AttendancePageState extends State<AttendancePage> {
     }
   }
 
-  Future<void> _loadUpcomingEvents(
-    ApiClient apiClient,
-    NetworkInfo networkInfo,
-  ) async {
+  Future<void> _loadUpcomingEvents(ApiClient apiClient,
+      NetworkInfo networkInfo,) async {
     try {
       final remoteDataSource = UpcomingEventsRemoteDataSourceImpl(apiClient);
       final repository = UpcomingEventsRepositoryImpl(
@@ -366,13 +362,13 @@ class _AttendancePageState extends State<AttendancePage> {
       final result = await getUpcomingEventsUseCase();
 
       result.fold(
-        (failure) {
+            (failure) {
           setState(() {
             _eventsError = failure.message;
             _isLoadingEvents = false;
           });
         },
-        (events) {
+            (events) {
           setState(() {
             _upcomingEvents = events;
             _isLoadingEvents = false;
@@ -388,11 +384,9 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   /// Load leave stats for the attendance summary card.
-  Future<void> _loadLeaveStats(
-    ApiClient apiClient,
-    NetworkInfo networkInfo,
-    {DateTime? targetMonth}
-  ) async {
+  Future<void> _loadLeaveStats(ApiClient apiClient,
+      NetworkInfo networkInfo,
+      {DateTime? targetMonth}) async {
     try {
       final remoteDataSource = LeaveStatsRemoteDataSourceImpl(apiClient);
       final repository = LeaveStatsRepositoryImpl(
@@ -410,12 +404,12 @@ class _AttendancePageState extends State<AttendancePage> {
       );
 
       result.fold(
-        (failure) {
+            (failure) {
           setState(() {
             _isLoadingLeaveStats = false;
           });
         },
-        (stats) {
+            (stats) {
           setState(() {
             _leaveStats = stats;
             _isLoadingLeaveStats = false;
@@ -485,11 +479,11 @@ class _AttendancePageState extends State<AttendancePage> {
         }
 
         final leaveTypes =
-            leaveTypesState is LeaveTypesLoaded
-                ? leaveTypesState.leaveTypes
-                : null;
+        leaveTypesState is LeaveTypesLoaded
+            ? leaveTypesState.leaveTypes
+            : null;
         final leavesError =
-            leaveTypesState is LeaveTypesError ? leaveTypesState.message : null;
+        leaveTypesState is LeaveTypesError ? leaveTypesState.message : null;
         final isLoadingLeaves = leaveTypesState is LeaveTypesLoading;
 
         return BlocListener<AttendancePunchBloc, AttendancePunchState>(
@@ -528,6 +522,10 @@ class _AttendancePageState extends State<AttendancePage> {
                         isLoading: _isLoadingAttendance,
                         onRefresh: _loadAllData,
                       ),
+                      // ElevatedButton(onPressed: () {
+                      //   Navigator.of(context).push(MaterialPageRoute(
+                      //       builder: (context) => FaceVerificationScreen())
+                      //   );}, child: Text("Face verification")),
                       // Punch Details
                       PunchDetails(
                         attendanceDetails: _attendanceDetails,

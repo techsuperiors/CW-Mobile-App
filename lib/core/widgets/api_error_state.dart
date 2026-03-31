@@ -8,17 +8,20 @@ class ApiErrorState extends StatelessWidget {
   final String? rawMessage;
   final VoidCallback? onRetry;
   final String title;
+  final String? description;
 
   const ApiErrorState({
     super.key,
     required this.rawMessage,
     this.onRetry,
     this.title = 'Something went wrong',
+    this.description,
   });
 
   @override
   Widget build(BuildContext context) {
     final message = ErrorMessageMapper.toUserFriendlyMessage(rawMessage);
+    final resolvedDescription = description ?? message;
 
     return Center(
       child: Padding(
@@ -42,7 +45,7 @@ class ApiErrorState extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              "There is a problem in loading this data...",
+              resolvedDescription,
               style: AppTextStyles.bodyMedium(context).copyWith(
                 color: AppColors.textSecondary,
               ),

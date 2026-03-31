@@ -7,6 +7,7 @@ import '../../../../../../../attendance/domain/entities/attendance_request_comme
 import '../../domain/entities/overtime_detail.dart';
 import '../../domain/repositories/overtime_repository.dart';
 import '../../models/overtime_request_model.dart';
+import '../../models/overtime_request_stats_model.dart';
 import '../datasources/overtime_remote_datasource.dart';
 
 class OvertimeRepositoryImpl implements OvertimeRepository {
@@ -45,6 +46,24 @@ class OvertimeRepositoryImpl implements OvertimeRepository {
         requestType: requestType,
       );
       return Right(requests);
+    } on AppException catch (e) {
+      return Left(ErrorHandler.handleException(e));
+    } catch (e) {
+      return Left(ErrorHandler.handleException(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, OvertimeRequestStatsModel>> getOvertimeRequestStats({
+    required int clientId,
+    String requestType = 'User',
+  }) async {
+    try {
+      final stats = await remoteDataSource.getOvertimeRequestStats(
+        clientId: clientId,
+        requestType: requestType,
+      );
+      return Right(stats);
     } on AppException catch (e) {
       return Left(ErrorHandler.handleException(e));
     } catch (e) {

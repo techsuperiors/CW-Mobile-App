@@ -31,9 +31,15 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
     if (await networkInfo.isConnected) {
       try {
         final profileModel = await remoteDataSource.getUserProfile();
+        final allowAllUsers = await remoteDataSource.getAllowAllUsers(
+          userId: profileModel.userId,
+        );
 
         // Convert model to entity
-        final profile = _mapModelToEntity(profileModel);
+        final profile = _mapModelToEntity(
+          profileModel,
+          allowAllUsers: allowAllUsers,
+        );
 
         return Right(profile);
       } on ServerException catch (e) {
@@ -46,10 +52,14 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
     }
   }
 
-  UserProfile _mapModelToEntity(UserProfileModel model) {
+  UserProfile _mapModelToEntity(
+    UserProfileModel model, {
+    required bool allowAllUsers,
+  }) {
     return UserProfile(
       clientId: model.clientId,
       userId: model.userId,
+      allowAllUsers: allowAllUsers,
       departmentId: model.departmentId,
       address: model.address,
       birthday: model.birthday,

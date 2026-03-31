@@ -1,8 +1,21 @@
 class AttendanceDayLog {
   final String? punchIn;
   final String? punchOut;
+  final String? activityAction;
+  final String? activityType;
+  final String? time;
+  final String? activityBy;
+  final String? location;
 
-  const AttendanceDayLog({this.punchIn, this.punchOut});
+  const AttendanceDayLog({
+    this.punchIn,
+    this.punchOut,
+    this.activityAction,
+    this.activityType,
+    this.time,
+    this.activityBy,
+    this.location,
+  });
 }
 
 class AttendanceDayShiftTiming {

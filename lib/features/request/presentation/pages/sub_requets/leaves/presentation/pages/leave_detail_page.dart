@@ -14,7 +14,9 @@ import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/api_service.dart';
 import '../../../../../../../../core/network/network_info.dart';
 import '../../../../../../../../core/utils/app_navigator.dart';
+import '../../../../../../../../core/utils/error_message_mapper.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../approval/presentation/widgets/approval_action_bar.dart';
 import '../../../../../../../authentication/presentation/pages/login_page.dart';
@@ -269,6 +271,15 @@ class _LeaveDetailView extends StatelessWidget {
                 onTap: NavigationHelper.getBottomNavHandler(context),
               ),
       body: BlocListener<LeaveDetailBloc, LeaveDetailState>(
+        listenWhen: (previous, current) {
+          if (current is LeaveDetailError) {
+            return previous is! LeaveDetailInitial &&
+                previous is! LeaveDetailLoading;
+          }
+          return current is LeaveDetailWithdrawn ||
+              current is LeaveStatusUpdated ||
+              current is LeaveCommentAdded;
+        },
         listener: (context, state) {
           if (state is LeaveDetailWithdrawn) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -283,7 +294,9 @@ class _LeaveDetailView extends StatelessWidget {
           } else if (state is LeaveDetailError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.message),
+                content: Text(
+                  ErrorMessageMapper.toUserFriendlyMessage(state.message),
+                ),
                 backgroundColor: AppColors.error,
               ),
             );
@@ -310,8 +323,9 @@ class _LeaveDetailView extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             if (state is LeaveDetailError) {
-              return _ErrorView(
-                message: state.message,
+              return ApiErrorState(
+                rawMessage: state.message,
+                title: 'Unable to load leave details',
                 onRetry:
                     () => ctx.read<LeaveDetailBloc>().add(
                       FetchLeaveDetail(int.tryParse(leaveEntity.id) ?? 0),
@@ -481,39 +495,6 @@ class _LeaveDetailView extends StatelessWidget {
                   ),
                 ),
           ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Error view
-// ─────────────────────────────────────────────────────────────────────────────
-class _ErrorView extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
-
-  const _ErrorView({required this.message, required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: AppColors.error),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.bodyMedium(context),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/constants/app_urls.dart';
+import '../../../../../../../../core/utils/error_message_mapper.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../approval/presentation/widgets/approval_action_bar.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
@@ -58,6 +60,7 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
   List<WfhApproverSnapshot> _approvers = const [];
   bool _commentsLoading = true;
   bool _submittingComment = false;
+  String? _commentsErrorMessage;
 
   @override
   void initState() {
@@ -115,7 +118,9 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
             // Show error
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.errorMessage),
+                content: Text(
+                  ErrorMessageMapper.toUserFriendlyMessage(state.errorMessage),
+                ),
                 backgroundColor: AppColors.error,
               ),
             );
@@ -658,6 +663,12 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
           SizedBox(height: screenHeight * 0.018),
           if (_commentsLoading)
             const Center(child: CircularProgressIndicator())
+          else if (_commentsErrorMessage != null)
+            ApiErrorState(
+              title: 'Unable to load comments',
+              rawMessage: _commentsErrorMessage,
+              onRetry: _loadComments,
+            )
           else if (_comments.isNotEmpty) ...[
             ..._comments.map(
               (comment) => Padding(
@@ -1015,7 +1026,10 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
   }
 
   Future<void> _loadComments() async {
-    setState(() => _commentsLoading = true);
+    setState(() {
+      _commentsLoading = true;
+      _commentsErrorMessage = null;
+    });
     try {
       final networkInfo = NetworkInfoImpl(Connectivity());
       final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
@@ -1034,9 +1048,14 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
         _comments = parseAttendanceRequestComments(responseData);
       } else {
         _comments = const [];
+        _commentsErrorMessage =
+            responseData is Map<String, dynamic>
+                ? responseData['message'] as String?
+                : null;
       }
-    } catch (_) {
+    } catch (e) {
       _comments = const [];
+      _commentsErrorMessage = e.toString();
     } finally {
       if (mounted) {
         setState(() => _commentsLoading = false);
@@ -1072,9 +1091,10 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
               ? responseData['message'] as String? ?? 'Failed to add comment'
               : 'Failed to add comment';
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      ScaffoldMessenger.of(this.context).showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text(ErrorMessageMapper.toUserFriendlyMessage(message)),
           backgroundColor: success ? AppColors.success : AppColors.error,
         ),
       );
@@ -1084,9 +1104,12 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
         await _loadComments();
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      ScaffoldMessenger.of(this.context).showSnackBar(
         SnackBar(
-          content: Text('Failed to add comment'),
+          content: Text(
+            ErrorMessageMapper.toUserFriendlyMessage(e.toString()),
+          ),
           backgroundColor: AppColors.error,
         ),
       );

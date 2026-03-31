@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 
@@ -9,6 +10,16 @@ import '../../../../../../../core/network/api_client.dart';
 import '../../../../../../../core/utils/data_encoder.dart';
 import 'models/expense_detail_model.dart';
 import 'models/expense_item_model.dart';
+
+class ExpenseApprovalListPage {
+  final List<ExpenseItemModel> items;
+  final int totalCount;
+
+  const ExpenseApprovalListPage({
+    required this.items,
+    required this.totalCount,
+  });
+}
 
 class ExpensePolicySelection {
   final int id;
@@ -131,6 +142,8 @@ class ExpenseRemoteData {
       );
 
       final body = response.data as Map<String, dynamic>;
+
+      print(body);
       final success = body['success'] as bool? ?? false;
       if (!success) {
         throw ServerException(
@@ -148,6 +161,56 @@ class ExpenseRemoteData {
       rethrow;
     } catch (e) {
       throw ServerException('Failed to load reimbursements: $e');
+    }
+  }
+
+  Future<ExpenseApprovalListPage> getExpenseApprovals({
+    required RequestAudienceScope scope,
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      final payload = {
+        'employeeID': <String>[],
+        'date': <String>[],
+        'approved_date': <String>[],
+        'approver_status': <String>[],
+        'request_type': [scope.attendanceRequestType],
+        'page': page,
+        'limit': limit,
+      };
+      final encodedPayload = encodeData(payload);
+
+      final response = await apiClient.get(
+        '${AppUrls.expenseApprovalList}?payload=$encodedPayload',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      final body = response.data as Map<String, dynamic>;
+      final success = body['success'] as bool? ?? false;
+      if (!success) {
+        throw ServerException(
+          body['message']?.toString() ?? 'Failed to load expense approvals',
+        );
+      }
+
+      final data = body['data'] as List<dynamic>? ?? const [];
+      final items =
+          data
+              .whereType<Map<String, dynamic>>()
+              .map(ExpenseItemModel.fromJson)
+              .toList()
+            ..sort((a, b) => b.fromDate.compareTo(a.fromDate));
+
+      return ExpenseApprovalListPage(
+        items: items,
+        totalCount:
+            (body['totalExpenseCount'] as num?)?.toInt() ?? items.length,
+      );
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException('Failed to load expense approvals: $e');
     }
   }
 
@@ -235,6 +298,48 @@ class ExpenseRemoteData {
       rethrow;
     } catch (e) {
       throw ServerException('Failed to withdraw expense request: $e');
+    }
+  }
+
+  Future<String> updateExpenseApprovalStatus({
+    required int expenseId,
+    required int expenseApprovalId,
+    required int approverId,
+    required String approvalStatus,
+  }) async {
+    try {
+      final encodedPayload = encodeData({
+        'expenseList': [
+          {
+            'expense_id': expenseId,
+            'expense_approval_id': expenseApprovalId,
+            'approver_id': approverId,
+            'approval_status': approvalStatus,
+          },
+        ],
+      });
+
+      final response = await apiClient.put(
+        AppUrls.expenseBulkStatusUpdate,
+        data: {'payload': encodedPayload},
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      final body = response.data as Map<String, dynamic>;
+      final success = body['success'] as bool? ?? false;
+      if (!success) {
+        throw ServerException(
+          body['message']?.toString() ??
+              'Failed to update expense request status',
+        );
+      }
+
+      return body['message']?.toString() ??
+          'Expense request updated successfully.';
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException('Failed to update expense request status: $e');
     }
   }
 

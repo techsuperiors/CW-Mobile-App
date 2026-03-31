@@ -1,9 +1,12 @@
 import 'package:dartz/dartz.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 import '../../../../../../../../core/error/error_handler.dart';
 import '../../../../../../../../core/error/exceptions.dart';
 import '../../../../../../../../core/error/failures.dart';
-import '../../models/wfh_request_model.dart';
 import '../../domain/repositories/wfh_repository.dart';
+import '../../models/wfh_request_model.dart';
+import '../../models/wfh_request_stats_model.dart';
+import '../../models/wfh_requests_page_model.dart';
 import '../datasources/wfh_remote_datasource.dart';
 
 class WfhRepositoryImpl implements WfhRepository {
@@ -12,10 +15,34 @@ class WfhRepositoryImpl implements WfhRepository {
   WfhRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<Either<Failure, List<WfhRequestModel>>> getWfhRequests() async {
+  Future<Either<Failure, WfhRequestsPageModel>> getWfhRequests({
+    int page = 1,
+    int limit = 5,
+  }) async {
     try {
-      final requests = await remoteDataSource.getWfhRequests();
+      final requests = await remoteDataSource.getWfhRequests(
+        page: page,
+        limit: limit,
+      );
       return Right(requests);
+    } on AppException catch (e) {
+      return Left(ErrorHandler.handleException(e));
+    } catch (e) {
+      return Left(ErrorHandler.handleException(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, WfhRequestStatsModel>> getWfhRequestStats({
+    required int clientId,
+    String requestType = 'User',
+  }) async {
+    try {
+      final stats = await remoteDataSource.getWfhRequestStats(
+        clientId: clientId,
+        requestType: requestType,
+      );
+      return Right(stats);
     } on AppException catch (e) {
       return Left(ErrorHandler.handleException(e));
     } catch (e) {
@@ -27,13 +54,13 @@ class WfhRepositoryImpl implements WfhRepository {
   Future<Either<Failure, List<WfhRequestModel>>> getTeamWfhRequests({
     int page = 1,
     int limit = 50,
-    String requestType = 'All',
+    RequestAudienceScope scope = RequestAudienceScope.allUsers,
   }) async {
     try {
       final requests = await remoteDataSource.getTeamWfhRequests(
         page: page,
         limit: limit,
-        requestType: requestType,
+        scope: scope,
       );
       return Right(requests);
     } on AppException catch (e) {

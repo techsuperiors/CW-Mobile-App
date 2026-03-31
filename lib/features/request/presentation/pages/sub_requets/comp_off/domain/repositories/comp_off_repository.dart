@@ -3,6 +3,7 @@ import 'package:dartz/dartz.dart';
 import '../../../../../../../../core/error/failures.dart';
 import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
 import '../../models/comp_off_request_model.dart';
+import '../../models/comp_off_request_stats_model.dart';
 import '../entities/comp_off_detail.dart';
 
 abstract class CompOffRepository {
@@ -11,6 +12,9 @@ abstract class CompOffRepository {
     int page = 1,
     int limit = 20,
     String requestType = 'All',
+  });
+  Future<Either<Failure, CompOffRequestStatsModel>> getCompOffRequestStats({
+    required int userId,
   });
   Future<Either<Failure, CompOffDetail>> getCompOffDetail(int compOffId);
   Future<Either<Failure, String>> createCompOffRequest({

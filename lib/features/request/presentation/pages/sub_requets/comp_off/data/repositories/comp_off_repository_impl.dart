@@ -7,6 +7,7 @@ import '../../../../../../../attendance/domain/entities/attendance_request_comme
 import '../../domain/entities/comp_off_detail.dart';
 import '../../domain/repositories/comp_off_repository.dart';
 import '../../models/comp_off_request_model.dart';
+import '../../models/comp_off_request_stats_model.dart';
 import '../datasources/comp_off_remote_datasource.dart';
 
 class CompOffRepositoryImpl implements CompOffRepository {
@@ -33,12 +34,28 @@ class CompOffRepositoryImpl implements CompOffRepository {
     String requestType = 'All',
   }) async {
     try {
-      final list = await remoteDataSource.getTeamCompOffRequests(
+      final pageData = await remoteDataSource.getTeamCompOffRequests(
         page: page,
         limit: limit,
         requestType: requestType,
       );
-      return Right(list);
+      return Right(pageData.requests);
+    } on AppException catch (e) {
+      return Left(ErrorHandler.handleException(e));
+    } catch (e) {
+      return Left(ErrorHandler.handleException(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, CompOffRequestStatsModel>> getCompOffRequestStats({
+    required int userId,
+  }) async {
+    try {
+      final stats = await remoteDataSource.getCompOffRequestStats(
+        userId: userId,
+      );
+      return Right(stats);
     } on AppException catch (e) {
       return Left(ErrorHandler.handleException(e));
     } catch (e) {

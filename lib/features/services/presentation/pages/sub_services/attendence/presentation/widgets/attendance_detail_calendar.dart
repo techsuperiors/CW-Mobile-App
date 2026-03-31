@@ -38,6 +38,8 @@ class AttendanceDetailCalendar extends StatefulWidget {
 class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
   late DateTime _currentDate;
   DateTime? _selectedDate;
+  static const Color _shortLeaveColor = Color(0xFFF4B400);
+  static const Color _halfDayLeaveColor = Color(0xFFFFC94D);
 
   @override
   void initState() {
@@ -56,25 +58,31 @@ class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
     }
   }
 
-  void _previousMonth() {
-    setState(() {
-      _currentDate = DateTime(_currentDate.year, _currentDate.month - 1);
-    });
-    widget.onMonthChanged?.call(_currentDate);
-  }
-
-  void _nextMonth() {
-    setState(() {
-      _currentDate = DateTime(_currentDate.year, _currentDate.month + 1);
-    });
-    widget.onMonthChanged?.call(_currentDate);
-  }
-
   void _selectDate(DateTime date) {
     setState(() {
       _selectedDate = date;
     });
     widget.onDateSelected?.call(date);
+  }
+
+  void _changeSelectedDate(int dayOffset) {
+    final baseDate = _selectedDate ?? DateTime.now();
+    final nextDate = DateTime(
+      baseDate.year,
+      baseDate.month,
+      baseDate.day + dayOffset,
+    );
+    final nextMonth = DateTime(nextDate.year, nextDate.month);
+    final currentMonth = DateTime(_currentDate.year, _currentDate.month);
+
+    if (!_isSameMonth(nextMonth, currentMonth)) {
+      setState(() {
+        _currentDate = nextMonth;
+      });
+      widget.onMonthChanged?.call(nextMonth);
+    }
+
+    _selectDate(nextDate);
   }
 
   List<DateTime?> _getCalendarGridDays() {
@@ -148,6 +156,10 @@ class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
         return DateStatus.wfh;
       case 'Leave':
         return DateStatus.leave;
+      case 'Short Leave':
+        return DateStatus.shortLeave;
+      case 'Half Day Leave':
+        return DateStatus.halfDayLeave;
       case 'Absent':
         return DateStatus.absent;
       case 'Holiday':
@@ -169,6 +181,10 @@ class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _isSameMonth(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month;
   }
 
   /// Get tooltip text for a date (holiday name, leave type, etc.)
@@ -207,7 +223,7 @@ class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
     switch (status) {
       case DateStatus.otherMonth:
         backgroundColor = AppColors.background;
-        textColor = AppColors.textSecondary.withOpacity(0.5);
+        textColor = AppColors.textSecondary.withValues(alpha: 0.5);
         break;
       case DateStatus.weekend:
         // Weekoff day — stripes (unless overridden above by holiday/present)
@@ -217,7 +233,7 @@ class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
         break;
       case DateStatus.available:
         // Future / no-data weekday — plain, no stripes
-        backgroundColor = AppColors.border.withOpacity(0.25);
+        backgroundColor = AppColors.border.withValues(alpha: 0.25);
         textColor = AppColors.textSecondary;
         showStripes = false;
         break;
@@ -234,6 +250,14 @@ class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
       case DateStatus.leave:
         backgroundColor = const Color(0xFFFF8C00); // orange
         textColor = Colors.white;
+        break;
+      case DateStatus.shortLeave:
+        backgroundColor = _shortLeaveColor;
+        textColor = Colors.white;
+        break;
+      case DateStatus.halfDayLeave:
+        backgroundColor = _halfDayLeaveColor;
+        textColor = AppColors.textPrimary;
         break;
       case DateStatus.absent:
         backgroundColor = const Color(0xFFE74C3C); // red
@@ -309,7 +333,9 @@ class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    final monthName = DateFormat('MMMM yyyy').format(_currentDate);
+    final displayedDate = DateFormat(
+      'dd MMM yyyy',
+    ).format(_selectedDate ?? _currentDate);
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: screenWidth * 0.020),
@@ -319,7 +345,7 @@ class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -328,125 +354,15 @@ class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with month name and navigation
+          // Header with selected-date navigation and legend
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  Text(
-                    monthName,
-                    style: AppTextStyles.heading4(context).copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(width: screenWidth * 0.02),
-
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: screenWidth * 0.042,
-                    color: AppColors.calendararrow,
-                  ),
-                  // Legend dots
-                  Builder(
-                    builder: (dotsContext) {
-                      return GestureDetector(
-                        onTap: () {
-                          // Find the specific RenderBox of the dots to get its exact screen position
-                          final RenderBox box =
-                              dotsContext.findRenderObject() as RenderBox;
-                          // Convert local coordinates to global screen coordinates
-                          final Offset offset = box.localToGlobal(Offset.zero);
-
-                          showMenu(
-                            context: dotsContext,
-                            // Define the exact position: Start at dots' left (dx) and just below dots' bottom (dy + height)
-                            position: RelativeRect.fromLTRB(
-                              offset.dx,
-                              offset.dy + box.size.height,
-                              offset.dx + box.size.width,
-                              offset.dy,
-                            ),
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            items: [
-                              PopupMenuItem(
-                                enabled: false,
-                                // Disable interaction as this is only for information
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildLegendRow(
-                                        dotsContext,
-                                        'Present',
-                                        AppColors.attendanceTeal,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _buildLegendRow(
-                                        dotsContext,
-                                        'Leave',
-                                        AppColors.warning,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _buildLegendRow(
-                                        dotsContext,
-                                        'Holiday',
-                                        AppColors.error,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _buildLegendRow(
-                                        dotsContext,
-                                        'WFH',
-                                        AppColors.success,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                        child: Container(
-                          // Transparent color ensures the entire padded area is hit-testable/tappable
-                          color: Colors.transparent,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: screenWidth * 0.01,
-                            vertical: screenHeight * 0.019,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            // Prevents the Row from stretching to full screen width
-                            children: [
-                              _buildDot(AppColors.success),
-                              const SizedBox(width: 2),
-                              _buildDot(AppColors.warning),
-                              const SizedBox(width: 2),
-                              _buildDot(AppColors.error),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-              // Navigation arrows
-              Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    onPressed: _previousMonth,
+                    onPressed: () => _changeSelectedDate(-1),
                     icon: Icon(
                       Icons.chevron_left,
                       size: screenWidth * 0.073,
@@ -456,9 +372,17 @@ class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
                     constraints: const BoxConstraints(),
                     visualDensity: VisualDensity.compact,
                   ),
-                  // SizedBox(width: screenWidth * 0.01),
+                  SizedBox(width: screenWidth * 0.015),
+                  Text(
+                    displayedDate,
+                    style: AppTextStyles.heading4(context).copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(width: screenWidth * 0.015),
                   IconButton(
-                    onPressed: _nextMonth,
+                    onPressed: () => _changeSelectedDate(1),
                     icon: Icon(
                       Icons.chevron_right,
                       size: screenWidth * 0.073,
@@ -469,6 +393,97 @@ class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
+              ),
+              Builder(
+                builder: (dotsContext) {
+                  return GestureDetector(
+                    onTap: () {
+                      final RenderBox box =
+                          dotsContext.findRenderObject() as RenderBox;
+                      final Offset offset = box.localToGlobal(Offset.zero);
+
+                      showMenu(
+                        context: dotsContext,
+                        position: RelativeRect.fromLTRB(
+                          offset.dx,
+                          offset.dy + box.size.height,
+                          offset.dx + box.size.width,
+                          offset.dy,
+                        ),
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        items: [
+                          PopupMenuItem(
+                            enabled: false,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildLegendRow(
+                                    dotsContext,
+                                    'Present',
+                                    AppColors.attendanceTeal,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildLegendRow(
+                                    dotsContext,
+                                    'Leave',
+                                    AppColors.warning,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildLegendRow(
+                                    dotsContext,
+                                    'Short Leave',
+                                    _shortLeaveColor,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildLegendRow(
+                                    dotsContext,
+                                    'Half Day Leave',
+                                    _halfDayLeaveColor,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildLegendRow(
+                                    dotsContext,
+                                    'Holiday',
+                                    AppColors.error,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildLegendRow(
+                                    dotsContext,
+                                    'WFH',
+                                    AppColors.success,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                    child: Container(
+                      color: Colors.transparent,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: screenWidth * 0.01,
+                        vertical: screenHeight * 0.019,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildDot(AppColors.success),
+                          const SizedBox(width: 2),
+                          _buildDot(AppColors.warning),
+                          const SizedBox(width: 2),
+                          _buildDot(AppColors.error),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -525,24 +540,6 @@ class _AttendanceDetailCalendarState extends State<AttendanceDetailCalendar> {
     );
   }
 
-  Widget _buildLegendItem(BuildContext context, String label, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        SizedBox(width: MediaQuery.of(context).size.width * 0.015),
-        Text(
-          label,
-          style: AppTextStyles.labelSmall(
-            context,
-          ).copyWith(color: AppColors.textSecondary),
-        ),
-      ],
-    );
-  }
 }
 
 Widget _buildDot(Color color) {
@@ -580,6 +577,8 @@ enum DateStatus {
   present,
   wfh,
   leave,
+  shortLeave,
+  halfDayLeave,
   absent,
   holiday,
 }
@@ -590,7 +589,7 @@ class StripedBackgroundPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint =
         Paint()
-          ..color = Colors.grey.withOpacity(0.25) // light grey stripes
+          ..color = Colors.grey.withValues(alpha: 0.25) // light grey stripes
           ..strokeWidth = 1.2
           ..style = PaintingStyle.stroke;
 
