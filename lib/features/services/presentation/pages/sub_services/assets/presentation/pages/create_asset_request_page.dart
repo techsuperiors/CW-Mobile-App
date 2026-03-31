@@ -140,7 +140,7 @@ class _CreateAssetRequestPageState extends State<CreateAssetRequestPage> {
         }
 
         return Scaffold(
-          backgroundColor: AppColors.background,
+          backgroundColor: AppColors.backgroundMedium,
           appBar: AppBar(
             forceMaterialTransparency: true,
             elevation: 0,

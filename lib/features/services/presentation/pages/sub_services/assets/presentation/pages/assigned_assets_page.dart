@@ -242,8 +242,7 @@ class _AssignedAssetsPageState extends State<AssignedAssetsPage>
       onRefresh: _userId != null ? () => _loadAll(_userId!) : () async {},
       child: ListView.builder(
         padding: EdgeInsets.symmetric(
-          horizontal: MediaQuery.of(context).size.width * 0.04,
-          vertical: MediaQuery.of(context).size.height * 0.025,
+          horizontal: MediaQuery.of(context).size.width * 0.002,
         ),
         itemCount: _assets.length,
         itemBuilder:
