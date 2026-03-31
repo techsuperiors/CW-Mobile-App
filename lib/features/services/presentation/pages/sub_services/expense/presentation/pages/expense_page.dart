@@ -13,7 +13,6 @@ import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
-import '../../../../../../../../core/widgets/access_denied_view.dart';
 import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../../core/widgets/status_tabbed_section.dart';
@@ -39,7 +38,7 @@ class ExpensePage extends StatefulWidget {
 
 class _ExpensePageState extends State<ExpensePage>
     with TickerProviderStateMixin {
-  late final TabController _topTabController;
+  late TabController _topTabController;
   late final TabController _statusTabController;
   final TextEditingController _searchController = TextEditingController();
   final ExpenseRemoteData _remoteData = ExpenseRemoteData(
@@ -82,10 +81,7 @@ class _ExpensePageState extends State<ExpensePage>
   @override
   void initState() {
     super.initState();
-    _topTabController = TabController(length: 2, vsync: this);
-    _topTabController.addListener(() {
-      if (mounted) setState(() {});
-    });
+    _topTabController = _createTopTabController(length: 1);
     _statusTabController = TabController(
       length: _statusTabs.length,
       vsync: this,
@@ -96,6 +92,31 @@ class _ExpensePageState extends State<ExpensePage>
     _searchController.addListener(() {
       if (mounted) setState(() {});
     });
+  }
+
+  TabController _createTopTabController({
+    required int length,
+    int initialIndex = 0,
+  }) {
+    final controller = TabController(
+      length: length,
+      vsync: this,
+      initialIndex: initialIndex.clamp(0, length - 1),
+    );
+    controller.addListener(() {
+      if (mounted) setState(() {});
+    });
+    return controller;
+  }
+
+  void _syncTopTabController(int length) {
+    if (_topTabController.length == length) return;
+    final previousIndex = _topTabController.index;
+    _topTabController.dispose();
+    _topTabController = _createTopTabController(
+      length: length,
+      initialIndex: previousIndex,
+    );
   }
 
   @override
@@ -187,6 +208,22 @@ class _ExpensePageState extends State<ExpensePage>
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final profileState = context.watch<UserProfileBloc>().state;
+    final isProfileLoaded = profileState is UserProfileLoaded;
+    final permissions =
+    isProfileLoaded
+        ? (profileState.profile.role?.permissions ?? const <String>[])
+        : const <String>[];
+    final hasApprovalAccess =
+        isProfileLoaded &&
+            ModulePermissions.expenseApproval.any(permissions.contains);
+    final topTabs =
+    hasApprovalAccess
+        ? const [Tab(text: 'Reimbursement'), Tab(text: 'Approval')]
+        : const [Tab(text: 'Reimbursement')];
+
+    _syncTopTabController(topTabs.length);
+
     return ResponsiveScaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
@@ -226,7 +263,9 @@ class _ExpensePageState extends State<ExpensePage>
           ).copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
         ),
         centerTitle: true,
-        bottom: PreferredSize(
+        bottom:
+        topTabs.length > 1
+            ? PreferredSize(
           preferredSize: const Size.fromHeight(44),
           child: TabBar(
             controller: _topTabController,
@@ -234,9 +273,10 @@ class _ExpensePageState extends State<ExpensePage>
             indicatorColor: Theme.of(context).colorScheme.primary,
             labelColor: AppColors.textPrimary,
             unselectedLabelColor: AppColors.textSecondary,
-            tabs: const [Tab(text: 'Reimbursement'), Tab(text: 'Approval')],
+            tabs: topTabs,
           ),
-        ),
+        )
+            : null,
       ),
       bottomNavigationBar: BottomNavBar(
         currentIndex: 0,
@@ -245,167 +285,155 @@ class _ExpensePageState extends State<ExpensePage>
       body: TabBarView(
         controller: _topTabController,
         children: [
-          BlocBuilder<UserProfileBloc, UserProfileState>(
-            builder: (context, state) {
-              if (state is! UserProfileLoaded) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              _ensureLoaded(state.profile.userId);
-              return Column(
-                children: [
-                  _buildToolbar(
-                    context,
-                    showAddButton: true,
-                    showApprovalFilter: false,
-                    availableScopes: const [],
-                  ),
-                  SizedBox(height: screenHeight * 0.02),
-                  Expanded(
-                    child: FutureBuilder<List<ExpenseItemModel>>(
-                      future: _reimbursementFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                        if (snapshot.hasError) {
-                          return ApiErrorState(
-                            rawMessage: snapshot.error.toString(),
-                            onRetry: _reload,
-                          );
-                        }
-                        final items = snapshot.data ?? const [];
-                        return _buildExpenseStatusSection(
-                          context: context,
-                          items: items,
-                          screenWidth: screenWidth,
-                          screenHeight: screenHeight,
-                          onTapItem: (entry) async {
-                            final shouldRefresh = await Navigator.of(context)
-                                .push<bool>(
-                              MaterialPageRoute(
-                                builder: (_) => ExpenseDetailPage(expense: entry),
-                              ),
-                            );
-                            if (shouldRefresh == true && mounted) {
-                              _reload();
-                            }
-                          },
-                        );
-                      },
+          if (!isProfileLoaded)
+            const Center(child: CircularProgressIndicator())
+          else ...[
+            Builder(
+              builder: (context) {
+                _ensureLoaded(profileState.profile.userId);
+                return Column(
+                  children: [
+                    _buildToolbar(
+                      context,
+                      showAddButton: true,
+                      showApprovalFilter: false,
+                      availableScopes: const [],
                     ),
-                  ),
-                ],
-              );
-            },
-          ),
-          BlocBuilder<UserProfileBloc, UserProfileState>(
-            builder: (context, state) {
-              if (state is! UserProfileLoaded) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final permissions =
-                  state.profile.role?.permissions ?? const <String>[];
-              final hasApprovalAccess = ModulePermissions.expenseApproval.any(
-                permissions.contains,
-              );
-              final allowAllUsers = state.profile.allowAllUsers;
-              final availableScopes =
+                    SizedBox(height: screenHeight * 0.02),
+                    Expanded(
+                      child: FutureBuilder<List<ExpenseItemModel>>(
+                        future: _reimbursementFuture,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+                          if (snapshot.hasError) {
+                            return ApiErrorState(
+                              rawMessage: snapshot.error.toString(),
+                              onRetry: _reload,
+                            );
+                          }
+                          final items = snapshot.data ?? const [];
+                          return _buildExpenseStatusSection(
+                            context: context,
+                            items: items,
+                            screenWidth: screenWidth,
+                            screenHeight: screenHeight,
+                            onTapItem: (entry) async {
+                              final shouldRefresh = await Navigator.of(context)
+                                  .push<bool>(
+                                MaterialPageRoute(
+                                  builder: (_) => ExpenseDetailPage(expense: entry),
+                                ),
+                              );
+                              if (shouldRefresh == true && mounted) {
+                                _reload();
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            if (hasApprovalAccess)
+              Builder(
+                builder: (context) {
+                  final allowAllUsers = profileState.profile.allowAllUsers;
+                  final availableScopes =
                   allowAllUsers
                       ? RequestAudienceScope.values
                       : const [
-                          RequestAudienceScope.myReportees,
-                          RequestAudienceScope.myIndirectReportees,
-                        ];
+                    RequestAudienceScope.myReportees,
+                    RequestAudienceScope.myIndirectReportees,
+                  ];
 
-              if (!allowAllUsers &&
-                  _selectedApprovalScope == RequestAudienceScope.allUsers) {
-                _selectedApprovalScope = RequestAudienceScope.myReportees;
-              }
+                  if (!allowAllUsers &&
+                      _selectedApprovalScope == RequestAudienceScope.allUsers) {
+                    _selectedApprovalScope = RequestAudienceScope.myReportees;
+                  }
 
-              _approvalFuture ??= _remoteData
-                  .getExpenseApprovals(
+                  _approvalFuture ??= _remoteData
+                      .getExpenseApprovals(
                     scope: _selectedApprovalScope,
                     page: 1,
                     limit: _approvalPageSize,
                   )
-                ..then((pageData) {
-                  if (!mounted) return;
-                  setState(() {
-                    if (_approvalItems.isEmpty) {
-                      _approvalItems = pageData.items;
-                      _approvalTotalCount = pageData.totalCount;
-                      _approvalCurrentPage = 1;
-                    }
-                  });
-                }).catchError((_) {});
+                    ..then((pageData) {
+                      if (!mounted) return;
+                      setState(() {
+                        if (_approvalItems.isEmpty) {
+                          _approvalItems = pageData.items;
+                          _approvalTotalCount = pageData.totalCount;
+                          _approvalCurrentPage = 1;
+                        }
+                      });
+                    }).catchError((_) {});
 
-              return Column(
-                children: [
-                  _buildToolbar(
-                    context,
-                    showAddButton: false,
-                    showApprovalFilter: hasApprovalAccess,
-                    availableScopes: availableScopes,
-                  ),
-                  SizedBox(height: screenHeight * 0.02),
-                  Expanded(
-                    child: !hasApprovalAccess
-                        ? const AccessDeniedView(
-                            title: 'Approval Access Required',
-                            message:
-                                'You do not have permission to view expense approvals.',
-                          )
-                        : FutureBuilder<ExpenseApprovalListPage>(
-                            future: _approvalFuture,
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                      ConnectionState.waiting &&
-                                  _approvalItems.isEmpty) {
-                                return const Center(
-                                  child: CircularProgressIndicator(),
-                                );
-                              }
-                              if (snapshot.hasError && _approvalItems.isEmpty) {
-                                return ApiErrorState(
-                                  rawMessage: snapshot.error.toString(),
-                                  onRetry: () => _loadApprovals(
-                                    scope: _selectedApprovalScope,
+                  return Column(
+                    children: [
+                      _buildToolbar(
+                        context,
+                        showAddButton: false,
+                        showApprovalFilter: true,
+                        availableScopes: availableScopes,
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      Expanded(
+                        child: FutureBuilder<ExpenseApprovalListPage>(
+                          future: _approvalFuture,
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting &&
+                                _approvalItems.isEmpty) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            if (snapshot.hasError && _approvalItems.isEmpty) {
+                              return ApiErrorState(
+                                rawMessage: snapshot.error.toString(),
+                                onRetry: () => _loadApprovals(
+                                  scope: _selectedApprovalScope,
+                                ),
+                              );
+                            }
+                            return _buildExpenseStatusSection(
+                              context: context,
+                              items: _approvalItems,
+                              screenWidth: screenWidth,
+                              screenHeight: screenHeight,
+                              isLoadingMore: _isLoadingMoreApprovals,
+                              onLoadMore: _loadMoreApprovals,
+                              onTapItem: (entry) async {
+                                final shouldRefresh =
+                                await Navigator.of(context).push<bool>(
+                                  MaterialPageRoute(
+                                    builder: (_) => ExpenseDetailPage(
+                                      expense: entry,
+                                      isApprovalMode: true,
+                                    ),
                                   ),
                                 );
-                              }
-                              return _buildExpenseStatusSection(
-                                context: context,
-                                items: _approvalItems,
-                                screenWidth: screenWidth,
-                                screenHeight: screenHeight,
-                                isLoadingMore: _isLoadingMoreApprovals,
-                                onLoadMore: _loadMoreApprovals,
-                                onTapItem: (entry) async {
-                                  final shouldRefresh =
-                                      await Navigator.of(context).push<bool>(
-                                    MaterialPageRoute(
-                                      builder: (_) => ExpenseDetailPage(
-                                        expense: entry,
-                                        isApprovalMode: true,
-                                      ),
-                                    ),
+                                if (shouldRefresh == true && mounted) {
+                                  _approvalItems = const [];
+                                  _approvalTotalCount = 0;
+                                  _loadApprovals(
+                                    scope: _selectedApprovalScope,
                                   );
-                                  if (shouldRefresh == true && mounted) {
-                                    _approvalItems = const [];
-                                    _approvalTotalCount = 0;
-                                    _loadApprovals(
-                                      scope: _selectedApprovalScope,
-                                    );
-                                  }
-                                },
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              );
-            },
-          ),
+                                }
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+          ],
         ],
       ),
     );
@@ -501,11 +529,11 @@ class _ExpensePageState extends State<ExpensePage>
   }
 
   Widget _buildToolbar(
-    BuildContext context, {
-    required bool showAddButton,
-    required bool showApprovalFilter,
-    required List<RequestAudienceScope> availableScopes,
-  }) {
+      BuildContext context, {
+        required bool showAddButton,
+        required bool showApprovalFilter,
+        required List<RequestAudienceScope> availableScopes,
+      }) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     return Row(
@@ -728,7 +756,7 @@ class _ExpenseCard extends StatelessWidget {
                               item.fromDate,
                               item.toDate,
                             ),
-                              style: AppTextStyles.bodySmall(context).copyWith(
+                            style: AppTextStyles.bodySmall(context).copyWith(
                               color: _accentColor,
                               fontWeight: FontWeight.w500,
                             ),
