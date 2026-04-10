@@ -8,8 +8,10 @@ import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../../core/utils/app_navigator.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
+import '../../../../../../../authentication/presentation/pages/login_page.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../data/datasources/document_remote_datasource.dart';
 import '../../data/repositories/document_repository_impl.dart';
@@ -43,7 +45,11 @@ class _DocumentPageState extends State<DocumentPage> {
   void initState() {
     super.initState();
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
+      AppNavigator.pushAndRemoveAll(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    },);
     final remoteDataSource = DocumentRemoteDataSourceImpl(apiClient);
     final repository = DocumentRepositoryImpl(
       remoteDataSource: remoteDataSource,

@@ -11,7 +11,12 @@ abstract class UserProfileEvent extends Equatable {
 
 /// Load user profile event
 class LoadUserProfile extends UserProfileEvent {
-  const LoadUserProfile();
+  final bool forceRefresh;
+
+  const LoadUserProfile({this.forceRefresh = false});
+
+  @override
+  List<Object?> get props => [forceRefresh];
 }
 
 /// Set user profile event (when profile is received from API)
@@ -28,4 +33,3 @@ class SetUserProfile extends UserProfileEvent {
 class ClearUserProfile extends UserProfileEvent {
   const ClearUserProfile();
 }
-

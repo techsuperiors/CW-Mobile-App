@@ -17,3 +17,12 @@ class PunchInRequested extends AttendancePunchEvent {
 class PunchOutRequested extends AttendancePunchEvent {
   const PunchOutRequested();
 }
+
+class PendingAttendanceSyncRequested extends AttendancePunchEvent {
+  final bool showFeedback;
+
+  const PendingAttendanceSyncRequested({this.showFeedback = false});
+
+  @override
+  List<Object?> get props => [showFeedback];
+}

@@ -15,8 +15,10 @@ import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../../core/utils/app_navigator.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
+import '../../../../../../../authentication/presentation/pages/login_page.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../../employee_agreement/data/datasources/agreement_remote_datasource.dart';
 import '../../../employee_agreement/data/repositories/agreement_repository_impl.dart';
@@ -64,7 +66,11 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
   void initState() {
     super.initState();
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
+      AppNavigator.pushAndRemoveAll(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    },);
     final remoteDataSource = DocumentRemoteDataSourceImpl(apiClient);
     final repository = DocumentRepositoryImpl(
       remoteDataSource: remoteDataSource,
@@ -706,7 +712,11 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
     }
 
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
+      AppNavigator.pushAndRemoveAll(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    },);
     final remoteDataSource = AgreementRemoteDataSourceImpl(apiClient);
     final repository = AgreementRepositoryImpl(
       remoteDataSource: remoteDataSource,

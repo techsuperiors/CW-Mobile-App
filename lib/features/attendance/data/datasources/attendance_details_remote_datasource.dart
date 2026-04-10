@@ -51,11 +51,9 @@ class AttendanceDetailsRemoteDataSourceImpl
     } on ServerException {
       rethrow;
     } catch (e) {
-      if (e is ServerException) {
-        rethrow;
-      }
+
       throw ServerException(
-        'Failed to get attendance details: ${e.toString()}',
+        'Failed to get attendance details',
       );
     }
   }

@@ -35,6 +35,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../home/presentation/widgets/bottom_nav_bar.dart';
+
 class LeaveApprovalPageListing extends StatefulWidget {
   const LeaveApprovalPageListing({super.key});
 
@@ -178,6 +181,10 @@ class _LeaveApprovalPageListingState extends State<LeaveApprovalPageListing>
             ),
           ),
           centerTitle: true,
+        ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 4,
+          onTap: NavigationHelper.getBottomNavHandler(context),
         ),
         body: Builder(
           builder:

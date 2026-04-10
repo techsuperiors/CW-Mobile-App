@@ -8,12 +8,12 @@ import '../entities/attendance_regularize_result.dart';
 abstract class AttendanceRegularizeRepository {
   Future<Either<Failure, AttendanceRegularizeResult>> applyRegularize({
     required String requestDate,
-    required int requestTo,
     required String requestFor,
     required String modeType,
     required String checkIn,
     required String checkOut,
     required String reason,
+    String? otherReason,
     required String description,
     required int userId,
     required bool isOther,

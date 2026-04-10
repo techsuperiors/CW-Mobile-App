@@ -111,6 +111,7 @@ class _ApplyCompOffPageState extends State<ApplyCompOffPage> {
             return Stack(
               children: [
                 ResponsiveScaffold(
+                  backgroundColor: AppColors.backgroundMedium,
                   appBar: AppBar(
                     forceMaterialTransparency: true,
                     elevation: 0,
@@ -183,7 +184,7 @@ class _ApplyCompOffPageState extends State<ApplyCompOffPage> {
                           ),
                           SizedBox(height: screenHeight * 0.02),
                           _buildTypeDropdown(context),
-                          SizedBox(height: screenHeight * 0.02),
+                          SizedBox(height: screenHeight * 0.04),
                           _buildDatePicker(context),
                           SizedBox(height: screenHeight * 0.02),
                           // Duration field: hidden for Day, visible for Hours
@@ -202,14 +203,46 @@ class _ApplyCompOffPageState extends State<ApplyCompOffPage> {
                                         ? 'Reason is required'
                                         : null,
                           ),
-                          const SizedBox(height: 24),
+                          SizedBox(height: screenHeight * 0.02),
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
                               onPressed: isSubmitting ? null : _handleSubmit,
-                              child: Text(isEdit ? 'Update' : 'Submit'),
+                              child: Text(
+                                isEdit ? 'Update' : 'Submit',
+                                style: AppTextStyles.buttonLarge(
+                                  context,
+                                ).copyWith(color: AppColors.background),
+                              ),
                             ),
                           ),
+                          SizedBox(height: screenHeight * 0.015),
+                          // Cancel Button
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: screenHeight * 0.018,
+                                ),
+                                side: BorderSide(color: AppColors.border),
+                                backgroundColor: AppColors.background,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                AppStrings.cancel,
+                                style: AppTextStyles.buttonLarge(
+                                  context,
+                                ).copyWith(color: AppColors.textPrimary),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: screenHeight * 0.02),
                         ],
                       ),
                     ),

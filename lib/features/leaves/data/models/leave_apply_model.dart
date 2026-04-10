@@ -9,13 +9,15 @@ class LeaveApplyRequest {
   final String endDate;
   final String subject;
   final String reason;
-  final String startHalf;
-  final String endHalf;
+  final String? startHalf;
+  final String? endHalf;
   final String dayType;
   final String description;
   final String shortCode;
   final int requestTo;
   final List<String> rHDates;
+  final String? leaveStartTime;
+  final String? leaveEndTime;
   final List<File> attachmentFiles; // Optional image attachments
 
   LeaveApplyRequest({
@@ -33,6 +35,8 @@ class LeaveApplyRequest {
     required this.shortCode,
     required this.requestTo,
     required this.rHDates,
+    this.leaveStartTime,
+    this.leaveEndTime,
     this.attachmentFiles = const [],
   });
 
@@ -51,6 +55,8 @@ class LeaveApplyRequest {
       'description': description,
       'short_code': shortCode,
       'request_to': requestTo,
+      'leave_start_time': leaveStartTime,
+      'leave_end_time': leaveEndTime,
       'rHDates': rHDates,
     };
   }

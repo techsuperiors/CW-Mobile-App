@@ -108,135 +108,6 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
     return halfDay == 'First Half' ? 'first_half' : 'second_half';
   }
 
-  /// Submit WFH request to API.
-  // Future<void> _submitWfhRequest() async {
-  //   if (!_formKey.currentState!.validate()) return;
-  //
-  //   if (_fromDate == null) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(
-  //         content: const Text('Please select a date'),
-  //         backgroundColor: AppColors.error,
-  //       ),
-  //     );
-  //     return;
-  //   }
-  //
-  //   if (_descriptionController.text.trim().isEmpty) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(
-  //         content: const Text('Please enter a description'),
-  //         backgroundColor: AppColors.error,
-  //       ),
-  //     );
-  //     return;
-  //   }
-  //
-  //   setState(() => _isSubmitting = true);
-  //
-  //   try {
-  //     final networkInfo = NetworkInfoImpl(Connectivity());
-  //     final dio = Dio();
-  //     final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
-  //
-  //     if (!await networkInfo.isConnected) {
-  //       _showError('No internet connection');
-  //       return;
-  //     }
-  //
-  //     // Get user_id from JWT token stored in SharedPreferences
-  //     final prefs = await SharedPreferences.getInstance();
-  //     int? userId;
-  //
-  //     // Decode JWT token to extract user_id
-  //     final token = prefs.getString('auth_token');
-  //     if (token != null) {
-  //       try {
-  //         final parts = token.split('.');
-  //         if (parts.length == 3) {
-  //           String jwtPayload = parts[1];
-  //           while (jwtPayload.length % 4 != 0) {
-  //             jwtPayload += '=';
-  //           }
-  //           final decoded = utf8.decode(base64Url.decode(jwtPayload));
-  //           final payloadMap = jsonDecode(decoded) as Map<String, dynamic>;
-  //           userId = payloadMap['user_id'] as int?;
-  //         }
-  //       } catch (_) {}
-  //     }
-  //
-  //     // Fallback: try from cached user
-  //     if (userId == null) {
-  //       try {
-  //         final authLocal = AuthLocalDataSourceImpl(prefs);
-  //         final user = await authLocal.getCachedUser();
-  //         if (user != null) {
-  //           userId = int.tryParse(user.id);
-  //         }
-  //       } catch (_) {}
-  //     }
-  //
-  //     // Determine request type
-  //     final isSingleDay =
-  //         _selectedWfhDuration == 'Single Day WFH' || _toDate == null;
-  //     final requestType = isSingleDay ? 'single' : 'multiple';
-  //
-  //     // Build payload — all fields are required by the API
-  //     final dateFormat = DateFormat('yyyy-MM-dd');
-  //     final payload = {
-  //       'subject': _subjectController.text.trim(),
-  //       'request_for': 46,
-  //       'request_type': requestType,
-  //       'description': _descriptionController.text.trim(),
-  //       'start_date': dateFormat.format(_fromDate!),
-  //       'end_date': dateFormat.format(_toDate ?? _fromDate!),
-  //       'start_half': _halfDayToApi(_fromHalfDay),
-  //       'end_half': _halfDayToApi(_toHalfDay),
-  //       'user_id': userId,
-  //     };
-  //
-  //     debugPrint('WFH payload: $payload');
-  //
-  //     // Encode payload using encodeData (same pattern as apply_leave, auth, etc.)
-  //     final encodedData = encodeData(payload);
-  //     debugPrint('WFH encoded payload: $encodedData');
-  //
-  //     final response = await apiClient.post(
-  //       AppUrls.wfhRequestRaise,
-  //       data: {'payload': encodedData},
-  //       options: Options(headers: {'Content-Type': 'application/json'}),
-  //     );
-  //
-  //     debugPrint('WFH response: ${response.statusCode} - ${response.data}');
-  //
-  //     final responseData = response.data as Map<String, dynamic>;
-  //
-  //     if (responseData['success'] == true) {
-  //       if (mounted) {
-  //         ScaffoldMessenger.of(context).showSnackBar(
-  //           SnackBar(
-  //             content: const Text('WFH request submitted successfully!'),
-  //             backgroundColor: AppColors.success,
-  //           ),
-  //         );
-  //         Navigator.of(context).pop(true); // Return true to indicate success
-  //       }
-  //     } else {
-  //       _showError(
-  //         responseData['message'] as String? ?? 'Failed to submit WFH request',
-  //       );
-  //     }
-  //   } on ServerException catch (e) {
-  //     _showError(e.message);
-  //   } catch (e) {
-  //     _showError('Failed to submit: ${e.toString()}');
-  //   } finally {
-  //     if (mounted) {
-  //       setState(() => _isSubmitting = false);
-  //     }
-  //   }
-  // }
-
   Future<void> _submitWfhRequest() async {
     if (!_formKey.currentState!.validate()) return;
     if (_fromDate == null) {
@@ -321,15 +192,17 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
       if (responseData['success'] == true) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text('WFH request submitted successfully!'), backgroundColor: AppColors.success),
+            SnackBar(
+              content: const Text('WFH request submitted successfully!'),
+              backgroundColor: AppColors.success,
+            ),
           );
           Navigator.of(context).pop(true);
         }
       } else {
         _showError(responseData['message'] ?? 'Failed to submit WFH request');
       }
-    }
-    catch (e) {
+    } catch (e) {
       String errorMessage = 'An unexpected error occurred';
 
       // Check if it's your custom ServerException
@@ -349,12 +222,11 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
       }
 
       _showError(errorMessage);
-    }
-
-    finally {
+    } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
+
   void _showError(String message) {
     if (mounted) {
       setState(() => _isSubmitting = false);
@@ -403,53 +275,24 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
         ),
         title: Text(
           widget.wfhRequest != null ? 'Edit WFH Request' : AppStrings.wfh,
-          style: AppTextStyles.bodyMedium(
+          style: AppTextStyles.heading4(
             context,
           ).copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
         ),
         centerTitle: true,
       ),
       bottomNavigationBar: BottomNavBar(
-        currentIndex: 0,
+        currentIndex: 3,
         onTap: NavigationHelper.getBottomNavHandler(context),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(screenWidth * 0.020),
+        padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.020),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header with icon and description
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Container(
-                  //   padding: EdgeInsets.all(screenWidth * 0.03),
-                  //   decoration: BoxDecoration(
-                  //     color: AppColors.attendanceTeal.withOpacity(0.1),
-                  //     borderRadius: BorderRadius.circular(12),
-                  //   ),
-                  //   child: Icon(
-                  //     Icons.home,
-                  //     color: AppColors.attendanceTeal,
-                  //     size: screenWidth * 0.06,
-                  //   ),
-                  // ),
-                  // SizedBox(height: screenHeight * 0.01),
-                  // Text(
-                  //   widget.wfhRequest != null
-                  //       ? 'Edit WFH Request'
-                  //       : AppStrings.wfh,
-                  //   style: AppTextStyles.heading3(context).copyWith(
-                  //     fontWeight: FontWeight.w700,
-                  //     color: AppColors.textPrimary,
-                  //   ),
-                  // ),
-                  SizedBox(height: screenHeight * 0.005),
-                ],
-              ),
-              SizedBox(height: screenHeight * 0.01),
               // Subject
               AppTextField(
                 label: 'Subject',
@@ -477,7 +320,12 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
               // Show date fields based on WFH Duration selection
               if (_selectedWfhDuration == 'Single Day WFH') ...[
                 SizedBox(height: screenHeight * 0.02),
-                Text('Date', style: AppTextStyles.labelLarge(context)),
+                Text(
+                  'Date',
+                  style: AppTextStyles.labelLarge(
+                    context,
+                  ).copyWith(color: AppColors.textHeading),
+                ),
                 SizedBox(height: screenHeight * 0.01),
                 _buildDateField(
                   context,
@@ -491,7 +339,12 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
               ] else if (_selectedWfhDuration == 'Multiple Day WFH') ...[
                 SizedBox(height: screenHeight * 0.02),
                 // From
-                Text('From', style: AppTextStyles.labelLarge(context)),
+                Text(
+                  'From',
+                  style: AppTextStyles.labelLarge(
+                    context,
+                  ).copyWith(color: AppColors.textHeading),
+                ),
                 SizedBox(height: screenHeight * 0.01),
                 Row(
                   children: [
@@ -526,7 +379,12 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
                 ),
                 SizedBox(height: screenHeight * 0.02),
                 // To
-                Text('To', style: AppTextStyles.labelLarge(context)),
+                Text(
+                  'To',
+                  style: AppTextStyles.labelLarge(
+                    context,
+                  ).copyWith(color: AppColors.textHeading),
+                ),
                 SizedBox(height: screenHeight * 0.01),
                 Row(
                   children: [
@@ -652,7 +510,12 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (label != null) ...[
-          Text(label, style: AppTextStyles.labelLarge(context)),
+          Text(
+            label,
+            style: AppTextStyles.labelLarge(
+              context,
+            ).copyWith(color: AppColors.textHeading),
+          ),
           SizedBox(height: screenHeight * 0.01),
         ],
         Container(

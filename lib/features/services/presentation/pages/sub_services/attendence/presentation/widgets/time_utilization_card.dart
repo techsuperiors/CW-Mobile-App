@@ -7,6 +7,8 @@ import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/utils/location_permission_helper.dart';
 import '../../../../../../../../core/utils/time_utils.dart';
+import '../../../../../../../attendance/data/datasources/attendance_offline_local_datasource.dart';
+import '../../../../../../../attendance/data/models/offline_attendance_action_model.dart';
 import '../../../../../../../attendance/domain/entities/attendance_details.dart';
 import '../../../../../../../attendance/presentation/bloc/attendance_punch_bloc.dart';
 import '../../../../../../../attendance/presentation/bloc/attendance_punch_event.dart';
@@ -33,11 +35,13 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
   bool _isPunchingIn = false;
   bool _isPunchingOut = false;
   Timer? _updateTimer;
-  DateTime? _punchInTime;
   bool?
   _localPunchedInOverride; // null = use server data, true/false = override
   DateTime? _virtualPunchInTime; // Fully client-owned, not cleared by server
   double _workedHours = 0.0;
+  double? _frozenWorkedHoursOverride;
+  final AttendanceOfflineLocalDataSource _offlineLocalDataSource =
+      AttendanceOfflineLocalDataSourceImpl();
 
   /// Check if user is already punched in
   bool get _isPunchedIn {
@@ -102,6 +106,7 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
   void initState() {
     super.initState();
     _initVirtualPunchInTime();
+    _hydratePendingOfflineState();
     _updateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _updatePunchInTime();
     });
@@ -128,31 +133,41 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
       }
 
       _updatePunchInTime();
+      _hydratePendingOfflineState();
     }
   }
 
-  void _initVirtualPunchInTime() {
-    if (!_getServerPunchedIn()) return;
+  Future<void> _hydratePendingOfflineState() async {
+    final actions = await _offlineLocalDataSource.getPendingActions();
+    if (!mounted) return;
 
-    final punchInStr = widget.attendanceDetails?.punchIn;
-    if (punchInStr == null || punchInStr.isEmpty || punchInStr == '-') return;
-
-    try {
-      DateTime punchInDateTime = DateTime.parse(punchInStr);
-      if (punchInDateTime.isUtc) {
-        punchInDateTime = punchInDateTime.toLocal();
+    setState(() {
+      if (actions.isEmpty) {
+        if (!_getServerPunchedIn()) {
+          _localPunchedInOverride = null;
+          _virtualPunchInTime = null;
+          _frozenWorkedHoursOverride = null;
+        }
+        return;
       }
 
-      // Include previous worked seconds (totalTime from API)
-      final previousSeconds = _getPreviousWorkedSeconds();
+      actions.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      final queueSnapshot = _buildPendingQueueSnapshot(actions);
 
-      // Virtual time = punchIn time - previous work
-      _virtualPunchInTime = punchInDateTime.subtract(
-        Duration(seconds: previousSeconds),
-      );
-    } catch (e) {
-      _virtualPunchInTime = null;
-    }
+      if (queueSnapshot.isPunchedIn) {
+        _localPunchedInOverride = true;
+        _frozenWorkedHoursOverride = null;
+        _virtualPunchInTime = queueSnapshot.virtualPunchInTime;
+      } else {
+        _localPunchedInOverride = false;
+        _virtualPunchInTime = null;
+        _frozenWorkedHoursOverride = queueSnapshot.frozenWorkedHours;
+      }
+    });
+  }
+
+  void _initVirtualPunchInTime() {
+    _virtualPunchInTime = _getServerVirtualPunchInTime();
   }
 
   @override
@@ -169,6 +184,8 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
         // Client-owned timer — not affected by server data
         final diff = DateTime.now().difference(_virtualPunchInTime!);
         _workedHours = diff.inSeconds / 3600.0;
+      } else if (_frozenWorkedHoursOverride != null) {
+        _workedHours = _frozenWorkedHoursOverride!;
       } else {
         // Not punched in locally — use server data
         _workedHours = TimeUtils.getWorkedHours(
@@ -195,6 +212,61 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
       return 0;
     }
     return 0;
+  }
+
+  DateTime? _getServerPunchInDateTime() {
+    final punchInStr = widget.attendanceDetails?.punchIn;
+    if (punchInStr == null || punchInStr.isEmpty || punchInStr == '-') {
+      return null;
+    }
+
+    try {
+      DateTime punchInDateTime = DateTime.parse(punchInStr);
+      if (punchInDateTime.isUtc) {
+        punchInDateTime = punchInDateTime.toLocal();
+      }
+      return punchInDateTime;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  DateTime? _getServerVirtualPunchInTime() {
+    final serverPunchIn = _getServerPunchInDateTime();
+    if (serverPunchIn == null || !_getServerPunchedIn()) return null;
+    return serverPunchIn.subtract(Duration(seconds: _getPreviousWorkedSeconds()));
+  }
+
+  _PendingQueueSnapshot _buildPendingQueueSnapshot(
+    List<OfflineAttendanceActionModel> actions,
+  ) {
+    var accumulatedSeconds = _getPreviousWorkedSeconds();
+    DateTime? activePunchInAt =
+        _getServerPunchedIn() ? _getServerPunchInDateTime() : null;
+
+    for (final action in actions) {
+      if (action.type == OfflineAttendanceActionType.punchIn) {
+        activePunchInAt ??= action.createdAt;
+      } else if (activePunchInAt != null) {
+        accumulatedSeconds +=
+            action.createdAt.difference(activePunchInAt).inSeconds;
+        activePunchInAt = null;
+      }
+    }
+
+    if (activePunchInAt != null) {
+      return _PendingQueueSnapshot(
+        isPunchedIn: true,
+        virtualPunchInTime: activePunchInAt.subtract(
+          Duration(seconds: accumulatedSeconds),
+        ),
+      );
+    }
+
+    return _PendingQueueSnapshot(
+      isPunchedIn: false,
+      frozenWorkedHours: accumulatedSeconds / 3600.0,
+    );
   }
 
   /// Triggers punch in via shared BLoC
@@ -230,38 +302,74 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
         }
       });
     } else if (state is AttendancePunchInSuccess) {
-      final prevSeconds = _getPreviousWorkedSeconds();
+      if (state.isQueuedOffline) {
+        setState(() {
+          _isPunchingIn = false;
+          _frozenWorkedHoursOverride = null;
+        });
+        _hydratePendingOfflineState();
+        return;
+      }
       setState(() {
         _isPunchingIn = false;
-        _localPunchedInOverride = true;
-        _virtualPunchInTime = state.punchInTime.subtract(
-          Duration(seconds: prevSeconds),
-        );
+        if (state.requiresServerRefresh) {
+          _localPunchedInOverride = null;
+          _virtualPunchInTime = null;
+          _frozenWorkedHoursOverride = null;
+        } else {
+          final prevSeconds = _getPreviousWorkedSeconds();
+          _localPunchedInOverride = true;
+          _frozenWorkedHoursOverride = null;
+          _virtualPunchInTime = state.punchInTime.subtract(
+            Duration(seconds: prevSeconds),
+          );
+        }
       });
-      widget.onRefresh();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(state.message),
-            backgroundColor: AppColors.success,
-          ),
-        );
+      if (!state.isQueuedOffline || state.requiresServerRefresh) {
+        widget.onRefresh();
       }
+      // if (mounted) {
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     SnackBar(
+      //       content: Text(
+      //         AttendancePunchReconciliationHelper.toUserMessage(state.message),
+      //       ),
+      //       backgroundColor: AppColors.success,
+      //     ),
+      //   );
+      // }
     } else if (state is AttendancePunchOutSuccess) {
+      if (state.isQueuedOffline) {
+        setState(() {
+          _isPunchingOut = false;
+        });
+        _hydratePendingOfflineState();
+        return;
+      }
+      final frozenWorkedHours =
+          _virtualPunchInTime != null
+              ? DateTime.now().difference(_virtualPunchInTime!).inSeconds /
+                  3600.0
+              : _workedHours;
       setState(() {
         _isPunchingOut = false;
-        _localPunchedInOverride = false;
+        _localPunchedInOverride = state.requiresServerRefresh ? null : false;
         _virtualPunchInTime = null;
+        _frozenWorkedHoursOverride = frozenWorkedHours;
       });
-      widget.onRefresh();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(state.message),
-            backgroundColor: AppColors.success,
-          ),
-        );
+      if (!state.isQueuedOffline || state.requiresServerRefresh) {
+        widget.onRefresh();
       }
+      // if (mounted) {
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     SnackBar(
+      //       content: Text(
+      //         AttendancePunchReconciliationHelper.toUserMessage(state.message),
+      //       ),
+      //       backgroundColor: AppColors.success,
+      //     ),
+      //   );
+      // }
     } else if (state is AttendancePunchError) {
       setState(() {
         _isPunchingIn = false;
@@ -273,6 +381,22 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
           SnackBar(
             content: Text(state.message),
             backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } else if (state is AttendancePendingSyncSuccess) {
+      setState(() {
+        _isPunchingIn = false;
+        _isPunchingOut = false;
+        _localPunchedInOverride = null;
+      });
+      _hydratePendingOfflineState();
+      widget.onRefresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(state.message),
+            backgroundColor: AppColors.success,
           ),
         );
       }
@@ -511,4 +635,16 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
       ),
     );
   }
+}
+
+class _PendingQueueSnapshot {
+  final bool isPunchedIn;
+  final DateTime? virtualPunchInTime;
+  final double? frozenWorkedHours;
+
+  const _PendingQueueSnapshot({
+    required this.isPunchedIn,
+    this.virtualPunchInTime,
+    this.frozenWorkedHours,
+  });
 }

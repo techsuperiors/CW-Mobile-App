@@ -16,13 +16,15 @@ abstract class LeaveTypesRepository {
     required String endDate,
     required String subject,
     required String reason,
-    required String startHalf,
-    required String endHalf,
+    required String? startHalf,
+    required String? endHalf,
     required String dayType,
     required String description,
     required String shortCode,
     required int requestTo,
     required List<String> rHDates,
+    String? leaveStartTime,
+    String? leaveEndTime,
     List<File> attachmentFiles,
   });
   Future<Either<Failure, LeaveApplyResult>> updateLeave({

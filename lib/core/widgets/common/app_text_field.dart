@@ -45,9 +45,9 @@ class AppTextField extends StatelessWidget {
         if (label != null) ...[
           Text(
             label!,
-            style: AppTextStyles.labelLarge(context).copyWith(
-              color: AppColors.textHeading
-            ),
+            style: AppTextStyles.labelLarge(
+              context,
+            ).copyWith(color: AppColors.textHeading),
           ),
           SizedBox(height: AppTextStyles.getSpacing(context, mobile: 8.0)),
         ],
@@ -62,15 +62,16 @@ class AppTextField extends StatelessWidget {
           focusNode: focusNode,
           onTap: onTap,
           decoration: InputDecoration(
-
             hintText: hint,
-            hintStyle: TextStyle(
-              color: AppColors.textSecondary,fontWeight: FontWeight.w400
+            hintStyle: AppTextStyles.bodyMedium(context).copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w400,
             ),
+
             prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
             suffixIcon: suffixIcon,
             filled: true,
-            fillColor: bgcolor??AppColors.background,
+            fillColor: bgcolor ?? AppColors.background,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.border),
@@ -87,7 +88,10 @@ class AppTextField extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.error),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
           ),
         ),
       ],

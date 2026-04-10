@@ -5,8 +5,13 @@ import 'common_agreement_detail_page.dart';
 /// Employee Agreement detail page showing full agreement content and signature
 class EmployeeAgreementDetailPage extends StatefulWidget {
   final EmployeeAgreementModel agreement;
+  final bool showDocumentsOnly;
 
-  const EmployeeAgreementDetailPage({super.key, required this.agreement});
+  const EmployeeAgreementDetailPage({
+    super.key,
+    required this.agreement,
+    this.showDocumentsOnly = false,
+  });
 
   @override
   State<EmployeeAgreementDetailPage> createState() =>
@@ -24,6 +29,7 @@ class _EmployeeAgreementDetailPageState
       content: widget.agreement.content,
       signatureUrl: widget.agreement.signatureUrl,
       documentUrl: widget.agreement.documentUrl,
+      showDocumentsOnly: widget.showDocumentsOnly,
     );
   }
 }

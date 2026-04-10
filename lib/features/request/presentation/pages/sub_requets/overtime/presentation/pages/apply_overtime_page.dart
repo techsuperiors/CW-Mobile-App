@@ -326,17 +326,13 @@ class _ApplyOvertimePageState extends State<ApplyOvertimePage> {
                     onTap: NavigationHelper.getBottomNavHandler(context),
                   ),
                   body: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: screenWidth * 0.042,
-                      vertical: 16,
-                    ),
+                      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.020),
+
                     child: Form(
                       key: _formKey,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SizedBox(height: screenHeight * 0.01),
-
                           // ── Attendance Day* label ──
                           Text(
                             'Attendance Day',

@@ -44,7 +44,7 @@ class UpcomingEventsRemoteDataSourceImpl implements UpcomingEventsRemoteDataSour
       if (e is ServerException) {
         rethrow;
       }
-      throw ServerException('Failed to get upcoming events: ${e.toString()}');
+      throw ServerException('Failed to get upcoming events');
     }
   }
 }

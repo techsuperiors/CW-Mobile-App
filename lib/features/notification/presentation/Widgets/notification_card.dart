@@ -80,11 +80,14 @@ class _NotificationCardState extends State<NotificationCard>
       decoration: BoxDecoration(
         color:
             isUnread
-                ? AppColors.attendanceTeal.withOpacity(0.05)
+                ? AppColors.attendanceTeal.withOpacity(0.02)
                 : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isUnread ? AppColors.attendanceTeal : AppColors.border,
+          color:
+              isUnread
+                  ? AppColors.attendanceTeal.withValues(alpha: 0.5)
+                  : AppColors.border,
           width: 1,
         ),
       ),

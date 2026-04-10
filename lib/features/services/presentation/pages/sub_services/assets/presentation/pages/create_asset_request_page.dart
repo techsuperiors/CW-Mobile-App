@@ -3,11 +3,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
+import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../../core/utils/app_navigator.dart';
 import '../../../../../../../../core/utils/error_message_mapper.dart';
 import '../../../../../../../../core/widgets/api_error_state.dart';
+import '../../../../../../../authentication/presentation/pages/login_page.dart';
 import '../../../../../../../user/presentation/bloc/user_profile_bloc.dart';
 import '../../../../../../../user/presentation/bloc/user_profile_state.dart';
 import '../../data/datasource/asset_remote_datasource.dart';
@@ -51,7 +54,11 @@ class _CreateAssetRequestPageState extends State<CreateAssetRequestPage> {
 
   void _initUseCases() {
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
+      AppNavigator.pushAndRemoveAll(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    },);
     final remoteDataSource = AssetRemoteDataSourceImpl(apiClient);
     final repository = AssetRepositoryImpl(remoteDataSource: remoteDataSource);
     _getCategoriesUseCase = GetAssetCategoriesUseCase(repository);
@@ -207,12 +214,13 @@ class _CreateAssetRequestPageState extends State<CreateAssetRequestPage> {
           horizontal: sw * 0.05,
           vertical: sh * 0.025,
         ),
+
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Category Dropdown ─────────────────────────────────────────
             _buildLabel('Asset Category *'),
-            SizedBox(height: sh * 0.008),
+            SizedBox(height: sh * 0.02),
             _buildDropdown<AssetCategoryEntity>(
               context: context,
               hint: 'Select Category',
@@ -230,7 +238,7 @@ class _CreateAssetRequestPageState extends State<CreateAssetRequestPage> {
 
             // ── Sub-Category Dropdown ─────────────────────────────────────
             _buildLabel('Sub-Category *'),
-            SizedBox(height: sh * 0.008),
+            SizedBox(height: sh * 0.02),
             _buildDropdown<AssetSubCategoryEntity>(
               context: context,
               hint:
@@ -248,24 +256,9 @@ class _CreateAssetRequestPageState extends State<CreateAssetRequestPage> {
 
             SizedBox(height: sh * 0.022),
 
-            // ── Request Type ──────────────────────────────────────────────
-            // _buildLabel('Request Type *'),
-            // SizedBox(height: sh * 0.008),
-            // _buildDropdown<String>(
-            //   context: context,
-            //   hint: 'Select Request Type',
-            //   value: _requestType,
-            //   items: _requestTypes,
-            //   labelBuilder: (t) => t,
-            //   onChanged:
-            //       (t) => setState(() => _requestType = t ?? 'Allocation'),
-            // ),
-
-            SizedBox(height: sh * 0.022),
-
             // ── Reason TextField ──────────────────────────────────────────
             _buildLabel('Reason *'),
-            SizedBox(height: sh * 0.008),
+            SizedBox(height: sh * 0.02),
             TextFormField(
               controller: _reasonController,
               maxLines: 4,
@@ -289,26 +282,23 @@ class _CreateAssetRequestPageState extends State<CreateAssetRequestPage> {
                   vertical: sh * 0.018,
                 ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: AppColors.borderLight,
-                    width: 1,
-                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.border),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: AppColors.borderLight,
-                    width: 1,
-                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.border),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 2,
+                  ),
                 ),
                 errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.error, width: 1),
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.error),
                 ),
               ),
             ),
@@ -349,6 +339,31 @@ class _CreateAssetRequestPageState extends State<CreateAssetRequestPage> {
                         ),
               ),
             ),
+            SizedBox(height: sh * 0.015),
+            // Cancel Button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: sh * 0.018),
+                  side: BorderSide(color: AppColors.border),
+                  backgroundColor: AppColors.background,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  AppStrings.cancel,
+                  style: AppTextStyles.buttonLarge(
+                    context,
+                  ).copyWith(color: AppColors.textPrimary),
+                ),
+              ),
+            ),
+            SizedBox(height: sh * 0.02),
           ],
         ),
       ),
@@ -358,9 +373,9 @@ class _CreateAssetRequestPageState extends State<CreateAssetRequestPage> {
   Widget _buildLabel(String text) {
     return Text(
       text,
-      style: AppTextStyles.bodyMedium(
+      style: AppTextStyles.labelLarge(
         context,
-      ).copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+      ).copyWith(fontWeight: FontWeight.w600, color: AppColors.textHeading),
     );
   }
 
@@ -376,15 +391,16 @@ class _CreateAssetRequestPageState extends State<CreateAssetRequestPage> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
       ),
       padding: EdgeInsets.symmetric(horizontal: sw * 0.04),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<T>(
           isExpanded: true,
           value: value,
+          borderRadius: BorderRadius.circular(12),
           hint: Text(
             hint,
             style: AppTextStyles.bodyMedium(

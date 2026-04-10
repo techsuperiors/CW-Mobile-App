@@ -1,12 +1,12 @@
 /// Attendance Regularize Request Model
 class AttendanceRegularizeRequest {
   final String requestDate;
-  final int requestTo;
   final String requestFor; // 'Punch-In', 'Punch-Out', 'both'
   final String modeType; // 'Remote', 'Office', etc.
   final String checkIn; // Format: 'yyyy-MM-dd HH:mm:ss+05:30'
   final String checkOut; // Format: 'yyyy-MM-dd HH:mm:ss+05:30'
   final String reason;
+  final String? otherReason;
   final String description;
   final int userId;
   final bool isOther;
@@ -14,12 +14,12 @@ class AttendanceRegularizeRequest {
 
   AttendanceRegularizeRequest({
     required this.requestDate,
-    required this.requestTo,
     required this.requestFor,
     required this.modeType,
     required this.checkIn,
     required this.checkOut,
     required this.reason,
+    this.otherReason,
     required this.description,
     required this.userId,
     required this.isOther,
@@ -29,12 +29,12 @@ class AttendanceRegularizeRequest {
   Map<String, dynamic> toJson() {
     return {
       'request_date': requestDate,
-      'request_to': requestTo,
       'request_for': requestFor,
       'mode_type': modeType,
       'check_in': checkIn,
       'check_out': checkOut,
       'reason': reason,
+      'other_reason': otherReason,
       'description': description,
       'user_id': userId,
       'is_Other': isOther,

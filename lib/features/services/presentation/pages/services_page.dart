@@ -63,8 +63,19 @@ class _ServicesPageState extends State<ServicesPage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => EmployeeAgreementPage(serviceId: serviceId),
+            builder:
+                (context) => EmployeeAgreementPage(
+                  serviceId: serviceId,
+                  showDocumentsOnly: true,
+                ),
           ),
+        );
+        break;
+
+      case 6: // Expenses
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ExpensePage()),
         );
         break;
       case 7: // Payslips
@@ -73,12 +84,6 @@ class _ServicesPageState extends State<ServicesPage> {
           MaterialPageRoute(
             builder: (context) => PayslipPage(serviceId: serviceId),
           ),
-        );
-        break;
-      case 6: // Expenses
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const ExpensePage()),
         );
         break;
       case 8: // Document
@@ -128,7 +133,7 @@ class _ServicesPageState extends State<ServicesPage> {
         centerTitle: false,
         title: Text(
           AppStrings.ourServices,
-          style: AppTextStyles.heading1(context).copyWith(
+          style: AppTextStyles.heading4(context).copyWith(
             fontWeight: FontWeight.w500,
             color: AppColors.textPrimary,
             height: 1.2,

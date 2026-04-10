@@ -96,22 +96,35 @@ class AuthRepository {
     }
   }
 
-  /// Logout - calls logout API, clears data only on API success
-  /// Returns true if logout succeeded (API success + data cleared), false otherwise
+  /// Logout - best effort backend logout followed by local session clear.
+  /// Returns true when local auth data is cleared successfully.
   Future<bool> logout() async {
+    var remoteLogoutSucceeded = false;
+
     try {
-      // Call logout API first so backend can invalidate the token
-      final success = await _apiService.callLogoutApi();
-      // Clear data only after successful API response
-      if (success) {
-        await TokenStorage.clearAll();
-        debugPrint('Logout complete - token and all data cleared');
-        return true;
-      }
-      debugPrint('Logout API failed - local data not cleared');
-      return false;
+      // Try to invalidate the backend session when possible, but don't trap
+      // the user in the app if the token is already gone or expired.
+      remoteLogoutSucceeded = await _apiService.callLogoutApi();
     } catch (e) {
-      debugPrint('Logout error: $e');
+      debugPrint('Logout API error: $e');
+    }
+
+    try {
+      final localDataCleared = await TokenStorage.clearAll();
+      if (!localDataCleared) {
+        debugPrint('Logout failed - unable to clear local auth data');
+        return false;
+      }
+
+      if (remoteLogoutSucceeded) {
+        debugPrint('Logout complete - backend session invalidated and local data cleared');
+      } else {
+        debugPrint('Logout completed locally - backend logout was skipped or failed');
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Logout local clear error: $e');
       return false;
     }
   }
@@ -268,4 +281,3 @@ class AuthRepository {
     }
   }
 }
-

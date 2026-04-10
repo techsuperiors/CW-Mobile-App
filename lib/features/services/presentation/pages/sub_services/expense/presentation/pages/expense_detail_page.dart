@@ -24,6 +24,7 @@ import '../../../../../../../user/presentation/bloc/user_profile_state.dart';
 import '../../data/expense_remote_data.dart';
 import '../../data/models/expense_detail_model.dart';
 import '../../data/models/expense_item_model.dart';
+import '../widgets/approval_level_tile.dart';
 import 'edit_expense_page.dart';
 
 class ExpenseDetailPage extends StatefulWidget {
@@ -252,27 +253,27 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                     controller: sc,
                     padding: EdgeInsets.all(sw * 0.04),
                     children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: AppColors.border,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
+                      // Center(
+                      //   child: Container(
+                      //     width: 40,
+                      //     height: 4,
+                      //     margin: const EdgeInsets.only(bottom: 16),
+                      //     decoration: BoxDecoration(
+                      //       color: AppColors.border,
+                      //       borderRadius: BorderRadius.circular(2),
+                      //     ),
+                      //   ),
+                      // ),
                       Text(
                         'Activity',
                         style: AppTextStyles.heading4(
                           context,
                         ).copyWith(fontWeight: FontWeight.w600),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: sh * 0.02),
                       if (detail.activity.isEmpty)
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          padding: EdgeInsets.symmetric(vertical: sw * 0.04),
                           child: Text(
                             'No activity available.',
                             style: AppTextStyles.bodyMedium(
@@ -395,7 +396,8 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                   },
                   itemBuilder: (context) {
                     return [
-                      if (!widget.isApprovalMode && widget.expense.isEditEnabled)
+                      if (!widget.isApprovalMode &&
+                          widget.expense.isEditEnabled)
                         PopupMenuItem(
                           value: 'Edit',
                           child: Row(
@@ -545,7 +547,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
 
                         _InfoRow(
                           label: 'Status',
-                          valueWidget: _StatusChip(
+                          valueWidget: StatusChip(
                             status: detail.approvalStatus,
                           ),
                         ),
@@ -572,9 +574,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                             color: AppColors.textSecondary,
                           ),
                         ),
-                        SizedBox(
-                          height: screenHeight * 0.02,
-                        ),
+                        SizedBox(height: screenHeight * 0.02),
 
                         if (widget.isApprovalMode &&
                             detail.approvalStatus.toLowerCase() == 'pending' &&
@@ -594,9 +594,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                           ),
                         ],
 
-                        SizedBox(
-                          height: screenHeight * 0.02,
-                        ),
+                        SizedBox(height: screenHeight * 0.02),
                         Text(
                           'Attachment',
                           style: AppTextStyles.bodyMediumHeading(
@@ -649,9 +647,10 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                         SizedBox(height: screenHeight * 0.02),
                         ...List.generate(
                           detail.approvals.length,
-                          (index) => _ApprovalLevelTile(
+                          (index) => ApprovalLevelTile(
                             approval: detail.approvals[index],
                             index: index,
+                            totalCount: detail.approvals.length,
                             isExpanded: _expandedIndices.contains(index),
                             onToggle: () {
                               setState(() {
@@ -899,7 +898,7 @@ class _ExpenseCommentsSectionState extends State<_ExpenseCommentsSection> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _Avatar(
+                          Avatar(
                             user: comment.createdBy,
                             size: screenWidth * 0.09,
                           ),
@@ -1041,7 +1040,7 @@ class _RequestByRow extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              _Avatar(user: user, size: 30),
+              Avatar(user: user, size: 30),
               SizedBox(width: screenWidth * 0.024),
               Flexible(
                 child: Text(
@@ -1106,44 +1105,6 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  final String status;
-
-  const _StatusChip({required this.status});
-
-  Color get _color {
-    switch (status.toLowerCase()) {
-      case 'approved':
-        return const Color(0xFF12B76A); // Green
-      case 'rejected':
-        return const Color(0xFFF04438); // Red
-      case 'withdrawn':
-        return const Color(0xFFF79009); // Orange
-      case 'pending':
-        return const Color(0xFF0086C9); // Orange
-      default:
-        return const Color(0xFF0086C9);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: _color,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        status,
-        style: AppTextStyles.labelSmall(
-          context,
-        ).copyWith(color: Colors.white, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-}
-
 class _ExpenseActivityTile extends StatelessWidget {
   final ExpenseActivity activity;
   final double sw;
@@ -1179,16 +1140,8 @@ class _ExpenseActivityTile extends StatelessWidget {
       margin: EdgeInsets.only(bottom: sh * 0.02),
       padding: EdgeInsets.all(sw * 0.035),
       decoration: BoxDecoration(
-        color: AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: AppColors.borderLight, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1212,7 +1165,7 @@ class _ExpenseActivityTile extends StatelessWidget {
                   ),
                 ),
               ),
-               SizedBox(width: sw*0.04),
+              SizedBox(width: sw * 0.04),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1228,10 +1181,10 @@ class _ExpenseActivityTile extends StatelessWidget {
                     if (actorName.isNotEmpty) const SizedBox(height: 4),
                     Text(
                       cleanText.isEmpty ? 'Activity updated' : cleanText,
+                      maxLines: 3,
                       style: AppTextStyles.bodyMediumHeading(context).copyWith(
                         color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        height: 1.35,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
@@ -1239,7 +1192,7 @@ class _ExpenseActivityTile extends StatelessWidget {
               ),
             ],
           ),
-           SizedBox(height: sh*0.02),
+          SizedBox(height: sh * 0.002),
           Row(
             children: [
               const Spacer(),
@@ -1379,283 +1332,6 @@ class _AttachmentTile extends StatelessWidget {
                     errorWidget:
                         (_, __, ___) => const Icon(Icons.broken_image_outlined),
                   ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ApprovalLevelTile extends StatelessWidget {
-  final ExpenseApprovalDetail approval;
-  final int index;
-  final bool isExpanded;
-  final VoidCallback onToggle;
-
-  const _ApprovalLevelTile({
-    required this.approval,
-    required this.index,
-    required this.isExpanded,
-    required this.onToggle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    return Padding(
-      padding: EdgeInsets.only(bottom: screenHeight * 0.02),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.only(top: screenHeight * 0.002),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.account_circle_outlined,
-                  color: AppColors.border,
-                  size: 26,
-                ),
-                if (!isExpanded)
-                  Container(
-                    width: screenWidth * 0.002,
-                    height: screenHeight * 0.02,
-                    color: AppColors.border,
-                  ),
-              ],
-            ),
-          ),
-          SizedBox(width: screenWidth * 0.02),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  InkWell(
-                    onTap: onToggle,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: screenWidth * 0.02,
-                        vertical: screenHeight * 0.01,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Level ${index + 1}',
-                              style: AppTextStyles.bodyMediumHeading(
-                                context,
-                              ).copyWith(color: AppColors.textSecondary),
-                            ),
-                          ),
-                          _StatusChip(status: approval.approvalStatus),
-                          SizedBox(width: screenWidth * 0.004),
-                          Icon(
-                            isExpanded
-                                ? Icons.keyboard_arrow_up
-                                : Icons.keyboard_arrow_down,
-                            color: AppColors.textSecondary,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (isExpanded)
-                    Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: screenWidth * 0.04,
-                        vertical: screenHeight * 0.01,
-                      ),
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          top: BorderSide(color: Color(0xFFE9EDF2)),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          _ApprovalInfoRow(
-                            label: 'Approver Name',
-                            valueWidget: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _Avatar(user: approval.assignee, size: 24),
-                                SizedBox(width: screenWidth * 0.02),
-                                Flexible(
-                                  child: Text(
-                                    approval.assignee.fullName.isEmpty
-                                        ? '—'
-                                        : approval.assignee.fullName,
-                                    style: AppTextStyles.bodySmall(
-                                      context,
-                                    ).copyWith(
-                                      color: AppColors.attendanceTeal,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          _ApprovalInfoRow(
-                            label: 'Approve Date',
-                            value:
-                                approval.actionTakenAt == null
-                                    ? '—'
-                                    : DateFormat(
-                                      'dd-MMM-yyyy',
-                                    ).format(approval.actionTakenAt!),
-                          ),
-                          _ApprovalInfoRow(
-                            label: 'Remark',
-                            value:
-                                (approval.remarks?.trim().isNotEmpty ?? false)
-                                    ? approval.remarks!.trim()
-                                    : '—',
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ApprovalInfoRow extends StatelessWidget {
-  final String label;
-  final String? value;
-  final Widget? valueWidget;
-
-  const _ApprovalInfoRow({required this.label, this.value, this.valueWidget});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 4,
-            child: Text(
-              label,
-              style: AppTextStyles.bodyMediumHeading(context).copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 5,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child:
-                  valueWidget ??
-                  Text(
-                    value ?? '—',
-                    textAlign: TextAlign.right,
-                    style: AppTextStyles.bodySmall(
-                      context,
-                    ).copyWith(color: AppColors.textSecondary),
-                  ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Avatar extends StatelessWidget {
-  final ExpenseRequester user;
-  final double size;
-
-  const _Avatar({required this.user, required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    if (user.imageUrl?.isNotEmpty == true) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipOval(
-          child: CachedNetworkImage(
-            imageUrl: user.imageUrl!,
-            fit: BoxFit.cover,
-            errorWidget: (_, __, ___) => _InitialAvatar(user: user, size: size),
-          ),
-        ),
-      );
-    }
-    return _InitialAvatar(user: user, size: size);
-  }
-}
-
-class _InitialAvatar extends StatelessWidget {
-  final ExpenseRequester user;
-  final double size;
-
-  const _InitialAvatar({required this.user, required this.size});
-
-  Color _parseColor() {
-    final raw = user.profileColor?.replaceFirst('#', '');
-    if (raw == null || raw.isEmpty) return AppColors.attendanceTeal;
-    final normalized = raw.length == 6 ? 'FF$raw' : raw;
-    return Color(int.tryParse(normalized, radix: 16) ?? 0xFF0DC5C1);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final initials =
-        user.fullName.isEmpty
-            ? '?'
-            : user.fullName
-                .split(' ')
-                .where((part) => part.isNotEmpty)
-                .take(2)
-                .map((part) => part[0].toUpperCase())
-                .join();
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: _parseColor(),
-        border: Border.all(color: Colors.white, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Center(
-        child: Text(
-          initials,
-          style: AppTextStyles.labelSmall(
-            context,
-          ).copyWith(color: Colors.white, fontWeight: FontWeight.w700),
         ),
       ),
     );

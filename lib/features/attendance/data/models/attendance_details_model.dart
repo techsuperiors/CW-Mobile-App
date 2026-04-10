@@ -1,4 +1,13 @@
 /// OverTime Model
+double? _parseNullableDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value);
+  return null;
+}
+
 class OverTimeModel {
   final int total;
   final int beforePunchIn;
@@ -413,8 +422,8 @@ class ActivityModel {
   final String? createdAt;
   final String? time;
   final String? penaltyMessage;
-  final int? paidDays;
-  final int? unPaidDays;
+  final double? paidDays;
+  final double? unPaidDays;
   final String? ip;
   final String? location;
   final String? mode;
@@ -450,8 +459,8 @@ class ActivityModel {
       createdAt: parseStringValue(json['created_at']),
       time: parseStringValue(json['time']),
       penaltyMessage: parseStringValue(json['penaltyMessage']),
-      paidDays: json['paidDays'] as int?,
-      unPaidDays: json['unPaidDays'] as int?,
+      paidDays: _parseNullableDouble(json['paidDays']),
+      unPaidDays: _parseNullableDouble(json['unPaidDays']),
       ip: parseStringValue(json['ip']),
       location: parseStringValue(json['location']),
       mode: parseStringValue(json['mode']),

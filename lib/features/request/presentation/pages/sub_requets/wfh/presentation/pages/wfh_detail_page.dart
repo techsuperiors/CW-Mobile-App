@@ -83,7 +83,11 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
     return BlocProvider(
       create: (context) {
         final networkInfo = NetworkInfoImpl(Connectivity());
-        final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+        final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
+          AppNavigator.pushAndRemoveAll(
+            MaterialPageRoute(builder: (_) => const LoginPage()),
+          );
+        },);
         final remoteDataSource = WfhRemoteDataSourceImpl(apiClient: apiClient);
         final repository = WfhRepositoryImpl(
           remoteDataSource: remoteDataSource,
@@ -169,7 +173,10 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
           ),
           bottomNavigationBar:
               widget.isApprovalMode
-                  ? null
+                  ? BottomNavBar(
+                currentIndex: 4,
+                onTap: NavigationHelper.getBottomNavHandler(context),
+              )
                   : BottomNavBar(
                     currentIndex: 3,
                     onTap: NavigationHelper.getBottomNavHandler(context),
@@ -220,6 +227,9 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
     DateFormat dateFormat,
     DateFormat dateTimeFormat,
   ) {
+    final isSingleDayRequest =
+        (widget.wfhRequest.requestType ?? '').toLowerCase() == 'single';
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -347,9 +357,7 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
           _buildDetailRow(
             context,
             'Request Type:',
-            (widget.wfhRequest.requestType ?? '').toLowerCase() == 'single'
-                ? 'Single Day'
-                : 'Multiple Days',
+            isSingleDayRequest ? 'Single Day' : 'Multiple Days',
 
             screenWidth,
             screenHeight,
@@ -375,21 +383,23 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
           Divider(height: screenHeight * 0.03, color: AppColors.border),
           _buildDetailRow(
             context,
-            'From:',
+            isSingleDayRequest ? 'On:' : 'From:',
             dateFormat.format(widget.wfhRequest.fromDate),
             screenWidth,
             screenHeight,
           ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRow(
-            context,
-            'To:',
-            widget.wfhRequest.toDate != null
-                ? dateFormat.format(widget.wfhRequest.toDate!)
-                : dateFormat.format(widget.wfhRequest.fromDate),
-            screenWidth,
-            screenHeight,
-          ),
+          if (!isSingleDayRequest) ...[
+            Divider(height: screenHeight * 0.03, color: AppColors.border),
+            _buildDetailRow(
+              context,
+              'To:',
+              widget.wfhRequest.toDate != null
+                  ? dateFormat.format(widget.wfhRequest.toDate!)
+                  : dateFormat.format(widget.wfhRequest.fromDate),
+              screenWidth,
+              screenHeight,
+            ),
+          ],
           // Show reject remark if rejected
           if (widget.wfhRequest.status == WfhStatus.rejected &&
               widget.wfhRequest.rejectRemark != null) ...[
@@ -942,7 +952,11 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
 
   Future<List<_WfhActivityItem>> _fetchActivityItems() async {
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
+      AppNavigator.pushAndRemoveAll(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    },);
     final requestIdString =
         widget.wfhRequest.attendanceRequestId ?? widget.wfhRequest.id;
     final requestId = int.tryParse(requestIdString) ?? 0;
@@ -987,7 +1001,11 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
   Future<void> _loadApprovers() async {
     try {
       final networkInfo = NetworkInfoImpl(Connectivity());
-      final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+      final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
+        AppNavigator.pushAndRemoveAll(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      },);
       final payload = encodeData({'request_id': _requestId});
       final response = await apiClient.get(
         '${AppUrls.wfhRequestDetails}?payload=$payload',

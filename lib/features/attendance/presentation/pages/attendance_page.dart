@@ -1,22 +1,27 @@
+import 'package:collectivWork/core/utils/token_storage.dart';
 import 'package:collectivWork/core/widgets/permission_guard.dart';
 import 'package:collectivWork/features/attendance/presentation/pages/face_verification/face_verification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dio/dio.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
 
+import '../../../../core/utils/app_navigator.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../authentication/presentation/pages/login_page.dart';
 import '../../../calendar/domain/entities/calendar_day_entity.dart';
 import '../../../calendar/presentation/bloc/calendar_bloc.dart';
 import '../../../leave_stats/data/datasources/leave_stats_remote_datasource.dart';
 import '../../../leave_stats/data/repository/leave_stats_repository_impl.dart';
 import '../../../leave_stats/domain/entities/leave_stats_entity.dart';
 import '../../../leave_stats/domain/usecases/get_leave_stats_usecase.dart';
+import '../../../user/data/datasources/user_profile_local_datasource.dart';
 import '../../data/datasources/attendance_details_remote_datasource.dart';
 import '../../data/repositories/attendance_details_repository_impl.dart';
 import '../../domain/entities/attendance_details.dart';
@@ -101,6 +106,7 @@ class _AttendancePageState extends State<AttendancePage> {
 
   /// How long loaded data is considered fresh before requiring a reload.
   static const _cacheDuration = Duration(minutes: 5);
+  static const _refreshTimeout = Duration(seconds: 20);
 
   /// Returns true if the cached data is stale and should be reloaded.
   bool get _isDataStale {
@@ -135,7 +141,15 @@ class _AttendancePageState extends State<AttendancePage> {
 
     final networkInfo = NetworkInfoImpl(Connectivity());
     final dio = Dio();
-    final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+    final apiClient = ApiClient(
+      dio: dio,
+      networkInfo: networkInfo,
+      onTokenExpired: () {
+        AppNavigator.pushAndRemoveAll(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      },
+    );
 
     final notificationRepo = NotificationRepositoryImpl(
       remoteDataSource: NotificationRemoteDataSourceImpl(apiClient: apiClient),
@@ -189,17 +203,21 @@ class _AttendancePageState extends State<AttendancePage> {
   Future<void> _refreshAttendanceSummaryOnly() async {
     final networkInfo = NetworkInfoImpl(Connectivity());
     final dio = Dio();
-    final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+    final apiClient = ApiClient(
+      dio: dio,
+      networkInfo: networkInfo,
+      onTokenExpired: () {
+        AppNavigator.pushAndRemoveAll(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      },
+    );
 
     setState(() {
       _isLoadingLeaveStats = true;
     });
 
-    await _loadLeaveStats(
-      apiClient,
-      networkInfo,
-      targetMonth: _selectedMonth,
-    );
+    await _loadLeaveStats(apiClient, networkInfo, targetMonth: _selectedMonth);
   }
 
   Future<void> _changeSelectedMonth(int monthOffset) async {
@@ -221,7 +239,7 @@ class _AttendancePageState extends State<AttendancePage> {
 
     final isLeavesReady =
         leaveTypesState is LeaveTypesLoaded ||
-            leaveTypesState is LeaveTypesError;
+        leaveTypesState is LeaveTypesError;
     return !_isLoadingProfile &&
         !_isLoadingAttendance &&
         !_isLoadingEvents &&
@@ -246,7 +264,15 @@ class _AttendancePageState extends State<AttendancePage> {
 
     final networkInfo = NetworkInfoImpl(Connectivity());
     final dio = Dio();
-    final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+    final apiClient = ApiClient(
+      dio: dio,
+      networkInfo: networkInfo,
+      onTokenExpired: () {
+        AppNavigator.pushAndRemoveAll(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      },
+    );
     final effectiveMonth = targetMonth ?? _selectedMonth;
     _loadCalendarData(effectiveMonth);
     // Call all APIs in parallel
@@ -256,12 +282,20 @@ class _AttendancePageState extends State<AttendancePage> {
         _loadUserProfile(apiClient, networkInfo),
         _loadAttendanceDetails(apiClient, networkInfo),
         _loadUpcomingEvents(apiClient, networkInfo),
-        _loadLeaveStats(
-          apiClient,
-          networkInfo,
-          targetMonth: effectiveMonth,
-        ),
-      ]);
+        _loadLeaveStats(apiClient, networkInfo, targetMonth: effectiveMonth),
+      ]).timeout(_refreshTimeout);
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _isLoadingProfile = false;
+          _isLoadingAttendance = false;
+          _isLoadingEvents = false;
+          _isLoadingLeaveStats = false;
+          _profileError ??= 'Refresh timed out. Please try again.';
+          _attendanceError ??= 'Refresh timed out. Please try again.';
+          _eventsError ??= 'Refresh timed out. Please try again.';
+        });
+      }
     } finally {
       _isLoadingInProgress = false;
       if (mounted) {
@@ -273,26 +307,31 @@ class _AttendancePageState extends State<AttendancePage> {
     }
   }
 
-  Future<void> _loadUserProfile(ApiClient apiClient,
-      NetworkInfo networkInfo,) async {
+  Future<void> _loadUserProfile(
+    ApiClient apiClient,
+    NetworkInfo networkInfo,
+  ) async {
     try {
       final remoteDataSource = UserProfileRemoteDataSourceImpl(apiClient);
+      final userProfileLocalDataSource = UserProfileLocalDataSourceImpl();
+
       final repository = UserProfileRepositoryImpl(
         remoteDataSource: remoteDataSource,
         networkInfo: networkInfo,
+        localDataSource: userProfileLocalDataSource,
       );
       final getUserProfileUseCase = GetUserProfileUseCase(repository);
 
       final result = await getUserProfileUseCase();
 
       result.fold(
-            (failure) {
+        (failure) {
           setState(() {
             _profileError = failure.message;
             _isLoadingProfile = false;
           });
         },
-            (profile) {
+        (profile) {
           setState(() {
             _userProfile = profile;
             _isLoadingProfile = false;
@@ -306,15 +345,19 @@ class _AttendancePageState extends State<AttendancePage> {
         },
       );
     } catch (e) {
-      setState(() {
-        _profileError = 'Error loading profile: ${e.toString()}';
-        _isLoadingProfile = false;
-      });
+      if (mounted) {
+        setState(() {
+          _profileError = 'Error loading profile: ${e.toString()}';
+          _isLoadingProfile = false;
+        });
+      }
     }
   }
 
-  Future<void> _loadAttendanceDetails(ApiClient apiClient,
-      NetworkInfo networkInfo,) async {
+  Future<void> _loadAttendanceDetails(
+    ApiClient apiClient,
+    NetworkInfo networkInfo,
+  ) async {
     try {
       final remoteDataSource = AttendanceDetailsRemoteDataSourceImpl(apiClient);
       final repository = AttendanceDetailsRepositoryImpl(
@@ -328,13 +371,13 @@ class _AttendancePageState extends State<AttendancePage> {
       final result = await getAttendanceDetailsUseCase();
 
       result.fold(
-            (failure) {
+        (failure) {
           setState(() {
             _attendanceError = failure.message;
             _isLoadingAttendance = false;
           });
         },
-            (attendanceDetails) {
+        (attendanceDetails) {
           setState(() {
             _attendanceDetails = attendanceDetails;
             _isLoadingAttendance = false;
@@ -349,8 +392,10 @@ class _AttendancePageState extends State<AttendancePage> {
     }
   }
 
-  Future<void> _loadUpcomingEvents(ApiClient apiClient,
-      NetworkInfo networkInfo,) async {
+  Future<void> _loadUpcomingEvents(
+    ApiClient apiClient,
+    NetworkInfo networkInfo,
+  ) async {
     try {
       final remoteDataSource = UpcomingEventsRemoteDataSourceImpl(apiClient);
       final repository = UpcomingEventsRepositoryImpl(
@@ -362,13 +407,13 @@ class _AttendancePageState extends State<AttendancePage> {
       final result = await getUpcomingEventsUseCase();
 
       result.fold(
-            (failure) {
+        (failure) {
           setState(() {
             _eventsError = failure.message;
             _isLoadingEvents = false;
           });
         },
-            (events) {
+        (events) {
           setState(() {
             _upcomingEvents = events;
             _isLoadingEvents = false;
@@ -384,9 +429,11 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   /// Load leave stats for the attendance summary card.
-  Future<void> _loadLeaveStats(ApiClient apiClient,
-      NetworkInfo networkInfo,
-      {DateTime? targetMonth}) async {
+  Future<void> _loadLeaveStats(
+    ApiClient apiClient,
+    NetworkInfo networkInfo, {
+    DateTime? targetMonth,
+  }) async {
     try {
       final remoteDataSource = LeaveStatsRemoteDataSourceImpl(apiClient);
       final repository = LeaveStatsRepositoryImpl(
@@ -404,12 +451,12 @@ class _AttendancePageState extends State<AttendancePage> {
       );
 
       result.fold(
-            (failure) {
+        (failure) {
           setState(() {
             _isLoadingLeaveStats = false;
           });
         },
-            (stats) {
+        (stats) {
           setState(() {
             _leaveStats = stats;
             _isLoadingLeaveStats = false;
@@ -417,9 +464,11 @@ class _AttendancePageState extends State<AttendancePage> {
         },
       );
     } catch (e) {
-      setState(() {
-        _isLoadingLeaveStats = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingLeaveStats = false;
+        });
+      }
     }
   }
 
@@ -429,14 +478,34 @@ class _AttendancePageState extends State<AttendancePage> {
 
     final networkInfo = NetworkInfoImpl(Connectivity());
     final dio = Dio();
-    final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+    final apiClient = ApiClient(
+      dio: dio,
+      networkInfo: networkInfo,
+      onTokenExpired: () {
+        AppNavigator.pushAndRemoveAll(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      },
+    );
 
     setState(() {
       _isLoadingAttendance = true;
       _attendanceError = null;
     });
 
-    await _loadAttendanceDetails(apiClient, networkInfo);
+    try {
+      await _loadAttendanceDetails(
+        apiClient,
+        networkInfo,
+      ).timeout(_refreshTimeout);
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _attendanceError = 'Attendance refresh timed out. Please try again.';
+          _isLoadingAttendance = false;
+        });
+      }
+    }
   }
 
   @override
@@ -479,19 +548,25 @@ class _AttendancePageState extends State<AttendancePage> {
         }
 
         final leaveTypes =
-        leaveTypesState is LeaveTypesLoaded
-            ? leaveTypesState.leaveTypes
-            : null;
+            leaveTypesState is LeaveTypesLoaded
+                ? leaveTypesState.leaveTypes
+                : null;
         final leavesError =
-        leaveTypesState is LeaveTypesError ? leaveTypesState.message : null;
+            leaveTypesState is LeaveTypesError ? leaveTypesState.message : null;
         final isLoadingLeaves = leaveTypesState is LeaveTypesLoading;
 
         return BlocListener<AttendancePunchBloc, AttendancePunchState>(
           listener: (context, punchState) {
             // Refresh attendance data after punch in/out success.
 
-            if (punchState is AttendancePunchInSuccess ||
-                punchState is AttendancePunchOutSuccess) {
+            if (punchState is AttendancePunchInSuccess &&
+                (!punchState.isQueuedOffline ||
+                    punchState.requiresServerRefresh)) {
+              _refreshAttendanceOnly(); // only attendance, not everything
+            }
+            if (punchState is AttendancePunchOutSuccess &&
+                (!punchState.isQueuedOffline ||
+                    punchState.requiresServerRefresh)) {
               _refreshAttendanceOnly(); // only attendance, not everything
             }
           },
@@ -520,18 +595,13 @@ class _AttendancePageState extends State<AttendancePage> {
                       AttendanceCard(
                         attendanceDetails: _attendanceDetails,
                         isLoading: _isLoadingAttendance,
-                        onRefresh: _loadAllData,
+                        onRefresh: _refreshAttendanceOnly,
                       ),
-                      // ElevatedButton(onPressed: () {
-                      //   Navigator.of(context).push(MaterialPageRoute(
-                      //       builder: (context) => FaceVerificationScreen())
-                      //   );}, child: Text("Face verification")),
-                      // Punch Details
                       PunchDetails(
                         attendanceDetails: _attendanceDetails,
                         isLoading: _isLoadingAttendance,
                         errorMessage: _attendanceError,
-                        onRefresh: _loadAllData,
+                        onRefresh: _refreshAttendanceOnly,
                       ),
                       SizedBox(height: responsiveSpacing(10)),
                       // Attendance Summary

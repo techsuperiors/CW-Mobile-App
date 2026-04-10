@@ -5,6 +5,8 @@ import '../../constants/app_colors.dart';
 class AppAvatar extends StatelessWidget {
   final String? imageUrl;
   final String? name;
+  final String? firstName;
+  final String? lastName;
   final double radius;
   final Color? backgroundColor;
   final IconData? icon;
@@ -13,12 +15,29 @@ class AppAvatar extends StatelessWidget {
     super.key,
     this.imageUrl,
     this.name,
+    this.firstName,
+    this.lastName,
     this.radius = 20,
     this.backgroundColor,
     this.icon,
   });
 
   String _getInitials() {
+    final trimmedFirstName = firstName?.trim() ?? '';
+    final trimmedLastName = lastName?.trim() ?? '';
+
+    if (trimmedFirstName.isNotEmpty && trimmedLastName.isNotEmpty) {
+      return '${trimmedFirstName[0]}${trimmedLastName[0]}'.toUpperCase();
+    }
+
+    if (trimmedFirstName.isNotEmpty) {
+      return trimmedFirstName[0].toUpperCase();
+    }
+
+    if (trimmedLastName.isNotEmpty) {
+      return trimmedLastName[0].toUpperCase();
+    }
+
     if (name == null || name!.trim().isEmpty) return '';
     final parts = name!.trim().split(RegExp(r'\s+'));
     if (parts.length == 1) return parts[0][0].toUpperCase();

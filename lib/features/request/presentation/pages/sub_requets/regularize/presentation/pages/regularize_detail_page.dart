@@ -216,13 +216,18 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                                     () => _updateRequestStatus('Approved'),
                                 onReject: () => _showRejectRemarkSheet(context),
                               )
-                              : null)
+                              : BottomNavBar(
+                                currentIndex: 4,
+                                onTap: NavigationHelper.getBottomNavHandler(
+                                  context,
+                                ),
+                              ))
                           : BottomNavBar(
-                              currentIndex: 3,
-                              onTap: NavigationHelper.getBottomNavHandler(
-                                context,
-                              ),
+                            currentIndex: 3,
+                            onTap: NavigationHelper.getBottomNavHandler(
+                              context,
                             ),
+                          ),
                   body:
                       state is RegularizeDetailError && state.detail == null
                           ? ApiErrorState(
@@ -303,8 +308,6 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
             state,
           ),
           SizedBox(height: screenHeight * 0.02),
-          // Description Section
-
           // Comments Section
           _buildCommentsSection(context, screenWidth, screenHeight, comments),
         ],
@@ -326,6 +329,12 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     final requestId = int.tryParse(widget.regularizeRequest.id) ?? 0;
     final detail = _detailFromState(state);
     final isPending = currentRequest.status == RegularizeStatus.pending;
+    final requestToDate = currentRequest.toDate;
+    final isSingleDayRequest =
+        requestToDate == null ||
+        (requestToDate.year == currentRequest.fromDate.year &&
+            requestToDate.month == currentRequest.fromDate.month &&
+            requestToDate.day == currentRequest.fromDate.day);
     final menuActions = <Map<String, String>>[
       if (isPending && !widget.isApprovalMode)
         {'value': 'Edit', 'icon': AppAssets.editIconwfh},
@@ -506,21 +515,23 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
           Divider(height: screenHeight * 0.03, color: AppColors.border),
           _buildDetailRow(
             context,
-            'From:',
+            isSingleDayRequest ? 'On:' : 'From:',
             dateFormat.format(currentRequest.fromDate),
             screenWidth,
             screenHeight,
           ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRow(
-            context,
-            'To:',
-            currentRequest.toDate != null
-                ? dateFormat.format(currentRequest.toDate!)
-                : dateFormat.format(currentRequest.fromDate),
-            screenWidth,
-            screenHeight,
-          ),
+          if (!isSingleDayRequest) ...[
+            Divider(height: screenHeight * 0.03, color: AppColors.border),
+            _buildDetailRow(
+              context,
+              'To:',
+              currentRequest.toDate != null
+                  ? dateFormat.format(currentRequest.toDate!)
+                  : dateFormat.format(currentRequest.fromDate),
+              screenWidth,
+              screenHeight,
+            ),
+          ],
           Divider(height: screenHeight * 0.03, color: AppColors.border),
           _buildDetailRow(
             context,
@@ -1009,9 +1020,12 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
       isDismissible: true,
       builder:
           (context) => DraggableScrollableSheet(
-            initialChildSize: 0.5, // Start at half screen
-            minChildSize: 0.3, // Minimum 30% of screen
-            maxChildSize: 0.9, // Maximum 90% of screen (can be dragged up)
+            initialChildSize: 0.5,
+            // Start at half screen
+            minChildSize: 0.3,
+            // Minimum 30% of screen
+            maxChildSize: 0.9,
+            // Maximum 90% of screen (can be dragged up)
             expand: false,
             builder:
                 (context, scrollController) => Container(

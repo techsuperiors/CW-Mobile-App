@@ -14,6 +14,7 @@ class AppStrings {
   static const String save = 'Save';
   static const String delete = 'Delete';
   static const String edit = 'Edit';
+  static const String report = 'Report';
   static const String add = 'Add';
   static const String search = 'Search';
   static const String filter = 'Filter';
@@ -21,6 +22,17 @@ class AppStrings {
   static const String retry = 'Retry';
   static const String comingSoon = 'Coming Soon';
   static const String back = 'Back';
+  static const String accountSyncWarning =
+      'We couldn\'t refresh your account. Some data may be outdated.';
+  static const String accountLoadFailedTitle = 'Unable to load your account';
+  static const String accountLoadFailedDescription =
+      'Check your internet connection and try again. If the problem continues, sign out and log back in.';
+  static const String bookmarks = 'Bookmarked Posts';
+  static const String postPreview = 'Post Preview';
+  static const String imagePreview = 'Image Preview';
+  static const String unableToLoadVideo = 'Unable to load video preview.';
+  static const String appNamePart1 = 'Collectiv';
+  static const String appNamePart2 = 'Work';
 
   // Authentication
   static const String login = 'Login';
@@ -94,6 +106,16 @@ class AppStrings {
   static const String passwordChangeSuccessMessage =
       'You have successfully change password. Please use the new password when Sign in.';
   static const String changePassword = 'Change Password';
+  static const String likedPosts = 'Liked Posts';
+  static const String repostedPosts = 'Reposted Posts';
+  static const String actions = 'Actions';
+  static const String reportedPosts = 'Reported Posts';
+  static const String reportPost = 'Report Post';
+  static const String reportPostSubtitle =
+      'Kindly specify the reason for reporting this post';
+  static const String reportPostQuestion = 'Why are you reporting this post?';
+  static const String pendingApproval = 'Pending Approval';
+  static const String searchPosts = 'Search posts';
   static const String currentPassword = 'Current Password';
   static const String enterCurrentPassword = 'Enter current password';
   static const String pleaseEnterCurrentPassword =
@@ -254,5 +276,15 @@ class AppStrings {
 
   //Expense Module
   static const String requestedby = 'Requested By';
+
+  //Drawer
+  static const String designation = 'Designation';
+  static const String employeeId = 'Employee Id';
+  static const String phoneNo = 'Phone No';
+  static const String gender = 'Gender';
+  static const String location = 'Location';
+
+  //Posts
+  static const String selectAudience = 'Select Audience';
 
 }

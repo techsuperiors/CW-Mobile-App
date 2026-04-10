@@ -3,8 +3,10 @@ import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../core/utils/token_storage.dart';
 import '../../domain/entities/user_profile.dart';
 import '../../domain/repositories/user_profile_repository.dart';
+import '../datasources/user_profile_local_datasource.dart';
 import '../datasources/user_profile_remote_datasource.dart';
 import '../models/user_profile_model.dart'
     hide
@@ -19,10 +21,12 @@ import '../models/user_profile_model.dart'
 /// User Profile repository implementation
 class UserProfileRepositoryImpl implements UserProfileRepository {
   final UserProfileRemoteDataSource remoteDataSource;
+  final UserProfileLocalDataSource localDataSource;
   final NetworkInfo networkInfo;
 
   UserProfileRepositoryImpl({
     required this.remoteDataSource,
+    required this.localDataSource,
     required this.networkInfo,
   });
 
@@ -34,14 +38,31 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
         final allowAllUsers = await remoteDataSource.getAllowAllUsers(
           userId: profileModel.userId,
         );
+        final enrichedProfileModel = profileModel.copyWith(
+          allowAllUsers: allowAllUsers,
+        );
+        final token = TokenStorage.getToken();
+
+        if (token != null && token.isNotEmpty) {
+          try {
+            await localDataSource.cacheUserProfile(
+              profile: enrichedProfileModel,
+              sessionToken: token,
+            );
+          } on CacheException {
+            // Profile fetch should still succeed even if local caching fails.
+          }
+        }
 
         // Convert model to entity
         final profile = _mapModelToEntity(
-          profileModel,
+          enrichedProfileModel,
           allowAllUsers: allowAllUsers,
         );
 
         return Right(profile);
+      } on AuthException catch (e) {
+        return Left(AuthFailure(e.message));
       } on ServerException catch (e) {
         return Left(ServerFailure(e.message));
       } catch (e) {
@@ -49,6 +70,46 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
       }
     } else {
       return Left(const NetworkFailure(AppStrings.noInternetConnection));
+    }
+  }
+
+  @override
+  Future<Either<Failure, UserProfile?>> getCachedUserProfile() async {
+    try {
+      final token = TokenStorage.getToken();
+      if (token == null || token.isEmpty) {
+        return const Right(null);
+      }
+
+      final cachedModel = await localDataSource.getCachedUserProfile(
+        sessionToken: token,
+      );
+      if (cachedModel == null) {
+        return const Right(null);
+      }
+
+      return Right(
+        _mapModelToEntity(
+          cachedModel,
+          allowAllUsers: cachedModel.allowAllUsers,
+        ),
+      );
+    } on CacheException catch (e) {
+      return Left(CacheFailure(e.message));
+    } catch (_) {
+      return const Left(CacheFailure(AppStrings.failedToGetCachedUser));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> clearCachedUserProfile() async {
+    try {
+      await localDataSource.clearCachedUserProfile();
+      return const Right(null);
+    } on CacheException catch (e) {
+      return Left(CacheFailure(e.message));
+    } catch (_) {
+      return const Left(CacheFailure(AppStrings.failedToClearCache));
     }
   }
 

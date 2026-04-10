@@ -68,6 +68,8 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
       shortCode: event.shortCode,
       requestTo: event.requestTo,
       rHDates: event.rHDates,
+      leaveStartTime: event.leaveStartTime,
+      leaveEndTime: event.leaveEndTime,
       attachmentFiles: event.attachmentFiles,
     );
 

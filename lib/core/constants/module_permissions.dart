@@ -1,6 +1,12 @@
 class ModulePermissions {
   ModulePermissions._();
 
+  static const postRead = ['Home:Post:Read'];
+
+  static const postWrite = ['Home:Post:Write'];
+
+  static const postAdmin = ['Admin Settings:Post:Admin'];
+
   static const leaveRequest = [
     'Leave Management:My Leaves:Read',
     'Leave Management:My Leaves:Write',
@@ -66,6 +72,13 @@ class ModulePermissions {
     'Expense Management:Reimbursements:Approvals:Write',
   ];
 
+  static const expenseService = [
+    'Expense Management:Reimbursements:Reimbursement:Read',
+    'Expense Management:Reimbursements:Reimbursement:Write',
+    'Expense Management:Reimbursements:Approvals:Read',
+    'Expense Management:Reimbursements:Approvals:Write',
+  ];
+
   static const anyApprovalAccess = [
     ...leaveApproval,
     ...wfhApproval,
@@ -73,6 +86,5 @@ class ModulePermissions {
     ...onDutyApproval,
     ...overtimeApproval,
     ...compOffApproval,
-    ...expenseApproval,
   ];
 }

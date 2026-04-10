@@ -26,12 +26,12 @@ class ApplyRegularizeBloc
 
     final result = await applyRegularizeUseCase(
       requestDate: event.requestDate,
-      requestTo: event.requestTo,
       requestFor: event.requestFor,
       modeType: event.modeType,
       checkIn: event.checkIn,
       checkOut: event.checkOut,
       reason: event.reason,
+      otherReason: event.otherReason,
       description: event.description,
       userId: event.userId,
       isOther: event.isOther,

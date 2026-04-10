@@ -8,6 +8,12 @@ abstract class CompOffDetailState extends Equatable {
   List<Object?> get props => [];
 }
 
+enum CompOffDetailSuccessAction {
+  commentAdded,
+  fileUploaded,
+  statusUpdated,
+}
+
 class CompOffDetailInitial extends CompOffDetailState {
   const CompOffDetailInitial();
 }
@@ -45,9 +51,19 @@ class CompOffDetailStatusUpdating extends CompOffDetailState {
 
 class CompOffDetailStatus extends CompOffDetailState {
   final String message;
-  const CompOffDetailStatus(this.message);
+  final CompOffDetailSuccessAction action;
+  final CompOffDetail? detail;
+  final List<AttendanceRequestComment> comments;
+
+  const CompOffDetailStatus(
+    this.message, {
+    required this.action,
+    this.detail,
+    this.comments = const [],
+  });
+
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [message, action, detail, comments];
 }
 
 class CompOffDetailError extends CompOffDetailState {

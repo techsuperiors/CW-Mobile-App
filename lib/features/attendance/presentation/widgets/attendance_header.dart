@@ -11,6 +11,8 @@ import '../../../notification/presentation/bloc/notification_bloc.dart';
 import '../../../notification/presentation/bloc/notification_state.dart';
 import '../../../notification/presentation/bloc/notification_event.dart';
 import '../../../notification/presentation/pages/notifications_page.dart';
+import '../../../user/presentation/bloc/user_profile_bloc.dart';
+import '../../../user/presentation/bloc/user_profile_state.dart';
 
 /// Attendance page header with profile and user info
 class AttendanceHeader extends StatelessWidget {
@@ -27,6 +29,15 @@ class AttendanceHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sharedProfile = context.select<UserProfileBloc, UserProfile?>((bloc) {
+      final state = bloc.state;
+      if (state is UserProfileLoaded) {
+        return state.profile;
+      }
+      return bloc.lastKnownProfile;
+    });
+    final resolvedProfile = userProfile ?? sharedProfile;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
@@ -36,8 +47,12 @@ class AttendanceHeader extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [AppColors.attendanceTeal, AppColors.attendancedarkbottom],
-            stops: [0.55, 1.2], // 26.77% and 100%
+            colors: [
+              AppColors.attendanceTeal, // 0xFF0B7F7F
+              Color(0xFF073F3F), // mid blend
+              AppColors.attendancedarkbottom, // 0xFF031e1e
+            ],
+            stops: [0.0, 0.85, 1.0],
           ),
           border: const Border(
             bottom: BorderSide(color: AppColors.attendanceBorderBlue, width: 1),
@@ -59,8 +74,10 @@ class AttendanceHeader extends StatelessWidget {
                 GestureDetector(
                   onTap: onAvatarTap,
                   child: AppAvatar(
-                    imageUrl: userProfile?.user.imageUrl,
-                    name: userProfile?.user.fullName,
+                    imageUrl: resolvedProfile?.user.imageUrl,
+                    name: resolvedProfile?.user.fullName,
+                    firstName: resolvedProfile?.user.firstName,
+                    lastName: resolvedProfile?.user.lastName,
                     radius: 28,
                     backgroundColor: AppColors.background,
                     icon: Icons.person,
@@ -76,7 +93,7 @@ class AttendanceHeader extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        userProfile?.user.fullName ?? 'User',
+                        resolvedProfile?.user.fullName ?? 'User',
                         style: AppTextStyles.heading3(
                           context,
                         ).copyWith(color: AppColors.textWhite, height: 1.2),
@@ -85,11 +102,11 @@ class AttendanceHeader extends StatelessWidget {
                         height: MediaQuery.of(context).size.height * 0.005,
                       ), // 0.5% of screen height
                       Text(
-                        userProfile?.userDesignation?.designationName ??
-                            userProfile?.user.employeeType ??
+                        resolvedProfile?.userDesignation?.designationName ??
+                            resolvedProfile?.user.employeeType ??
                             'Employee',
                         style: AppTextStyles.bodyMedium(context).copyWith(
-                          color: AppColors.textWhite.withOpacity(0.9),
+                          color: AppColors.textWhite.withValues(alpha: 0.9),
                           height: 1.2,
                         ),
                       ),
@@ -106,20 +123,26 @@ class AttendanceHeader extends StatelessWidget {
                     context.read<NotificationBloc>().add(
                       MarkNotificationsAsViewed(),
                     );
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder:
-                            (_) => BlocProvider.value(
-                              value: context.read<NotificationBloc>(),
-                              child: const NotificationsPage(),
-                            ),
-                      ),
-                    ).then((_) {
-                      if (context.mounted) {
-                        context.read<NotificationBloc>().add(ClearNotificationCountLocally());
-                        context.read<NotificationBloc>().add(FetchNotificationCount());
-                      }
-                    });
+                    Navigator.of(context)
+                        .push(
+                          MaterialPageRoute(
+                            builder:
+                                (_) => BlocProvider.value(
+                                  value: context.read<NotificationBloc>(),
+                                  child: const NotificationsPage(),
+                                ),
+                          ),
+                        )
+                        .then((_) {
+                          if (context.mounted) {
+                            context.read<NotificationBloc>().add(
+                              ClearNotificationCountLocally(),
+                            );
+                            context.read<NotificationBloc>().add(
+                              FetchNotificationCount(),
+                            );
+                          }
+                        });
                   },
                   child: Stack(
                     clipBehavior: Clip.none,

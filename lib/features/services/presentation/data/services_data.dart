@@ -1,6 +1,7 @@
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_assets.dart';
+import '../../../../core/constants/module_permissions.dart';
 import '../../domain/models/service_model.dart';
 
 /// Services data provider - can be replaced with API call
@@ -36,8 +37,8 @@ class ServicesData {
         iconColor: AppColors.serviceGreen,
         backgroundColor: AppColors.serviceGreenBg,
         anyOfPermissions: [
-        "Company Policies:My Policy:Read",
-        "Company Policies:Team Policy:Read"
+          "Company Policies:My Policy:Read",
+          "Company Policies:Team Policy:Read",
         ],
       ),
       ServiceModel(
@@ -65,10 +66,7 @@ class ServicesData {
         iconPath: AppAssets.iconExpenses,
         iconColor: AppColors.servicePinkDark,
         backgroundColor: AppColors.servicePinkDarkBg,
-        anyOfPermissions: [
-          'Expense Management:Trip:Read',
-          'Expense Management:Reimbursements:Reimbursement:Read',
-        ],
+        anyOfPermissions: ModulePermissions.expenseService,
       ),
       ServiceModel(
         id: '7',
@@ -86,9 +84,7 @@ class ServicesData {
         iconPath: AppAssets.iconDocument,
         iconColor: AppColors.serviceYellow,
         backgroundColor: AppColors.serviceYellowBg,
-        requiredPermission:
-          'Document Management:My Drive:Read',
-
+        requiredPermission: 'Document Management:My Drive:Read',
       ),
       ServiceModel(
         id: '9',
@@ -97,9 +93,7 @@ class ServicesData {
         iconPath: AppAssets.iconAssets,
         iconColor: AppColors.servicePurple,
         backgroundColor: AppColors.servicePurpleBg,
-        anyOfPermissions: [
-          'Asset Management:Assigned Asset:Read',
-        ],
+        anyOfPermissions: ['Asset Management:Assigned Asset:Read'],
       ),
       ServiceModel(
         id: '10',

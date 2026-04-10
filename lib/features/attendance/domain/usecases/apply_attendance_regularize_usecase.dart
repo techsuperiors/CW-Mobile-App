@@ -11,12 +11,12 @@ class ApplyAttendanceRegularizeUseCase {
 
   Future<Either<Failure, AttendanceRegularizeResult>> call({
     required String requestDate,
-    required int requestTo,
     required String requestFor,
     required String modeType,
     required String checkIn,
     required String checkOut,
     required String reason,
+    String? otherReason,
     required String description,
     required int userId,
     required bool isOther,
@@ -24,12 +24,12 @@ class ApplyAttendanceRegularizeUseCase {
   }) {
     return repository.applyRegularize(
       requestDate: requestDate,
-      requestTo: requestTo,
       requestFor: requestFor,
       modeType: modeType,
       checkIn: checkIn,
       checkOut: checkOut,
       reason: reason,
+      otherReason: otherReason,
       description: description,
       userId: userId,
       isOther: isOther,

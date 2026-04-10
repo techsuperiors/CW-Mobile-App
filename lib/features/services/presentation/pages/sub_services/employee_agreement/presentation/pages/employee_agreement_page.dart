@@ -28,8 +28,13 @@ import '../../domain/models/employee_agreement_model.dart';
 /// Employee Agreement page showing list of agreements
 class EmployeeAgreementPage extends StatefulWidget {
   final int? serviceId;
+  final bool showDocumentsOnly;
 
-  const EmployeeAgreementPage({super.key, this.serviceId});
+  const EmployeeAgreementPage({
+    super.key,
+    this.serviceId,
+    this.showDocumentsOnly = false,
+  });
 
   @override
   State<EmployeeAgreementPage> createState() => _EmployeeAgreementPageState();
@@ -228,6 +233,7 @@ class _EmployeeAgreementPageState extends State<EmployeeAgreementPage> {
                         padding: EdgeInsets.only(bottom: spacing),
                         child: EmployeeAgreementCard(
                           agreement: agreements[index],
+                          showDocumentsOnly: widget.showDocumentsOnly,
                         ),
                       );
                     },

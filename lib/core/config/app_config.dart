@@ -10,6 +10,7 @@ class AppConfig {
     defaultValue: 'production',
   );
 
+
   static bool get isDevelopment => environment == 'development';
   static bool get isProduction => environment == 'production';
 

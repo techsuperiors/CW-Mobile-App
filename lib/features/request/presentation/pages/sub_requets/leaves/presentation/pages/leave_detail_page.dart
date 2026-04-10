@@ -47,7 +47,11 @@ class LeaveDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
+      AppNavigator.pushAndRemoveAll(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    },);
 
     return BlocProvider(
       create:
@@ -265,7 +269,10 @@ class _LeaveDetailView extends StatelessWidget {
       ),
       bottomNavigationBar:
           isApprovalMode
-              ? null
+              ? BottomNavBar(
+            currentIndex: 4,
+            onTap: NavigationHelper.getBottomNavHandler(context),
+          )
               : BottomNavBar(
                 currentIndex: 3,
                 onTap: NavigationHelper.getBottomNavHandler(context),
@@ -573,9 +580,34 @@ class _DetailsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd/MM/yyyy');
+    final dateFormat = DateFormat('dd-MMM-yyyy');
     final statusColor = _statusColor(detail.status);
     final appliedOn = detail.createdAt ?? detail.requestDate;
+    final normalizedDayType = detail.dayType.toLowerCase();
+    final isSingleDayRequest = normalizedDayType == 'single';
+    final isHalfDayRequest = normalizedDayType == 'half';
+    final isShortLeaveRequest = normalizedDayType == 'short';
+    final isMultipleDaysRequest = normalizedDayType == 'multiple';
+    final requestTypeLabel =
+        isHalfDayRequest
+            ? 'Half Day'
+            : isShortLeaveRequest
+            ? 'Short Leave'
+            : isMultipleDaysRequest
+            ? 'Multiple Days'
+            : 'Single Day';
+    final onValue =
+        isHalfDayRequest
+            ? '${dateFormat.format(detail.startDate)} (${LeaveDetailModel.halfLabel(detail.startHalf)})'
+            : dateFormat.format(detail.startDate);
+    final fromValue =
+        '${dateFormat.format(detail.startDate)}${detail.startHalf != null && detail.startHalf!.isNotEmpty ? '  (${LeaveDetailModel.halfLabel(detail.startHalf)})' : ''}';
+    final toValue =
+        '${dateFormat.format(detail.endDate)}${detail.endHalf != null && detail.endHalf!.isNotEmpty ? '  (${LeaveDetailModel.halfLabel(detail.endHalf)})' : ''}';
+    final shortLeaveTimeRange = _formatShortLeaveTimeRange(
+      detail.leaveStartTime,
+      detail.leaveEndTime,
+    );
 
     return _Card(
       sw: sw,
@@ -594,7 +626,7 @@ class _DetailsCard extends StatelessWidget {
           _Div(sh: sh),
           _Row(
             label: 'Request Type:',
-            value: detail.dayType == 'single' ? 'Single Day' : 'Multiple Days',
+            value: requestTypeLabel,
             sw: sw,
             sh: sh,
           ),
@@ -624,24 +656,37 @@ class _DetailsCard extends StatelessWidget {
           ),
           _Div(sh: sh),
           _Row(
-            label: 'From:',
-            value:
-                '${dateFormat.format(detail.startDate)}  (${LeaveDetailModel.halfLabel(detail.startHalf)})',
+            label: (isSingleDayRequest || isHalfDayRequest || isShortLeaveRequest)
+                ? 'On:'
+                : 'From:',
+            value: (isSingleDayRequest || isHalfDayRequest || isShortLeaveRequest)
+                ? onValue
+                : fromValue,
             sw: sw,
             sh: sh,
           ),
-          _Div(sh: sh),
-          _Row(
-            label: 'To:',
-            value:
-                '${dateFormat.format(detail.endDate)}  (${LeaveDetailModel.halfLabel(detail.endHalf)})',
-            sw: sw,
-            sh: sh,
-          ),
+          if (isMultipleDaysRequest) ...[
+            _Div(sh: sh),
+            _Row(
+              label: 'To:',
+              value: toValue,
+              sw: sw,
+              sh: sh,
+            ),
+          ],
+          if (isShortLeaveRequest && shortLeaveTimeRange != null) ...[
+            _Div(sh: sh),
+            _Row(
+              label: 'Time:',
+              value: shortLeaveTimeRange,
+              sw: sw,
+              sh: sh,
+            ),
+          ],
           _Div(sh: sh),
           _Row(
             label: 'Applied On:',
-            value: DateFormat('dd/MM/yyyy hh:mm a').format(appliedOn),
+            value: DateFormat('dd-MMM-yyyy hh:mm a').format(appliedOn),
             sw: sw,
             sh: sh,
           ),
@@ -683,6 +728,33 @@ class _DetailsCard extends StatelessWidget {
       default:
         return  AppColors.approvalSheetPending;
     }
+  }
+
+  String? _formatShortLeaveTimeRange(String? startTime, String? endTime) {
+    final formattedStart = _formatApiTime(startTime);
+    final formattedEnd = _formatApiTime(endTime);
+    if (formattedStart == null || formattedEnd == null) {
+      return null;
+    }
+    return '$formattedStart - $formattedEnd';
+  }
+
+  String? _formatApiTime(String? rawTime) {
+    if (rawTime == null || rawTime.trim().isEmpty) {
+      return null;
+    }
+
+    final normalized = rawTime.trim();
+    final patterns = <String>['HH:mm:ss', 'HH:mm'];
+    for (final pattern in patterns) {
+      try {
+        final parsed = DateFormat(pattern).parseStrict(normalized);
+        return DateFormat('hh:mm a').format(parsed);
+      } catch (_) {
+        continue;
+      }
+    }
+    return normalized;
   }
 }
 

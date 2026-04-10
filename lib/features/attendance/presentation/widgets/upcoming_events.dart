@@ -294,14 +294,47 @@ class UpcomingEvents extends StatelessWidget {
   }
 
   Widget _buildInitialsAvatar(UpcomingEventWidget event, double size) {
-    return Center(
-      child: Icon(Icons.person, color: AppColors.iconprofilecolor, size: 36),
-      // SvgPicture.asset(
-      //   AppAssets.profileavatar,
-      //   width: size * 0.133,
-      //   height: size * 0.133,
-      //   fit: BoxFit.contain,
-      // ),
+    final initials = _getInitials(event.personName);
+
+    return Container(
+      color: _parseProfileColor(event.profileColor),
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style:
+        TextStyle(
+          color: AppColors.background,
+          fontWeight: FontWeight.w600,
+          fontSize: size * 0.05,
+        ),
+      ),
     );
+  }
+
+  String _getInitials(String name) {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) return 'U';
+
+    final parts =
+        trimmedName
+            .split(RegExp(r'\s+'))
+            .where((part) => part.isNotEmpty)
+            .toList();
+
+    if (parts.isEmpty) return 'U';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  Color _parseProfileColor(String? colorValue) {
+    final fallback = AppColors.iconprofilecolor;
+    if (colorValue == null || colorValue.trim().isEmpty) return fallback;
+
+    final normalized = colorValue.trim().replaceFirst('#', '');
+    if (normalized.length != 6) return fallback;
+
+    final hex = int.tryParse('FF$normalized', radix: 16);
+    if (hex == null) return fallback;
+    return Color(hex);
   }
 }

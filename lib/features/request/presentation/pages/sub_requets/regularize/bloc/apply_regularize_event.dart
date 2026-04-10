@@ -11,12 +11,12 @@ abstract class ApplyRegularizeEvent extends Equatable {
 /// Apply regularize request event
 class ApplyRegularize extends ApplyRegularizeEvent {
   final String requestDate;
-  final int requestTo;
   final String requestFor; // 'Punch-In', 'Punch-Out', 'both'
   final String modeType; // 'Remote', 'Office', etc.
   final String checkIn; // Format: 'yyyy-MM-dd HH:mm:ss+05:30'
   final String checkOut; // Format: 'yyyy-MM-dd HH:mm:ss+05:30'
   final String reason;
+  final String? otherReason;
   final String description;
   final int userId;
   final bool isOther;
@@ -24,12 +24,12 @@ class ApplyRegularize extends ApplyRegularizeEvent {
 
   const ApplyRegularize({
     required this.requestDate,
-    required this.requestTo,
     required this.requestFor,
     required this.modeType,
     required this.checkIn,
     required this.checkOut,
     required this.reason,
+    this.otherReason,
     required this.description,
     required this.userId,
     required this.isOther,
@@ -39,12 +39,12 @@ class ApplyRegularize extends ApplyRegularizeEvent {
   @override
   List<Object> get props => [
         requestDate,
-        requestTo,
         requestFor,
         modeType,
         checkIn,
         checkOut,
         reason,
+        otherReason ?? '',
         description,
         userId,
         isOther,

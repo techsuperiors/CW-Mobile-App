@@ -37,7 +37,8 @@ class PunchDetails extends StatelessWidget {
                 child:  Center(child: _buildPunchGridSkeleton(context)),
               )
               : errorMessage != null
-              ? SizedBox(
+              ?
+          SizedBox(
                 height: screenHeight * 0.15,
                 child: Center(
                   child: Column(

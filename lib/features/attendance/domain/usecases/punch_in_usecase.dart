@@ -14,13 +14,14 @@ class PunchInUseCase {
     required double latitude,
     required double longitude,
     required String punchType,
+    bool needsAddressResolution = false,
   }) {
     return repository.punchIn(
       punchInLocation: punchInLocation,
       latitude: latitude,
       longitude: longitude,
       punchType: punchType,
+      needsAddressResolution: needsAddressResolution,
     );
   }
 }
-

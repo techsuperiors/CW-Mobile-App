@@ -9,11 +9,17 @@ import '../../../../core/error/exceptions.dart';
 import '../../../../core/utils/data_encoder.dart';
 import '../models/leave_type_model.dart';
 import '../models/leave_apply_model.dart';
+import '../models/leave_policy_model.dart';
 import 'package:dio/dio.dart';
 
 /// Leave Types remote data source interface
 abstract class LeaveTypesRemoteDataSource {
   Future<LeaveTypesResponseModel> getLeaveTypes(int userId);
+  Future<List<LeavePolicyModel>> getLeavePolicies(int userId);
+  Future<WorkingHoursModel> getWorkingHours({
+    required int userId,
+    required String date,
+  });
   Future<LeaveApplyResponse> applyLeave(LeaveApplyRequest request);
   Future<LeaveApplyResponse> updateLeave(UpdateLeaveRequest request);
   Future<LeaveFileUploadResponse> uploadLeaveFiles({
@@ -61,6 +67,80 @@ class LeaveTypesRemoteDataSourceImpl implements LeaveTypesRemoteDataSource {
     } catch (e) {
       if (e is ServerException) rethrow;
       throw ServerException('Failed to get leave types: ${e.toString()}');
+    }
+  }
+
+  @override
+  Future<List<LeavePolicyModel>> getLeavePolicies(int userId) async {
+    developer.log(
+      'Loading leave policy for user_id=$userId',
+      name: 'LeavePolicyAPI',
+    );
+    try {
+      final payload = {'user_id': userId};
+      final encodedPayload = encodeData(payload);
+      final url = '${AppUrls.leaveUserPolicy}?payload=$encodedPayload';
+
+      final response = await apiClient.get(
+        url,
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      final responseMap = response.data as Map<String, dynamic>;
+      if (responseMap['success'] != true) {
+        throw ServerException(
+          responseMap['message']?.toString() ?? 'Failed to get leave policy',
+        );
+      }
+
+      final data = responseMap['data'] as Map<String, dynamic>? ?? const {};
+      final leaveConfig = data['leave_config'] as List<dynamic>? ?? const [];
+      return leaveConfig
+          .whereType<Map<String, dynamic>>()
+          .map(LeavePolicyModel.fromJson)
+          .where((policy) => policy.leaveTypeName.trim().isNotEmpty)
+          .toList();
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException('Failed to get leave policy: ${e.toString()}');
+    }
+  }
+
+  @override
+  Future<WorkingHoursModel> getWorkingHours({
+    required int userId,
+    required String date,
+  }) async {
+    developer.log(
+      'Loading working hours for user_id=$userId date=$date',
+      name: 'LeaveWorkingHoursAPI',
+    );
+    try {
+      final payload = {'user_id': userId, 'date': date};
+      final encodedPayload = encodeData(payload);
+      final url = '${AppUrls.attendanceUserWorkingHours}?payload=$encodedPayload';
+
+      final response = await apiClient.get(
+        url,
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      final responseMap = response.data as Map<String, dynamic>;
+      if (responseMap['success'] != true) {
+        throw ServerException(
+          responseMap['message']?.toString() ??
+              'Failed to get working hours',
+        );
+      }
+
+      return WorkingHoursModel.fromJson(responseMap);
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException('Failed to get working hours: ${e.toString()}');
     }
   }
 

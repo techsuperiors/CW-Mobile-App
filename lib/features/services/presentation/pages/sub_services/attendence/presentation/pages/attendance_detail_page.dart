@@ -7,10 +7,12 @@ import 'dart:developer' as developer;
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/utils/app_navigator.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../authentication/presentation/pages/login_page.dart';
 import '../../../../../../../calendar/domain/entities/calendar_day_entity.dart';
 import '../../../../../../../calendar/presentation/bloc/calendar_bloc.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
@@ -73,7 +75,11 @@ class _AttendanceDetailPageState extends State<AttendanceDetailPage> {
     try {
       final networkInfo = NetworkInfoImpl(Connectivity());
       final dio = Dio();
-      final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+      final apiClient = ApiClient(dio: dio, networkInfo: networkInfo,onTokenExpired: () {
+        AppNavigator.pushAndRemoveAll(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      },);
       final remoteDataSource = AttendanceDetailsRemoteDataSourceImpl(apiClient);
       final repository = AttendanceDetailsRepositoryImpl(
         remoteDataSource: remoteDataSource,
@@ -190,7 +196,11 @@ class _AttendanceDetailPageState extends State<AttendanceDetailPage> {
   _buildAttendanceDayDetailUseCase() async {
     final networkInfo = NetworkInfoImpl(Connectivity());
     final dio = Dio();
-    final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+    final apiClient = ApiClient(dio: dio, networkInfo: networkInfo,onTokenExpired: () {
+      AppNavigator.pushAndRemoveAll(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    },);
     final remoteDataSource = AttendanceDetailsRemoteDataSourceImpl(apiClient);
     final repository = AttendanceDetailsRepositoryImpl(
       remoteDataSource: remoteDataSource,

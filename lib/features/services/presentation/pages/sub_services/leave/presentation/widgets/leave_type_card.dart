@@ -15,6 +15,8 @@ import 'package:collectivWork/features/request/presentation/pages/sub_requets/le
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/leaves/presentation/bloc/leave_history/leave_history_bloc.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/leaves/presentation/bloc/leave_history/leave_history_event.dart';
 import 'package:collectivWork/features/request/presentation/pages/sub_requets/leaves/presentation/pages/leave_history_page.dart';
+import '../../../../../../../../core/utils/app_navigator.dart';
+import '../../../../../../../authentication/presentation/pages/login_page.dart';
 import 'donut_chart_widget.dart';
 
 /// Card widget for displaying leave type information with donut chart
@@ -140,6 +142,11 @@ class LeaveTypeCard extends StatelessWidget {
         final apiClient = ApiClient(
           dio: Dio(),
           networkInfo: networkInfo,
+          onTokenExpired: () {
+            AppNavigator.pushAndRemoveAll(
+              MaterialPageRoute(builder: (_) => const LoginPage()),
+            );
+          },
         );
         final remoteDataSource = LeavesRemoteDataSourceImpl(
           apiClient: apiClient,

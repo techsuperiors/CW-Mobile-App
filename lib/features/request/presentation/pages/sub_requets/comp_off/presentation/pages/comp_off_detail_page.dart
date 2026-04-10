@@ -10,12 +10,14 @@ import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../../core/utils/app_navigator.dart';
 import '../../../../../../../../core/utils/error_message_mapper.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../approval/presentation/widgets/approval_action_bar.dart';
 import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
+import '../../../../../../../authentication/presentation/pages/login_page.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../bloc/comp_off_detail_bloc.dart';
 import '../../bloc/comp_off_detail_event.dart';
@@ -55,7 +57,15 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
   void initState() {
     super.initState();
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final apiClient = ApiClient(
+      dio: Dio(),
+      networkInfo: networkInfo,
+      onTokenExpired: () {
+        AppNavigator.pushAndRemoveAll(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      },
+    );
     final remote = CompOffRemoteDataSourceImpl(apiClient: apiClient);
     final repo = CompOffRepositoryImpl(remoteDataSource: remote);
     _bloc = CompOffDetailBloc(
@@ -78,10 +88,13 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
 
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          return;
+        }
         Navigator.of(context).pop(_shouldRefresh);
-        return false; // important
       },
       child: BlocProvider.value(
         value: _bloc,
@@ -96,14 +109,17 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
           },
           listener: (context, state) {
             if (state is CompOffDetailStatus) {
-              _shouldRefresh = true;
+              _shouldRefresh =
+                  state.action != CompOffDetailSuccessAction.commentAdded;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.message),
                   backgroundColor: AppColors.success,
                 ),
               );
-              if (widget.isApprovalMode && Navigator.of(context).canPop()) {
+              if (widget.isApprovalMode &&
+                  state.action == CompOffDetailSuccessAction.statusUpdated &&
+                  Navigator.of(context).canPop()) {
                 Navigator.of(context).pop(true);
               }
             } else if (state is CompOffDetailError) {
@@ -172,7 +188,12 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
                   ),
                   bottomNavigationBar:
                       widget.isApprovalMode
-                          ? null
+                          ? BottomNavBar(
+                            currentIndex: 4,
+                            onTap: NavigationHelper.getBottomNavHandler(
+                              context,
+                            ),
+                          )
                           : BottomNavBar(
                             currentIndex: 3,
                             onTap: NavigationHelper.getBottomNavHandler(
@@ -256,11 +277,8 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
   ) {
     final title = detail?.subject ?? widget.request.subject;
     final requestBy = detail?.requestByName;
-    final requestTo = detail?.requestToName;
     final requestByImg = detail?.requestByImage;
-    final requestToImg = detail?.requestToImage;
     final requestByColor = detail?.requestByColor;
-    final requestToColor = detail?.requestToColor;
     final requestId = int.tryParse(widget.request.id) ?? 0;
     final isPending = status == CompOffStatus.pending;
     final menuActions = <Map<String, String>>[
@@ -276,7 +294,7 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -386,7 +404,7 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
           const SizedBox(height: 14),
           _userRow(
             context,
-            'Request By',
+            'Requested By',
             requestBy,
             requestByImg,
             requestByColor,
@@ -395,7 +413,7 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
           _fieldRow(
             context,
             'Requested For',
-            DateFormat('dd-MM-yyyy').format(date),
+            DateFormat('dd-MMM-yyyy').format(date),
           ),
           _divider(),
           _fieldRow(
@@ -481,7 +499,9 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
         (name ?? 'U').trim().isNotEmpty ? (name ?? 'U').trim()[0] : 'U';
     final displayName =
         name?.trim().isNotEmpty == true ? name!.trim() : 'Not set';
-    final bgColor = Color(_parseColor(color ?? '#0dcaf0')).withOpacity(0.12);
+    final bgColor = Color(
+      _parseColor(color ?? '#0dcaf0'),
+    ).withValues(alpha: 0.12);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -645,7 +665,7 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border.withOpacity(0.6)),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -654,31 +674,7 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
           const SizedBox(height: 10),
           _buildCommentBox(context),
           const SizedBox(height: 12),
-
-          ...comments.map((c) => _commentTile(context, c)).toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _infoRow(BuildContext context, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              label,
-              style: AppTextStyles.bodySmall(
-                context,
-              ).copyWith(color: AppColors.textSecondary),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(value, style: AppTextStyles.bodyMedium(context)),
-          ),
+          ...comments.map((c) => _commentTile(context, c)),
         ],
       ),
     );
@@ -739,7 +735,7 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
             children: [
               CircleAvatar(
                 radius: screenWidth * 0.05,
-                backgroundColor: AppColors.primary.withOpacity(0.1),
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                 child: Text(
                   authorName.isNotEmpty ? authorName[0].toUpperCase() : 'U',
                   style: AppTextStyles.bodyMedium(context).copyWith(
@@ -779,6 +775,7 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
     if (state is CompOffDetailLoaded) return state.detail;
     if (state is CompOffDetailSubmitting) return state.detail;
     if (state is CompOffDetailStatusUpdating) return state.detail;
+    if (state is CompOffDetailStatus) return state.detail;
     if (state is CompOffDetailError) return state.detail;
     return null;
   }
@@ -787,6 +784,7 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
     if (state is CompOffDetailLoaded) return state.comments;
     if (state is CompOffDetailSubmitting) return state.comments;
     if (state is CompOffDetailStatusUpdating) return state.comments;
+    if (state is CompOffDetailStatus) return state.comments;
     if (state is CompOffDetailError) return state.comments;
     return const [];
   }

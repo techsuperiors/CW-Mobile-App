@@ -6,6 +6,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webcontent_converter/webcontent_converter.dart';
 
@@ -25,6 +26,9 @@ class PayslipPdfViewerPage extends StatefulWidget {
 }
 
 class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
+  static const MethodChannel _downloadsChannel = MethodChannel(
+    'collectivwork/downloads',
+  );
   bool _isDownloading = false;
   late final WebViewController _webViewController;
   bool _isPageLoading = true;
@@ -91,7 +95,7 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
 
       final fileName =
           'Payslip_${_sanitizeFileName(widget.payslip.displayName, '.pdf')}';
-      final directory = await _resolveDownloadDirectory();
+      final directory = await _resolveGenerationDirectory();
       await directory.create(recursive: true);
       final filePath = path.join(directory.path, fileName);
       final savedPath = await WebcontentConverter.contentToPDF(
@@ -106,6 +110,10 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
       final file = File(savedPath);
       if (!await file.exists()) {
         throw Exception('Downloaded file could not be found.');
+      }
+
+      if (Platform.isAndroid) {
+        await _saveToDownloads(file: file, fileName: fileName);
       }
 
       _showSnack(
@@ -131,45 +139,73 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
       return true;
     }
 
+    final androidInfo = await _androidSdkInt();
+    if (androidInfo != null && androidInfo >= 29) {
+      return true;
+    }
+
     final storageStatus = await Permission.storage.status;
     if (storageStatus.isGranted) {
       return true;
     }
 
     final storageResult = await Permission.storage.request();
-    if (storageResult.isGranted) {
-      return true;
-    }
-
-    final manageStatus = await Permission.manageExternalStorage.status;
-    if (manageStatus.isGranted) {
-      return true;
-    }
-
-    final manageResult = await Permission.manageExternalStorage.request();
-    return manageResult.isGranted;
+    return storageResult.isGranted;
   }
 
-  Future<Directory> _resolveDownloadDirectory() async {
+  Future<int?> _androidSdkInt() async {
+    if (!Platform.isAndroid) {
+      return null;
+    }
+
+    try {
+      final sdk = await _downloadsChannel.invokeMethod<int>('getAndroidSdkInt');
+      return sdk;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _saveToDownloads({
+    required File file,
+    required String fileName,
+  }) async {
+    final result = await _downloadsChannel.invokeMethod<Map<dynamic, dynamic>>(
+      'saveFileToDownloads',
+      <String, dynamic>{
+        'sourcePath': file.path,
+        'fileName': fileName,
+        'mimeType': 'application/pdf',
+        'subdirectory': 'Payslips',
+      },
+    );
+
+    if (result == null) {
+      throw Exception('Could not save payslip to Downloads.');
+    }
+
+    final isSuccess = result['success'] == true;
+    if (!isSuccess) {
+      throw Exception(
+        (result['error'] as String?) ?? 'Could not save payslip to Downloads.',
+      );
+    }
+  }
+
+  Future<Directory> _resolveGenerationDirectory() async {
     if (Platform.isIOS) {
       final documentsDirectory = await getApplicationDocumentsDirectory();
       return Directory(path.join(documentsDirectory.path, 'Payslips'));
     }
 
-    final publicDownloadDir = Directory('/storage/emulated/0/Download');
-    if (await publicDownloadDir.exists()) {
-      return publicDownloadDir;
+    final externalDirectory = await getExternalStorageDirectory();
+    if (externalDirectory != null) {
+      return Directory(path.join(externalDirectory.path, 'Payslips'));
     }
 
-    final scopedDownloadDirs = await getExternalStorageDirectories(
-      type: StorageDirectory.downloads,
+    return Directory(
+      path.join((await getApplicationDocumentsDirectory()).path, 'Payslips'),
     );
-    if (scopedDownloadDirs != null && scopedDownloadDirs.isNotEmpty) {
-      return scopedDownloadDirs.first;
-    }
-
-    return (await getExternalStorageDirectory()) ??
-        await getApplicationDocumentsDirectory();
   }
 
   String _sanitizeFileName(String rawName, String extension) {
@@ -391,7 +427,7 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
 
         title: Text(
           widget.payslip.displayName,
-          style: AppTextStyles.bodyLarge(
+          style: AppTextStyles.heading4(
             context,
           ).copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
           overflow: TextOverflow.ellipsis,

@@ -31,6 +31,7 @@ class BottomNavBar extends StatelessWidget {
             state is UserProfileLoaded
                 ? (state.profile.role?.permissions ?? const <String>[])
                 : const <String>[];
+        final showPosts = ModulePermissions.postRead.any(permissions.contains);
         final showApproval = ModulePermissions.anyApprovalAccess.any(
           permissions.contains,
         );
@@ -43,7 +44,7 @@ class BottomNavBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 20,
                   offset: const Offset(0, -4),
                 ),
@@ -62,14 +63,15 @@ class BottomNavBar extends StatelessWidget {
                     activeColor: activeColor,
                     inactiveColor: inactiveColor,
                   ),
-                  // _buildNavItem(
-                  //   index: 1,
-                  //   icon: AppAssets.iconPosts,
-                  //   isSvgIcon: true,
-                  //   label: AppStrings.posts,
-                  //   activeColor: activeColor,
-                  //   inactiveColor: inactiveColor,
-                  // ),
+                  if (showPosts)
+                    _buildNavItem(
+                      index: 1,
+                      icon: AppAssets.iconPosts,
+                      isSvgIcon: true,
+                      label: AppStrings.posts,
+                      activeColor: activeColor,
+                      inactiveColor: inactiveColor,
+                    ),
                   _buildNavItem(
                     index: 2,
                     icon: AppAssets.iconHome,
@@ -114,7 +116,7 @@ class BottomNavBar extends StatelessWidget {
   }) {
     final isSelected = currentIndex == index;
     final itemColor = isSelected ? activeColor : inactiveColor;
-    
+
     return Expanded(
       child: GestureDetector(
         onTap: () => onTap(index),
@@ -129,17 +131,10 @@ class BottomNavBar extends StatelessWidget {
                 icon as String,
                 width: 22,
                 height: 22,
-                colorFilter: ColorFilter.mode(
-                  itemColor,
-                  BlendMode.srcIn,
-                ),
+                colorFilter: ColorFilter.mode(itemColor, BlendMode.srcIn),
               )
             else
-              Icon(
-                icon as IconData,
-                size: 22,
-                color: itemColor,
-              ),
+              Icon(icon as IconData, size: 22, color: itemColor),
             const SizedBox(height: 6),
             // Label
             Text(

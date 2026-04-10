@@ -54,13 +54,15 @@ class ApplyLeave extends LeaveRequestEvent {
   final String endDate;
   final String subject;
   final String reason;
-  final String startHalf;
-  final String endHalf;
+  final String? startHalf;
+  final String? endHalf;
   final String dayType;
   final String description;
   final String shortCode;
   final int requestTo;
   final List<String> rHDates;
+  final String? leaveStartTime;
+  final String? leaveEndTime;
   final List<File> attachmentFiles; // Optional image attachments
 
   const ApplyLeave({
@@ -78,6 +80,8 @@ class ApplyLeave extends LeaveRequestEvent {
     required this.shortCode,
     required this.requestTo,
     required this.rHDates,
+    this.leaveStartTime,
+    this.leaveEndTime,
     this.attachmentFiles = const [],
   });
 
@@ -90,13 +94,15 @@ class ApplyLeave extends LeaveRequestEvent {
         endDate,
         subject,
         reason,
-        startHalf,
-        endHalf,
+        startHalf ?? '',
+        endHalf ?? '',
         dayType,
         description,
         shortCode,
         requestTo,
         rHDates,
+        leaveStartTime ?? '',
+        leaveEndTime ?? '',
       ];
 }
 

@@ -92,5 +92,14 @@ class AppAssets {
   //Gifs
   static const String swipeGif="assets/gifs/swipe_gif.gif";
 
+  //posts
+  static const String repostIcon="assets/icons/repost_icon.svg";
+  static const String alreadyrepostIcon="assets/icons/already_repost_icon.svg";
+  static const String unlikeIcon="assets/icons/like_icon.svg";
+  static const String likeIcon="assets/icons/liked_icon.svg";
+  static const String commentIcon="assets/icons/comment_icon.svg";
+  static const String bookmarksIcon="assets/icons/bookmarks_icon.svg";
+
+
 
 }

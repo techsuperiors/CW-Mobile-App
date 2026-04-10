@@ -1,3 +1,5 @@
+import 'package:collectivWork/core/constants/app_strings.dart';
+import 'package:collectivWork/core/constants/app_text_styles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -179,24 +181,32 @@ class _SplashPageState extends State<SplashPage>
                           text: TextSpan(
                             children: [
                               TextSpan(
-                                text: 'Collectiv\n',
-                                style: TextStyle(
+                                text: AppStrings.appNamePart1,
+                                style:AppTextStyles.heading1(context).copyWith(
                                   color: AppColors.textHeading,
-                                  fontSize: screenWidth * 0.082,
+                                  // fontSize: screenWidth * 0.082,
                                   fontWeight: FontWeight.w800,
                                   height: 0.96,
                                   letterSpacing: -0.8,
-                                ),
+                                )
+
                               ),
                               TextSpan(
-                                text: 'Work',
-                                style: TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: screenWidth * 0.082,
-                                  fontWeight: FontWeight.w800,
-                                  height: 0.96,
-                                  letterSpacing: -0.8,
-                                ),
+                                text: AppStrings.appNamePart2,
+                                  style:AppTextStyles.heading1(context).copyWith(
+                                    color: AppColors.primary,
+                                    // fontSize: screenWidth * 0.082,
+                                    fontWeight: FontWeight.w800,
+                                    height: 0.96,
+                                    letterSpacing: -0.8,
+                                  )
+                                // style: TextStyle(
+                                //   color: AppColors.primary,
+                                //   // fontSize: screenWidth * 0.082,
+                                //   fontWeight: FontWeight.w800,
+                                //   height: 0.96,
+                                //   letterSpacing: -0.8,
+                                // ),
                               ),
                             ],
                           ),

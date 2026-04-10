@@ -10,6 +10,7 @@ import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../../core/utils/app_navigator.dart';
 import '../../../../../../../../core/utils/data_encoder.dart';
 import '../../../../../../../../core/utils/error_message_mapper.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
@@ -18,6 +19,7 @@ import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../approval/presentation/widgets/approval_action_bar.dart';
 import '../../../../../../../attendance/domain/entities/attendance_request_comment.dart';
+import '../../../../../../../authentication/presentation/pages/login_page.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../../../../../../user/presentation/bloc/user_profile_bloc.dart';
 import '../../../../../../../user/presentation/bloc/user_profile_state.dart';
@@ -62,7 +64,11 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
   void initState() {
     super.initState();
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
+      AppNavigator.pushAndRemoveAll(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    },);
     final remoteDataSource = OvertimeRemoteDataSourceImpl(apiClient: apiClient);
     final repository = OvertimeRepositoryImpl(
       remoteDataSource: remoteDataSource,
@@ -187,7 +193,10 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
 
                 bottomNavigationBar:
                     widget.isApprovalMode
-                        ? null
+                        ? BottomNavBar(
+                      currentIndex: 4,
+                      onTap: NavigationHelper.getBottomNavHandler(context),
+                    )
                         : BottomNavBar(
                           currentIndex: 3,
                           onTap: NavigationHelper.getBottomNavHandler(context),

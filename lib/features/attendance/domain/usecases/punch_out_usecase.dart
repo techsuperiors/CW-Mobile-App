@@ -13,11 +13,13 @@ class PunchOutUseCase {
     required String punchOutLocation,
     required double latitude,
     required double longitude,
+    bool needsAddressResolution = false,
   }) {
     return repository.punchOut(
       punchOutLocation: punchOutLocation,
       latitude: latitude,
       longitude: longitude,
+      needsAddressResolution: needsAddressResolution,
     );
   }
 }

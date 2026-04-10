@@ -59,53 +59,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         debugPrint('Token retrieved successfully, length: ${token.length}');
       }
 
-      // Fetch user profile after successful login with auth token
-      // The token will be automatically added to the request header by ApiClient
-      if (getUserProfileUseCase != null && token != null && token.isNotEmpty) {
-        try {
-          debugPrint('Fetching user profile with auth token in header...');
-          final profileResult = await getUserProfileUseCase!();
-          profileResult.fold(
-            (failure) {
-              // Profile fetch failed, but login was successful
-              // Continue with login but log the error
-              debugPrint('Failed to fetch user profile: ${failure.message}');
-            },
-            (profile) {
-              // Profile fetched successfully
-              // Store the profile in UserProfileBloc
-              if (userProfileBloc != null) {
-                userProfileBloc!.add(SetUserProfile(profile));
-              }
-              debugPrint('User profile fetched successfully!');
-              debugPrint('Name: ${profile.user.fullName}');
-              debugPrint('Email: ${profile.user.email}');
-              debugPrint('Employee ID: ${profile.user.employeeID}');
-              debugPrint(
-                'Designation: ${profile.userDesignation?.designationName ?? 'N/A'}',
-              );
-              debugPrint(
-                'Department: ${profile.userDepartment?.departmentName ?? 'N/A'}',
-              );
-              debugPrint('Client Name: ${profile.client?.clientName ?? 'N/A'}');
-              debugPrint('Role: ${profile.role?.roleName ?? 'N/A'}');
-              debugPrint(
-                'Permissions Count: ${profile.role?.permissions?.length ?? 0}',
-              );
-              debugPrint('Employment Status: ${profile.employmentStatus}');
-              debugPrint('In Probation: ${profile.inProbation}');
-              debugPrint('CTC: ${profile.ctc ?? 'N/A'}');
-            },
-          );
-        } catch (e) {
-          // Profile fetch error, but login was successful
-          // Continue with login but log the error
-          debugPrint('Error fetching user profile: $e');
-        }
-      } else if (getUserProfileUseCase == null) {
-        debugPrint('Warning: GetUserProfileUseCase is not provided');
+      if (userProfileBloc != null && token != null && token.isNotEmpty) {
+        userProfileBloc!.add(const LoadUserProfile(forceRefresh: true));
+      } else if (userProfileBloc == null) {
+        debugPrint('Warning: UserProfileBloc is not provided');
       } else {
-        debugPrint('Warning: Token is empty, cannot fetch user profile');
+        debugPrint('Warning: Token is empty, cannot load user profile');
       }
 
       emit(AuthAuthenticated(user));
@@ -154,6 +113,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final hasToken = TokenStorage.hasToken();
 
       if (hasToken) {
+        if (userProfileBloc != null) {
+          userProfileBloc!.add(const LoadUserProfile());
+        }
+
         // Token exists, user is authenticated
         // Create minimal user object (token exists but no user data from API)
         final user = UserModel(
@@ -165,28 +128,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           createdAt: null,
         );
         emit(AuthAuthenticated(user));
-
-        // Load user profile if available
-        if (getUserProfileUseCase != null && userProfileBloc != null) {
-          try {
-            final profileResult = await getUserProfileUseCase!();
-            profileResult.fold(
-              (failure) {
-                debugPrint(
-                  'Failed to load user profile on auth check: ${failure.message}',
-                );
-              },
-              (profile) {
-                userProfileBloc!.add(SetUserProfile(profile));
-                debugPrint(
-                  'User profile loaded on auth check: ${profile.user.fullName}',
-                );
-              },
-            );
-          } catch (e) {
-            debugPrint('Error loading user profile on auth check: $e');
-          }
-        }
       } else {
         // No token, user is not authenticated
         emit(const AuthUnauthenticated());

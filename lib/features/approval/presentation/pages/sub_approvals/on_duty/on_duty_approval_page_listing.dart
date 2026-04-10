@@ -33,6 +33,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../home/presentation/widgets/bottom_nav_bar.dart';
+
 class OnDutyApprovalPageListing extends StatefulWidget {
   const OnDutyApprovalPageListing({super.key});
 
@@ -94,6 +97,10 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
             ),
           ),
           centerTitle: true,
+        ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 4,
+          onTap: NavigationHelper.getBottomNavHandler(context),
         ),
         body: const AccessDeniedView(
           title: 'Approval Access Required',
@@ -163,7 +170,7 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
                 Flexible(
                   child: Text(
                     'Back',
-                    style: AppTextStyles.bodyLarge(context).copyWith(
+                    style: AppTextStyles.bodyMedium(context).copyWith(
                       fontWeight: FontWeight.w400,
                       color: Theme.of(context).colorScheme.primary,
                     ),
@@ -182,6 +189,10 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
             ),
           ),
           centerTitle: true,
+        ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 4,
+          onTap: NavigationHelper.getBottomNavHandler(context),
         ),
         body: Builder(
           builder:

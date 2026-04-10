@@ -9,12 +9,17 @@ abstract class AttendanceRepository {
     required double latitude,
     required double longitude,
     required String punchType,
+    bool needsAddressResolution = false,
   });
 
   Future<Either<Failure, PunchInResult>> punchOut({
     required String punchOutLocation,
     required double latitude,
     required double longitude,
+    bool needsAddressResolution = false,
   });
-}
 
+  Future<bool> syncPendingActions();
+
+  Future<bool> hasPendingActions();
+}

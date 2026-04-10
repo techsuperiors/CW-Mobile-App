@@ -73,7 +73,30 @@ class CompOffDetailBloc extends Bloc<CompOffDetailEvent, CompOffDetailState> {
         }
       },
       (message) async {
-        emit(CompOffDetailStatus(message));
+        final commentsResult = await getCompOffCommentsUseCase(
+          compOffId: event.compOffId,
+        );
+        final refreshedComments = commentsResult.fold(
+          (_) => comments,
+          (updatedComments) => updatedComments,
+        );
+
+        emit(
+          CompOffDetailStatus(
+            message,
+            action: CompOffDetailSuccessAction.commentAdded,
+            detail: detail,
+            comments: refreshedComments,
+          ),
+        );
+
+        if (detail != null) {
+          emit(
+            CompOffDetailLoaded(detail: detail, comments: refreshedComments),
+          );
+          return;
+        }
+
         add(LoadCompOffDetail(event.compOffId));
       },
     );
@@ -103,7 +126,14 @@ class CompOffDetailBloc extends Bloc<CompOffDetailEvent, CompOffDetailState> {
         }
       },
       (message) {
-        emit(CompOffDetailStatus(message));
+        emit(
+          CompOffDetailStatus(
+            message,
+            action: CompOffDetailSuccessAction.fileUploaded,
+            detail: detail,
+            comments: comments,
+          ),
+        );
         add(LoadCompOffDetail(event.compOffId));
       },
     );
@@ -135,7 +165,14 @@ class CompOffDetailBloc extends Bloc<CompOffDetailEvent, CompOffDetailState> {
         }
       },
       (message) async {
-        emit(CompOffDetailStatus(message));
+        emit(
+          CompOffDetailStatus(
+            message,
+            action: CompOffDetailSuccessAction.statusUpdated,
+            detail: detail,
+            comments: comments,
+          ),
+        );
         add(LoadCompOffDetail(event.compOffId));
       },
     );

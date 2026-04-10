@@ -9,8 +9,13 @@ import '../bloc/agreement_bloc.dart';
 /// Card widget for displaying employee agreement information
 class EmployeeAgreementCard extends StatelessWidget {
   final EmployeeAgreementModel agreement;
+  final bool showDocumentsOnly;
 
-  const EmployeeAgreementCard({super.key, required this.agreement});
+  const EmployeeAgreementCard({
+    super.key,
+    required this.agreement,
+    this.showDocumentsOnly = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +31,10 @@ class EmployeeAgreementCard extends StatelessWidget {
             builder:
                 (context) => BlocProvider.value(
                   value: bloc,
-                  child: EmployeeAgreementDetailPage(agreement: agreement),
+                  child: EmployeeAgreementDetailPage(
+                    agreement: agreement,
+                    showDocumentsOnly: showDocumentsOnly,
+                  ),
                 ),
           ),
         );

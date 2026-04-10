@@ -66,8 +66,8 @@ class Activity {
   final String? createdAt;
   final String? time;
   final String? penaltyMessage;
-  final int? paidDays;
-  final int? unPaidDays;
+  final double? paidDays;
+  final double? unPaidDays;
   final String? ip;
   final String? location;
   final String? mode;

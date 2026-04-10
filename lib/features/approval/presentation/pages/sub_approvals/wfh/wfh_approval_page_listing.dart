@@ -31,6 +31,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../home/presentation/widgets/bottom_nav_bar.dart';
+
 class WfhApprovalPageListing extends StatefulWidget {
   const WfhApprovalPageListing({super.key});
 
@@ -91,6 +94,10 @@ class _WfhApprovalPageListingState extends State<WfhApprovalPageListing>
             ),
           ),
           centerTitle: true,
+        ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 4,
+          onTap: NavigationHelper.getBottomNavHandler(context),
         ),
         body: const AccessDeniedView(
           title: 'Approval Access Required',
@@ -176,6 +183,10 @@ class _WfhApprovalPageListingState extends State<WfhApprovalPageListing>
             ),
           ),
           centerTitle: true,
+        ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 4,
+          onTap: NavigationHelper.getBottomNavHandler(context),
         ),
         body: Builder(
           builder:

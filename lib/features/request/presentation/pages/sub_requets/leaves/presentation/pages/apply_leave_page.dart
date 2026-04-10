@@ -12,13 +12,16 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/utils/app_navigator.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../authentication/presentation/pages/login_page.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../../../../../../../core/widgets/common/app_text_field.dart';
 import '../../../../../../../leaves/data/datasources/leave_types_remote_datasource.dart';
+import '../../../../../../../leaves/data/models/leave_policy_model.dart';
 import '../../../../../../../leaves/data/repositories/leave_types_repository_impl.dart';
 import '../../../../../../../leaves/domain/usecases/get_leave_types_usecase.dart';
 import '../../../../../../../leaves/domain/usecases/apply_leave_usecase.dart';
@@ -52,11 +55,17 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
     'Family',
     'Other',
   ];
+  static const String _singleDayOption = 'Single Day';
+  static const String _multipleDaysOption = 'Multiple Days';
+  static const String _halfDayOption = 'Half Day';
+  static const String _shortLeaveOption = 'Short Leave';
+  static const List<String> _halfDayOptions = ['First Half', 'Second Half'];
 
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _subjectController;
   late final TextEditingController _descriptionController;
   late final LeaveRequestBloc _leaveRequestBloc;
+  late final LeaveTypesRemoteDataSource _leaveRemoteDataSource;
 
   String? _selectedLeaveType;
   String? _selectedLeaveDuration;
@@ -79,6 +88,12 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
   String? _deletingExistingFileId;
   bool _hasDeletedExistingAttachment = false;
   UpdateLeave? _pendingUpdateEvent;
+  Map<String, LeavePolicyModel> _leavePoliciesByType = {};
+  WorkingHoursModel? _workingHours;
+  bool _isLoadingLeavePolicies = false;
+  bool _isLoadingWorkingHours = false;
+  TimeOfDay? _leaveStartTime;
+  TimeOfDay? _leaveEndTime;
 
   @override
   void initState() {
@@ -90,9 +105,14 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
     // Initialize BLoC (only for applying - leave types come from LeaveTypesBloc/dashboard)
     final networkInfo = NetworkInfoImpl(Connectivity());
     final dio = Dio();
-    final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
+    final apiClient = ApiClient(dio: dio, networkInfo: networkInfo,onTokenExpired: () {
+      AppNavigator.pushAndRemoveAll(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    },);
+    _leaveRemoteDataSource = LeaveTypesRemoteDataSourceImpl(apiClient);
     final repository = LeaveTypesRepositoryImpl(
-      remoteDataSource: LeaveTypesRemoteDataSourceImpl(apiClient),
+      remoteDataSource: _leaveRemoteDataSource,
       networkInfo: networkInfo,
     );
     _leaveRequestBloc = LeaveRequestBloc(
@@ -110,6 +130,7 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
 
     final profileState = context.read<UserProfileBloc>().state;
     _hydrateRequestToFromProfileState(profileState);
+    _loadLeavePoliciesFromProfileState(profileState);
   }
 
   void _initializeFormFromLeaveRequest(LeaveEntity leaveRequest) {
@@ -178,6 +199,153 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
     return DateFormat('yyyy-MM-dd').format(date);
   }
 
+  String _formatApiTime(TimeOfDay time) {
+    final hours = time.hour.toString().padLeft(2, '0');
+    final minutes = time.minute.toString().padLeft(2, '0');
+    return '$hours:$minutes:00';
+  }
+
+  String _formatTimeOfDay(TimeOfDay time) {
+    final now = DateTime.now();
+    final value = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      time.hour,
+      time.minute,
+    );
+    return DateFormat('hh:mm a').format(value);
+  }
+
+  DateTime _combineDateAndTime(DateTime date, TimeOfDay time) {
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  LeavePolicyModel? get _selectedLeavePolicy {
+    final selectedLeaveType = _selectedLeaveType;
+    if (selectedLeaveType == null) return null;
+    return _leavePoliciesByType[selectedLeaveType];
+  }
+
+  bool get _supportsHalfDay => _selectedLeavePolicy?.allowHalfDayLeave == true;
+
+  bool get _supportsShortLeave => _selectedLeavePolicy?.allowShortLeave == true;
+
+  bool get _supportsClubLeave => _selectedLeavePolicy?.allowClubLeave == true;
+
+  bool get _isShortLeave => _selectedLeaveDuration == _shortLeaveOption;
+
+  bool get _isHalfDay => _selectedLeaveDuration == _halfDayOption;
+
+  bool get _isSingleDay => _selectedLeaveDuration == _singleDayOption;
+
+  bool get _isMultipleDays => _selectedLeaveDuration == _multipleDaysOption;
+
+  List<String> _leaveDurationOptions() {
+    final options = <String>[_singleDayOption, _multipleDaysOption];
+    if (_supportsHalfDay) {
+      options.add(_halfDayOption);
+    }
+    if (_supportsShortLeave) {
+      options.add(_shortLeaveOption);
+    }
+    return options;
+  }
+
+  void _syncDurationWithPolicy() {
+    final allowedOptions = _leaveDurationOptions();
+    if (_selectedLeaveDuration != null &&
+        !allowedOptions.contains(_selectedLeaveDuration)) {
+      _selectedLeaveDuration = null;
+    }
+
+    if (!_supportsClubLeave) {
+      _clubLeave = false;
+    }
+
+    if (!_isHalfDay) {
+      _fromHalfDay = _halfDayOptions.first;
+      _toHalfDay = _halfDayOptions.last;
+    }
+
+    if (!_isShortLeave) {
+      _leaveStartTime = null;
+      _leaveEndTime = null;
+      _workingHours = null;
+    }
+
+    if (!_isMultipleDays) {
+      _selectedToDate = null;
+    }
+  }
+
+  Future<void> _loadLeavePoliciesFromProfileState(
+    UserProfileState profileState,
+  ) async {
+    if (profileState is! UserProfileLoaded || _isLoadingLeavePolicies) return;
+
+    setState(() {
+      _isLoadingLeavePolicies = true;
+    });
+
+    try {
+      final policies = await _leaveRemoteDataSource.getLeavePolicies(
+        profileState.profile.userId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _leavePoliciesByType = {
+          for (final policy in policies) policy.leaveTypeName: policy,
+        };
+        _syncDurationWithPolicy();
+        _isLoadingLeavePolicies = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingLeavePolicies = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load leave policy: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _loadWorkingHoursForDate(DateTime date) async {
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is! UserProfileLoaded) return;
+
+    setState(() {
+      _isLoadingWorkingHours = true;
+    });
+
+    try {
+      final workingHours = await _leaveRemoteDataSource.getWorkingHours(
+        userId: profileState.profile.userId,
+        date: _formatDate(date),
+      );
+      if (!mounted) return;
+      setState(() {
+        _workingHours = workingHours;
+        _isLoadingWorkingHours = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingWorkingHours = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load working hours: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
   /// Handle form submission
   void _handleSubmit() {
     _hydrateRequestToFromProfileState(context.read<UserProfileBloc>().state);
@@ -207,7 +375,17 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
       return;
     }
 
-    if (_selectedLeaveDuration == 'Multiple Days' && _selectedToDate == null) {
+    if (_selectedLeaveDuration == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please select a leave duration'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (_isMultipleDays && _selectedToDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please select an end date'),
@@ -227,20 +405,99 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
       return;
     }
 
+    if (_isShortLeave) {
+      if (_leaveStartTime == null || _leaveEndTime == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Please select leave start and end time'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
+      final startDateTime = _combineDateAndTime(_fromDate!, _leaveStartTime!);
+      final endDateTime = _combineDateAndTime(_fromDate!, _leaveEndTime!);
+      if (!endDateTime.isAfter(startDateTime)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Leave end time must be after start time'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
+      final fullDayHours = _workingHours?.fullDayHours ?? 0;
+      final shortDayHours = _workingHours?.shortDayHours ?? 0;
+      final maxShortLeaveSeconds = fullDayHours - shortDayHours;
+      if (maxShortLeaveSeconds <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Working hours are not available for the selected date',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
+      final selectedSeconds = endDateTime.difference(startDateTime).inSeconds;
+      if (selectedSeconds > maxShortLeaveSeconds) {
+        final allowedDuration = Duration(seconds: maxShortLeaveSeconds);
+        final hours = allowedDuration.inHours;
+        final minutes = allowedDuration.inMinutes.remainder(60);
+        final allowedText =
+            minutes == 0 ? '$hours hour(s)' : '$hours hour(s) $minutes min';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Short leave cannot exceed $allowedText for the selected date',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+    }
+
     // Determine dates based on leave duration
     DateTime startDate;
     DateTime endDate;
+    String dayType;
+    String? startHalf;
+    String? endHalf;
+    String? leaveStartTime;
+    String? leaveEndTime;
 
-    if (_selectedLeaveDuration == 'Single Day') {
-      // For Single Day: start_date and end_date must be the same
+    if (_isSingleDay) {
       startDate = _fromDate!;
-      endDate = _fromDate!; // Same date for single day
+      endDate = _fromDate!;
+      dayType = 'single';
+      startHalf = 'first_half';
+      endHalf = 'second_half';
+    } else if (_isHalfDay) {
+      startDate = _fromDate!;
+      endDate = _fromDate!;
+      dayType = 'half';
+      startHalf = _convertHalfDay(_fromHalfDay);
+      endHalf = startHalf;
+    } else if (_isShortLeave) {
+      startDate = _fromDate!;
+      endDate = _fromDate!;
+      dayType = 'short';
+      startHalf = null;
+      endHalf = null;
+      leaveStartTime = _formatApiTime(_leaveStartTime!);
+      leaveEndTime = _formatApiTime(_leaveEndTime!);
     } else {
-      // For Multiple Days: start_date and end_date should be different
       startDate = _fromDate!;
       endDate = _selectedToDate!;
+      dayType = 'multiple';
+      startHalf = _convertHalfDay(_fromHalfDay);
+      endHalf = _convertHalfDay(_toHalfDay);
 
-      // Validate that end date is not before start date
       if (endDate.isBefore(startDate)) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -251,10 +508,6 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
         return;
       }
     }
-
-    // Determine day type
-    final dayType =
-        _selectedLeaveDuration == 'Single Day' ? 'single' : 'multiple';
 
     // Validate request_to is selected
     if (_requestToId == null) {
@@ -277,8 +530,8 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
         endDate: dayType == 'single' ? null : _formatDate(endDate),
         subject: _subjectController.text.trim(),
         reason: _selectedReason ?? '',
-        startHalf: _convertHalfDay(_fromHalfDay),
-        endHalf: _convertHalfDay(_toHalfDay),
+        startHalf: startHalf ?? 'first_half',
+        endHalf: endHalf ?? 'second_half',
         dayType: dayType,
         description: _descriptionController.text.trim(),
         requestTo: _requestToId!,
@@ -304,12 +557,14 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
         endDate: _formatDate(endDate),
         subject: _subjectController.text.trim(),
         reason: _selectedReason ?? '',
-        startHalf: _convertHalfDay(_fromHalfDay),
-        endHalf: _convertHalfDay(_toHalfDay),
+        startHalf: startHalf,
+        endHalf: endHalf,
         dayType: dayType,
         description: _descriptionController.text.trim(),
         shortCode: _getShortCode(_selectedLeaveType),
         requestTo: _requestToId!,
+        leaveStartTime: leaveStartTime,
+        leaveEndTime: leaveEndTime,
         rHDates: [],
         attachmentFiles: _selectedFiles,
       ),
@@ -345,8 +600,50 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
       setState(() {
         if (isFromDate) {
           _fromDate = picked;
+          if (!_isMultipleDays) {
+            _selectedToDate = null;
+          }
         } else {
           _selectedToDate = picked;
+        }
+      });
+
+      if (_isShortLeave) {
+        await _loadWorkingHoursForDate(picked);
+      }
+    }
+  }
+
+  Future<void> _selectTime(BuildContext context, bool isStartTime) async {
+    final TimeOfDay initialTime =
+        isStartTime
+            ? (_leaveStartTime ?? const TimeOfDay(hour: 9, minute: 0))
+            : (_leaveEndTime ?? const TimeOfDay(hour: 10, minute: 0));
+
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.attendanceTeal,
+              onPrimary: AppColors.textWhite,
+              surface: AppColors.background,
+              onSurface: AppColors.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        if (isStartTime) {
+          _leaveStartTime = picked;
+        } else {
+          _leaveEndTime = picked;
         }
       });
     }
@@ -438,6 +735,7 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
 
               // Initialize reporting manager when profile is loaded
               _hydrateRequestToFromProfileState(profileState);
+              unawaited(_loadLeavePoliciesFromProfileState(profileState));
               // Load leave types if not yet loaded (e.g. user opened Apply Leave before dashboard)
               final leaveTypesState = context.read<LeaveTypesBloc>().state;
               if (leaveTypesState is LeaveTypesInitial) {
@@ -454,352 +752,502 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
               Navigator.of(context).pop(_hasDeletedExistingAttachment);
             },
             child: ResponsiveScaffold(
-            backgroundColor: AppColors.backgroundMedium,
-            appBar: AppBar(
-              forceMaterialTransparency: true,
-              elevation: 0,
-              backgroundColor: AppColors.background,
-              foregroundColor: AppColors.textPrimary,
-              leading: GestureDetector(
-                onTap: () =>
-                    Navigator.of(context).pop(_hasDeletedExistingAttachment),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.arrow_back_ios,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: screenWidth * 0.048,
-                    ),
-                    Flexible(
-                      child: Text(
-                        AppStrings.back,
-                        style: AppTextStyles.bodyMedium(context).copyWith(
-                          fontWeight: FontWeight.w400,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              leadingWidth: 110,
-              title: Text(
-                widget.leaveRequest != null
-                    ? 'Edit Leave Request'
-                    : AppStrings.applyLeave,
-                style: AppTextStyles.bodyMedium(context).copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              centerTitle: true,
-            ),
-            bottomNavigationBar: BottomNavBar(
-              currentIndex: 0,
-              onTap: NavigationHelper.getBottomNavHandler(context),
-            ),
-            body: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.020),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: screenHeight * 0.02),
-                    // Subject
-                    AppTextField(
-                      label: 'Subject',
-                      hint: 'Enter Subject',
-                      controller: _subjectController,
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    // Leave Type (from dashboard LeaveTypesBloc - no API call here)
-                    BlocBuilder<LeaveTypesBloc, LeaveTypesState>(
-                      builder: (context, leaveTypesState) {
-                        final leaveTypeItems =
-                            leaveTypesState is LeaveTypesLoaded
-                                ? leaveTypesState.leaveTypes.leaveTypes
-                                    .map((lt) => lt.leaveType)
-                                    .toList()
-                                : <String>[];
-                        final isLoading =
-                            leaveTypesState is LeaveTypesLoading ||
-                            leaveTypesState is LeaveTypesInitial;
-                        final hasError = leaveTypesState is LeaveTypesError;
-
-                        return _buildDropdownField(
-                          context,
-                          label: 'Leave Type',
-                          value: _selectedLeaveType,
-                          hint:
-                              isLoading
-                                  ? 'Loading...'
-                                  : hasError
-                                  ? 'Visit dashboard first to load leave types'
-                                  : 'Select Leave Type',
-                          items: leaveTypeItems,
-                          onChanged:
-                              isLoading || hasError
-                                  ? null
-                                  : (value) {
-                                    setState(() => _selectedLeaveType = value);
-                                  },
-                        );
-                      },
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    // Leave Duration
-                    _buildDropdownField(
-                      context,
-                      label: 'Leave Duration (Day or Days)',
-                      value: _selectedLeaveDuration,
-                      hint: 'Select Day Type',
-                      items: ['Single Day', 'Multiple Days'],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedLeaveDuration = value;
-                          // Clear toDate when switching to Single Day
-                          if (value == 'Single Day') {
-                            _selectedToDate = null;
-                          }
-                        });
-                      },
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    // Date fields - Show different layout based on Single Day or Multiple Days
-                    if (_selectedLeaveDuration == 'Single Day') ...[
-                      // Single Day - Show only one date field (no half-day dropdown)
-                      Text('Date', style: AppTextStyles.labelLarge(context)),
-                      SizedBox(height: screenHeight * 0.01),
-                      _buildDateField(
+              backgroundColor: AppColors.backgroundMedium,
+              appBar:
+              AppBar(
+                forceMaterialTransparency: true,
+                elevation: 0,
+                backgroundColor: AppColors.background,
+                foregroundColor: AppColors.textPrimary,
+                leading: GestureDetector(
+                  onTap:
+                      () => Navigator.of(
                         context,
-                        value:
-                            _fromDate != null
-                                ? DateFormat('dd MMM yyyy').format(_fromDate!)
-                                : null,
-                        hint: 'Select Date',
-                        onTap: () => _selectDate(context, true),
+                      ).pop(_hasDeletedExistingAttachment),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.arrow_back_ios,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: screenWidth * 0.048,
                       ),
-                    ] else ...[
-                      // Multiple Days - Show From and To fields
-                      // From
-                      Text('From', style: AppTextStyles.labelLarge(context)),
-                      SizedBox(height: screenHeight * 0.01),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 1,
-                            child: _buildDateField(
-                              context,
-                              value:
-                                  _fromDate != null
-                                      ? DateFormat(
-                                        'dd MMM yyyy',
-                                      ).format(_fromDate!)
-                                      : null,
-                              hint: 'Select Date',
-                              onTap: () => _selectDate(context, true),
-                            ),
+                      Flexible(
+                        child: Text(
+                          AppStrings.back,
+                          style: AppTextStyles.bodyMedium(context).copyWith(
+                            fontWeight: FontWeight.w400,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
-                          SizedBox(width: screenWidth * 0.02),
-                          Expanded(
-                            flex: 1,
-                            child: _buildDropdownField(
-                              context,
-                              value: _fromHalfDay,
-                              items: ['First Half', 'Second Half'],
-                              label: '',
-                              onChanged: (value) {
-                                setState(() {
-                                  _fromHalfDay = value ?? 'First Half';
-                                });
-                              },
-                              showLabel: false,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      // To
-                      Text('To', style: AppTextStyles.labelLarge(context)),
-                      SizedBox(height: screenHeight * 0.01),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 1,
-                            child: _buildDateField(
-                              context,
-                              value:
-                                  _selectedToDate != null
-                                      ? DateFormat(
-                                        'dd MMM yyyy',
-                                      ).format(_selectedToDate!)
-                                      : null,
-                              hint: 'Select Date',
-                              onTap: () => _selectDate(context, false),
-                            ),
-                          ),
-                          SizedBox(width: screenWidth * 0.02),
-                          Expanded(
-                            flex: 1,
-                            child: _buildDropdownField(
-                              context,
-                              value: _toHalfDay,
-                              items: ['First Half', 'Second Half'],
-                              onChanged: (value) {
-                                setState(() {
-                                  _toHalfDay = value ?? 'Second Half';
-                                });
-                              },
-                              showLabel: false,
-                              label: '',
-                            ),
-                          ),
-                        ],
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
-                    SizedBox(height: screenHeight * 0.02),
-                    // Club Leave
-                    Text(
-                      'Club Leave',
-                      style: AppTextStyles.labelLarge(context),
-                    ),
-                    SizedBox(height: screenHeight * 0.01),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildRadioOption(
+                  ),
+                ),
+                leadingWidth: 110,
+                title: Text(
+                  widget.leaveRequest != null
+                      ? 'Edit Leave Request'
+                      : AppStrings.applyLeave,
+                  style: AppTextStyles.heading4(context).copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                centerTitle: true,
+              ),
+              bottomNavigationBar: BottomNavBar(
+                currentIndex: 3,
+                onTap: NavigationHelper.getBottomNavHandler(context),
+              ),
+              body: SingleChildScrollView(
+
+                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.020),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Subject
+                      AppTextField(
+                        label: 'Subject',
+                        hint: 'Enter Subject',
+                        controller: _subjectController,
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      // Leave Type (from dashboard LeaveTypesBloc - no API call here)
+                      BlocBuilder<LeaveTypesBloc, LeaveTypesState>(
+                        builder: (context, leaveTypesState) {
+                          final leaveTypeItems =
+                              leaveTypesState is LeaveTypesLoaded
+                                  ? leaveTypesState.leaveTypes.leaveTypes
+                                      .map((lt) => lt.leaveType)
+                                      .where(
+                                        (leaveType) =>
+                                            leaveType.trim().toUpperCase() !=
+                                            'LOP',
+                                      )
+                                      .toList()
+                                  : <String>[];
+                          final isLoading =
+                              leaveTypesState is LeaveTypesLoading ||
+                              leaveTypesState is LeaveTypesInitial;
+                          final hasError = leaveTypesState is LeaveTypesError;
+
+                          return _buildDropdownField(
                             context,
-                            label: 'Yes',
-                            value: true,
-                            groupValue: _clubLeave,
-                            onChanged: (value) {
-                              setState(() {
-                                _clubLeave = value;
-                              });
-                            },
-                          ),
+                            label: 'Leave Type',
+                            value: _selectedLeaveType,
+                            hint:
+                                isLoading
+                                    ? 'Loading...'
+                                    : hasError
+                                    ? 'Visit dashboard first to load leave types'
+                                    : 'Select Leave Type',
+                            items: leaveTypeItems,
+                            onChanged:
+                                isLoading || hasError
+                                    ? null
+                                    : (value) {
+                                      setState(() {
+                                        _selectedLeaveType = value;
+                                        _syncDurationWithPolicy();
+                                      });
+                                    },
+                          );
+                        },
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      // Leave Duration
+                      _buildDropdownField(
+                        context,
+                        label: 'Leave Duration (Day or Days)',
+                        value: _selectedLeaveDuration,
+                        hint:
+                            _selectedLeaveType == null
+                                ? 'Select leave type first'
+                                : _isLoadingLeavePolicies
+                                ? 'Loading leave policy...'
+                                : 'Select Day Type',
+                        items: _leaveDurationOptions(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedLeaveDuration = value;
+                            if (value != _multipleDaysOption) {
+                              _selectedToDate = null;
+                            }
+                            if (value != _shortLeaveOption) {
+                              _leaveStartTime = null;
+                              _leaveEndTime = null;
+                              _workingHours = null;
+                            }
+                            if (value != _halfDayOption) {
+                              _fromHalfDay = _halfDayOptions.first;
+                            }
+                          });
+                          if (value == _shortLeaveOption && _fromDate != null) {
+                            unawaited(_loadWorkingHoursForDate(_fromDate!));
+                          }
+                        },
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      // Date fields
+                      if (_isSingleDay) ...[
+                        Text(
+                          'Date',
+                          style: AppTextStyles.labelLarge(
+                            context,
+                          ).copyWith(color: AppColors.textHeading),
                         ),
-                        Expanded(
-                          child: _buildRadioOption(
+                        SizedBox(height: screenHeight * 0.01),
+                        _buildDateField(
+                          context,
+                          value:
+                              _fromDate != null
+                                  ? DateFormat('dd MMM yyyy').format(_fromDate!)
+                                  : null,
+                          hint: 'Select Date',
+                          onTap: () => _selectDate(context, true),
+                        ),
+                      ] else if (_isHalfDay) ...[
+                        Text(
+                          'Date',
+                          style: AppTextStyles.labelLarge(
                             context,
-                            label: 'No',
-                            value: false,
-                            groupValue: _clubLeave,
-                            onChanged: (value) {
-                              setState(() {
-                                _clubLeave = value;
-                              });
-                            },
+                          ).copyWith(color: AppColors.textHeading),
+                        ),
+                        SizedBox(height: screenHeight * 0.01),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildDateField(
+                                context,
+                                value:
+                                    _fromDate != null
+                                        ? DateFormat(
+                                          'dd MMM yyyy',
+                                        ).format(_fromDate!)
+                                        : null,
+                                hint: 'Select Date',
+                                onTap: () => _selectDate(context, true),
+                              ),
+                            ),
+                            SizedBox(width: screenWidth * 0.02),
+                            Expanded(
+                              child: _buildDropdownField(
+                                context,
+                                value: _fromHalfDay,
+                                items: _halfDayOptions,
+                                label: '',
+                                showLabel: false,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _fromHalfDay =
+                                        value ?? _halfDayOptions.first;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else if (_isShortLeave) ...[
+                        Text(
+                          'Date',
+                          style: AppTextStyles.labelLarge(
+                            context,
+                          ).copyWith(color: AppColors.textHeading),
+                        ),
+                        SizedBox(height: screenHeight * 0.01),
+                        _buildDateField(
+                          context,
+                          value:
+                              _fromDate != null
+                                  ? DateFormat('dd MMM yyyy').format(_fromDate!)
+                                  : null,
+                          hint: 'Select Date',
+                          onTap: () => _selectDate(context, true),
+                        ),
+                        SizedBox(height: screenHeight * 0.02),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTimeField(
+                                context,
+                                label: 'From Time',
+                                value:
+                                    _leaveStartTime != null
+                                        ? _formatTimeOfDay(_leaveStartTime!)
+                                        : null,
+                                hint: 'Select Start Time',
+                                onTap: () => _selectTime(context, true),
+                              ),
+                            ),
+                            SizedBox(width: screenWidth * 0.02),
+                            Expanded(
+                              child: _buildTimeField(
+                                context,
+                                label: 'To Time',
+                                value:
+                                    _leaveEndTime != null
+                                        ? _formatTimeOfDay(_leaveEndTime!)
+                                        : null,
+                                hint: 'Select End Time',
+                                onTap: () => _selectTime(context, false),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_isLoadingWorkingHours) ...[
+                          SizedBox(height: screenHeight * 0.01),
+                          Text(
+                            'Loading working hours...',
+                            style: AppTextStyles.bodySmall(
+                              context,
+                            ).copyWith(color: AppColors.textSecondary),
                           ),
+                        ] else if (_workingHours != null) ...[
+                          SizedBox(height: screenHeight * 0.01),
+                          Text(
+                            'Max allowed: ${_formatDurationLabel(_workingHours!.fullDayHours - _workingHours!.shortDayHours)}',
+                            style: AppTextStyles.bodySmall(
+                              context,
+                            ).copyWith(color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ] else ...[
+                        Text(
+                          'From',
+                          style: AppTextStyles.labelLarge(
+                            context,
+                          ).copyWith(color: AppColors.textHeading),
+                        ),
+                        SizedBox(height: screenHeight * 0.01),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 1,
+                              child: _buildDateField(
+                                context,
+                                value:
+                                    _fromDate != null
+                                        ? DateFormat(
+                                          'dd MMM yyyy',
+                                        ).format(_fromDate!)
+                                        : null,
+                                hint: 'Select Date',
+                                onTap: () => _selectDate(context, true),
+                              ),
+                            ),
+                            SizedBox(width: screenWidth * 0.02),
+                            Expanded(
+                              flex: 1,
+                              child: _buildDropdownField(
+                                context,
+                                value: _fromHalfDay,
+                                items: _halfDayOptions,
+                                label: '',
+                                onChanged: (value) {
+                                  setState(() {
+                                    _fromHalfDay =
+                                        value ?? _halfDayOptions.first;
+                                  });
+                                },
+                                showLabel: false,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: screenHeight * 0.02),
+                        // To
+                        Text(
+                          'To',
+                          style: AppTextStyles.labelLarge(
+                            context,
+                          ).copyWith(color: AppColors.textHeading),
+                        ),
+                        SizedBox(height: screenHeight * 0.01),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 1,
+                              child: _buildDateField(
+                                context,
+                                value:
+                                    _selectedToDate != null
+                                        ? DateFormat(
+                                          'dd MMM yyyy',
+                                        ).format(_selectedToDate!)
+                                        : null,
+                                hint: 'Select Date',
+                                onTap: () => _selectDate(context, false),
+                              ),
+                            ),
+                            SizedBox(width: screenWidth * 0.02),
+                            Expanded(
+                              flex: 1,
+                              child: _buildDropdownField(
+                                context,
+                                value: _toHalfDay,
+                                items: _halfDayOptions,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _toHalfDay = value ?? _halfDayOptions.last;
+                                  });
+                                },
+                                showLabel: false,
+                                label: '',
+                              ),
+                            ),
+                          ],
                         ),
                       ],
-                    ),
-                    // Club Leave Type dropdown is disabled - always send empty string
-                    // The dropdown is kept hidden as per requirement
-                    SizedBox(height: screenHeight * 0.02),
+                      SizedBox(height: screenHeight * 0.02),
+                      if (_supportsClubLeave) ...[
+                        Text(
+                          'Club Leave',
+                          style: AppTextStyles.labelLarge(
+                            context,
+                          ).copyWith(color: AppColors.textHeading),
+                        ),
+                        SizedBox(height: screenHeight * 0.02),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildRadioOption(
+                                context,
+                                label: 'Yes',
+                                value: true,
+                                groupValue: _clubLeave,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _clubLeave = value;
+                                  });
+                                },
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildRadioOption(
+                                context,
+                                label: 'No',
+                                value: false,
+                                groupValue: _clubLeave,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _clubLeave = value;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: screenHeight * 0.02),
+                      ],
 
-                    _buildDropdownField(
-                      context,
-                      label: 'Reason',
-                      value: _selectedReason,
-                      hint: 'Select Reason',
-                      items: _reasonOptions,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedReason = value;
-                        });
-                      },
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    // Description
-                    AppTextField(
-                      label: 'Description',
-                      hint: 'Enter Description',
-                      controller: _descriptionController,
-                      maxLines: 2,
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    // Upload
-                    Text('Upload', style: AppTextStyles.labelLarge(context)),
-                    SizedBox(height: screenHeight * 0.01),
-                    _buildUploadButton(context),
-                    SizedBox(height: screenHeight * 0.03),
-                    // Submit Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isSubmitting ? null : _handleSubmit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.attendanceTeal,
-                          foregroundColor: AppColors.textWhite,
-                          padding: EdgeInsets.symmetric(
-                            vertical: screenHeight * 0.018,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                          disabledBackgroundColor: AppColors.textSecondary,
-                        ),
-                        child:
-                            _isSubmitting
-                                ? SizedBox(
-                                  height: screenHeight * 0.02,
-                                  width: screenHeight * 0.02,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      AppColors.textWhite,
-                                    ),
-                                  ),
-                                )
-                                : Text(
-                                  widget.leaveRequest != null
-                                      ? 'Update'
-                                      : 'Submit',
-                                  style: AppTextStyles.buttonLarge(
-                                    context,
-                                  ).copyWith(color: AppColors.textWhite),
-                                ),
-                      ),
-                    ),
-                    SizedBox(height: screenHeight * 0.015),
-                    // Cancel Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.of(
-                            context,
-                          ).pop(_hasDeletedExistingAttachment);
+                      _buildDropdownField(
+                        context,
+                        label: 'Reason',
+                        value: _selectedReason,
+                        hint: 'Select Reason',
+                        items: _reasonOptions,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedReason = value;
+                          });
                         },
-                        style: OutlinedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                            vertical: screenHeight * 0.018,
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      // Description
+                      AppTextField(
+                        label: 'Description',
+                        hint: 'Enter Description',
+                        controller: _descriptionController,
+                        maxLines: 3,
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      // Upload
+                      Text(
+                        'Upload',
+                        style: AppTextStyles.labelLarge(
+                          context,
+                        ).copyWith(color: AppColors.textHeading),
+                      ),
+                      SizedBox(height: screenHeight * 0.01),
+                      _buildUploadButton(context),
+                      SizedBox(height: screenHeight * 0.03),
+                      // Submit Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isSubmitting ? null : _handleSubmit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.attendanceTeal,
+                            foregroundColor: AppColors.textWhite,
+                            padding: EdgeInsets.symmetric(
+                              vertical: screenHeight * 0.018,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                            disabledBackgroundColor: AppColors.textSecondary,
                           ),
-                          side: BorderSide(color: AppColors.border),
-                          backgroundColor: AppColors.background,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          AppStrings.cancel,
-                          style: AppTextStyles.buttonLarge(
-                            context,
-                          ).copyWith(color: AppColors.textPrimary),
+                          child:
+                              _isSubmitting
+                                  ? SizedBox(
+                                    height: screenHeight * 0.02,
+                                    width: screenHeight * 0.02,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        AppColors.textWhite,
+                                      ),
+                                    ),
+                                  )
+                                  : Text(
+                                    widget.leaveRequest != null
+                                        ? 'Update'
+                                        : 'Submit',
+                                    style: AppTextStyles.buttonLarge(
+                                      context,
+                                    ).copyWith(color: AppColors.textWhite),
+                                  ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                  ],
+                      SizedBox(height: screenHeight * 0.015),
+                      // Cancel Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.of(
+                              context,
+                            ).pop(_hasDeletedExistingAttachment);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              vertical: screenHeight * 0.018,
+                            ),
+                            side: BorderSide(color: AppColors.border),
+                            backgroundColor: AppColors.background,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            AppStrings.cancel,
+                            style: AppTextStyles.buttonLarge(
+                              context,
+                            ).copyWith(color: AppColors.textPrimary),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                    ],
+                  ),
                 ),
               ),
-            ),
             ),
           ),
         ),
@@ -832,7 +1280,12 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (showLabel && label != null) ...[
-          Text(label, style: AppTextStyles.labelLarge(context)),
+          Text(
+            label,
+            style: AppTextStyles.labelLarge(
+              context,
+            ).copyWith(color: AppColors.textHeading),
+          ),
           SizedBox(height: screenHeight * 0.01),
         ],
         Container(
@@ -841,20 +1294,25 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.border),
           ),
-          padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
+          padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02),
 
           child: DropdownButtonFormField<String>(
             initialValue: value,
             isExpanded: true,
             borderRadius: BorderRadius.circular(12),
-
+            hint: Text(
+              hint ?? '',
+              style: AppTextStyles.bodyMedium(context).copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w400, // 👈 force normal
+              ),
+            ),
             decoration: InputDecoration(
-              hintText: hint,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(
-                horizontal: screenWidth * 0.01,
+                horizontal: screenWidth * 0.02,
                 vertical: screenHeight * 0.018,
               ),
             ),
@@ -862,7 +1320,13 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
                 items.map((String item) {
                   return DropdownMenuItem<String>(
                     value: item,
-                    child: Text(item, style: AppTextStyles.bodyMedium(context)),
+                    child: Text(
+                      item,
+                      style: AppTextStyles.bodyMediumHeading(context).copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
                   );
                 }).toList(),
             onChanged: onChanged,
@@ -900,13 +1364,16 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              value ?? hint,
-              style: AppTextStyles.bodyMedium(context).copyWith(
-                color:
-                    value != null
-                        ? AppColors.textPrimary
-                        : AppColors.textSecondary,
+            Flexible(
+              child: Text(
+                value ?? hint,
+                style: AppTextStyles.bodyMediumHeading(context).copyWith(
+                  color:
+                      value != null
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             Icon(
@@ -918,6 +1385,36 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
         ),
       ),
     );
+  }
+
+  Widget _buildTimeField(
+    BuildContext context, {
+    required String label,
+    String? value,
+    required String hint,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppTextStyles.labelLarge(context)),
+         SizedBox(height: MediaQuery.of(context).size.height * 0.01),
+        _buildDateField(context, value: value, hint: hint, onTap: onTap),
+      ],
+    );
+  }
+
+  String _formatDurationLabel(int seconds) {
+    final duration = Duration(seconds: seconds);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    if (hours == 0) {
+      return '$minutes min';
+    }
+    if (minutes == 0) {
+      return '$hours hr';
+    }
+    return '$hours hr $minutes min';
   }
 
   Future<void> _pickImage() async {
@@ -1022,16 +1519,13 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
                       onTap:
                           isDeletingExisting
                               ? null
-                              :
-                          isExistingFile
+                              : isExistingFile
                               ? () => _previewNetworkFile(
                                 context,
                                 url: existingAttachment!.url,
                               )
-                              : () => _previewLocalFile(
-                                context,
-                                file: localFile!,
-                              ),
+                              : () =>
+                                  _previewLocalFile(context, file: localFile!),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child:
@@ -1055,10 +1549,11 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                         textAlign: TextAlign.center,
-                                        style: AppTextStyles.labelSmall(context)
-                                            .copyWith(
-                                              color: AppColors.textSecondary,
-                                            ),
+                                        style: AppTextStyles.labelSmall(
+                                          context,
+                                        ).copyWith(
+                                          color: AppColors.textSecondary,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1278,7 +1773,7 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
                     : null,
           ),
           SizedBox(width: screenWidth * 0.02),
-          Text(label, style: AppTextStyles.bodyMedium(context)),
+          Text(label, style: AppTextStyles.bodyMediumHeading(context)),
         ],
       ),
     );

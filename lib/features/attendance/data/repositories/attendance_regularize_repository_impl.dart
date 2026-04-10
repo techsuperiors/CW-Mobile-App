@@ -24,12 +24,12 @@ class AttendanceRegularizeRepositoryImpl
   @override
   Future<Either<Failure, AttendanceRegularizeResult>> applyRegularize({
     required String requestDate,
-    required int requestTo,
     required String requestFor,
     required String modeType,
     required String checkIn,
     required String checkOut,
     required String reason,
+    String? otherReason,
     required String description,
     required int userId,
     required bool isOther,
@@ -39,12 +39,12 @@ class AttendanceRegularizeRepositoryImpl
       try {
         final request = AttendanceRegularizeRequest(
           requestDate: requestDate,
-          requestTo: requestTo,
           requestFor: requestFor,
           modeType: modeType,
           checkIn: checkIn,
           checkOut: checkOut,
           reason: reason,
+          otherReason: otherReason,
           description: description,
           userId: userId,
           isOther: isOther,

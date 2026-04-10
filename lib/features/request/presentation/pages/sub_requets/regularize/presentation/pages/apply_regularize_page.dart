@@ -41,17 +41,24 @@ class ApplyRegularizePage extends StatefulWidget {
 }
 
 class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
+  static const List<String> _regularizeReasonOptions = [
+    'Forgot to punch-in and punch-out',
+    'Network issue',
+    'Other',
+  ];
+
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _descriptionController;
   late final TextEditingController _reasonController;
+  late final TextEditingController _otherReasonController;
   late final ApplyRegularizeBloc _applyRegularizeBloc;
   late final CalendarBloc _calendarBloc;
 
   DateTime? _attendanceDate;
-  String? _requestTo;
   int? _requestToId; // Store the reporting manager ID
   RegularizeRequestType _requestType = RegularizeRequestType.both;
   String? _captureMode;
+  String? _selectedReason;
   TimeOfDay? _punchInTime;
   TimeOfDay? _punchOutTime;
 
@@ -63,6 +70,7 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
     super.initState();
     _descriptionController = TextEditingController();
     _reasonController = TextEditingController();
+    _otherReasonController = TextEditingController();
 
     // Initialize regularize BLoC
     final networkInfo = NetworkInfoImpl(Connectivity());
@@ -106,7 +114,16 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
     _attendanceDate = regularizeRequest.fromDate;
     _requestType = regularizeRequest.requestType;
     _captureMode = regularizeRequest.modeType;
-    _reasonController.text = regularizeRequest.reason;
+    if (_regularizeReasonOptions
+        .where((option) => option != 'Other')
+        .contains(regularizeRequest.reason)) {
+      _selectedReason = regularizeRequest.reason;
+      _reasonController.text = regularizeRequest.reason;
+    } else {
+      _selectedReason = 'Other';
+      _reasonController.text = regularizeRequest.reason;
+      _otherReasonController.text = regularizeRequest.reason;
+    }
     _descriptionController.text = regularizeRequest.description ?? '';
     if (regularizeRequest.checkIn != null) {
       _punchInTime = TimeOfDay.fromDateTime(regularizeRequest.checkIn!);
@@ -121,6 +138,7 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
   void dispose() {
     _descriptionController.dispose();
     _reasonController.dispose();
+    _otherReasonController.dispose();
     _applyRegularizeBloc.close();
     _calendarBloc.close();
     super.dispose();
@@ -184,16 +202,6 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
       return;
     }
 
-    if (widget.regularizeRequest == null && _requestToId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please select a manager to request to'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
     if (widget.regularizeRequest == null && _captureMode == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -231,15 +239,26 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
       }
     }
 
-    if (_reasonController.text.trim().isEmpty) {
+    final resolvedReason =
+        _selectedReason == 'Other'
+            ? _otherReasonController.text.trim()
+            : (_selectedReason ?? '').trim();
+
+    if (resolvedReason.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please enter a reason'),
+          content: Text(
+            _selectedReason == 'Other'
+                ? 'Please enter other reason'
+                : 'Please select a reason',
+          ),
           backgroundColor: AppColors.error,
         ),
       );
       return;
     }
+
+    _reasonController.text = resolvedReason;
 
     // Get user profile to get user_id
     final userProfileState = context.read<UserProfileBloc>().state;
@@ -304,15 +323,18 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
     _applyRegularizeBloc.add(
       ApplyRegularize(
         requestDate: _formatDate(_attendanceDate!),
-        requestTo: _requestToId!,
         requestFor: _convertRequestType(_requestType),
         modeType: _captureMode!,
         checkIn: checkIn,
         checkOut: checkOut,
-        reason: _reasonController.text.trim(),
+        reason: _selectedReason == 'Other' ? 'Other' : resolvedReason,
+        otherReason:
+            _selectedReason == 'Other'
+                ? _otherReasonController.text.trim()
+                : null,
         description: _descriptionController.text.trim(),
         userId: userId,
-        isOther: false,
+        isOther: _selectedReason == 'Other',
         statusUpdatedBy: statusUpdatedBy,
       ),
     );
@@ -486,7 +508,6 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
               final profile = profileState.profile;
               if (profile.reportingManagerInfo != null) {
                 setState(() {
-                  _requestTo = profile.reportingManagerInfo!.fullName;
                   _requestToId = profile.reportingManager;
                 });
               }
@@ -525,7 +546,9 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
               ),
               leadingWidth: 110,
               title: Text(
-                AppStrings.regularize,
+                widget.regularizeRequest != null
+                    ? 'Edit Regularize Request'
+                    : AppStrings.regularize,
                 style: AppTextStyles.heading4(context).copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -534,7 +557,7 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
               centerTitle: true,
             ),
             bottomNavigationBar: BottomNavBar(
-              currentIndex: 0,
+              currentIndex: 3,
               onTap: NavigationHelper.getBottomNavHandler(context),
             ),
             body: SingleChildScrollView(
@@ -544,39 +567,6 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header with icon and description
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(screenWidth * 0.03),
-                          decoration: BoxDecoration(
-                            color: AppColors.attendanceTeal.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: AppColors.attendanceTeal,
-                              width: 2,
-                            ),
-                          ),
-                          child: Icon(
-                            Icons.check_circle,
-                            color: AppColors.attendanceTeal,
-                            size: screenWidth * 0.06,
-                          ),
-                        ),
-                        SizedBox(height: screenHeight * 0.01),
-                        Text(
-                          widget.regularizeRequest != null
-                              ? 'Edit Regularize Request'
-                              : AppStrings.regularize,
-                          style: AppTextStyles.heading3(context).copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: screenHeight * 0.03),
                     // Attendance Day
                     Text(
                       'Attendance Day',
@@ -594,44 +584,7 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
                       hint: 'Select Date',
                       onTap: () => _selectDate(context),
                     ),
-                    // SizedBox(height: screenHeight * 0.02),
-                    // // Request To - Get from user profile
-                    // BlocBuilder<UserProfileBloc, UserProfileState>(
-                    //   builder: (context, profileState) {
-                    //     List<String> managerItems = [];
-                    //
-                    //     if (profileState is UserProfileLoaded) {
-                    //       final profile = profileState.profile;
-                    //       if (profile.reportingManagerInfo != null) {
-                    //         final managerName =
-                    //             profile.reportingManagerInfo!.fullName;
-                    //         managerItems = [managerName];
-                    //       }
-                    //     }
-                    //
-                    //     // Show loading or placeholder if profile not loaded
-                    //     if (managerItems.isEmpty) {
-                    //       managerItems = ['Loading...'];
-                    //     }
-                    //
-                    //     return _buildDropdownField(
-                    //       context,
-                    //       label: 'Request To',
-                    //       value: _requestTo,
-                    //       items: managerItems,
-                    //       onChanged: (value) {
-                    //         setState(() {
-                    //           _requestTo = value;
-                    //           // Update ID when profile is loaded
-                    //           if (profileState is UserProfileLoaded) {
-                    //             _requestToId =
-                    //                 profileState.profile.reportingManager;
-                    //           }
-                    //         });
-                    //       },
-                    //     );
-                    //   },
-                    // ),
+
                     SizedBox(height: screenHeight * 0.02),
                     // Request Type (Radio Buttons)
                     Text(
@@ -743,17 +696,39 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
                     ),
                     SizedBox(height: screenHeight * 0.02),
                     if (widget.regularizeRequest == null) ...[
-                      AppTextField(
+                      _buildDropdownField(
+                        context,
                         label: 'Reason',
-                        hint: 'Enter Reason',
-                        controller: _reasonController,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Please enter a reason';
-                          }
-                          return null;
+                        value: _selectedReason,
+                        items: _regularizeReasonOptions,
+                        hint: 'Select Reason',
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedReason = value;
+                            if (value != 'Other') {
+                              _reasonController.text = value ?? '';
+                              _otherReasonController.clear();
+                            } else {
+                              _reasonController.clear();
+                            }
+                          });
                         },
                       ),
+                      if (_selectedReason == 'Other') ...[
+                        SizedBox(height: screenHeight * 0.02),
+                        AppTextField(
+                          label: 'Other Reason',
+                          hint: 'Enter Other Reason',
+                          controller: _otherReasonController,
+                          validator: (value) {
+                            if (_selectedReason == 'Other' &&
+                                (value == null || value.trim().isEmpty)) {
+                              return 'Please enter other reason';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
                       SizedBox(height: screenHeight * 0.02),
                     ],
                     // Description
@@ -1026,7 +1001,9 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
                 shape: BoxShape.circle,
 
                 color:
-                    isSelected ? AppColors.attendanceTeal : Colors.transparent,
+                    isSelected
+                        ? AppColors.attendanceTeal
+                        : AppColors.backgroundMedium,
               ),
               child:
                   isSelected
@@ -1035,7 +1012,11 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
                         size: screenWidth * 0.04,
                         color: Colors.white,
                       )
-                      : null,
+                      : Icon(
+                        Icons.circle,
+                        size: screenWidth * 0.04,
+                        color: Colors.white,
+                      ),
             ),
             SizedBox(width: screenWidth * 0.02),
             Expanded(
@@ -1046,7 +1027,7 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
                       isSelected
                           ? AppColors.attendanceTeal
                           : AppColors.textPrimary,
-                  fontWeight:  FontWeight.normal,
+                  fontWeight: FontWeight.normal,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

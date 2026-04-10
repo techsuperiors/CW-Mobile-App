@@ -152,7 +152,7 @@ class _OvertimePageListingState extends State<OvertimePageListing>
                         if (state is OvertimeRequestError) {
                         return  ApiErrorState(
                             title: 'Unable to load overtime requests',
-                            rawMessage: state.message,
+                            rawMessage: "something went wrong",
                             onRetry: () {
                               context
                                   .read<OvertimeRequestBloc>()

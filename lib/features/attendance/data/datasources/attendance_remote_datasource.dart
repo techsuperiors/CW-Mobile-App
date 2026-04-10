@@ -13,16 +13,18 @@ class PunchInRequest {
   final double latitude;
   final double longitude;
   final String punchType;
+  final String? punchIn;
 
   PunchInRequest({
     required this.punchInLocation,
     required this.latitude,
     required this.longitude,
     required this.punchType,
+    this.punchIn,
   });
 
   Map<String, dynamic> toJson() {
-    return {
+    final data = <String, dynamic>{
       'punch_in_location': punchInLocation,
       'userLocation': {
         'latitude': latitude,
@@ -30,6 +32,10 @@ class PunchInRequest {
       },
       'punch_type': punchType,
     };
+    if (punchIn != null && punchIn!.trim().isNotEmpty) {
+      data['punch_in_time'] = punchIn;
+    }
+    return data;
   }
 }
 
@@ -59,21 +65,27 @@ class PunchOutRequest {
   final String punchOutLocation;
   final double latitude;
   final double longitude;
+  final String? punchOut;
 
   PunchOutRequest({
     required this.punchOutLocation,
     required this.latitude,
     required this.longitude,
+    this.punchOut,
   });
 
   Map<String, dynamic> toJson() {
-    return {
+    final data = <String, dynamic>{
       'punch_out_location': punchOutLocation,
       'userLocation': {
         'latitude': latitude,
         'longitude': longitude,
       },
     };
+    if (punchOut != null && punchOut!.trim().isNotEmpty) {
+      data['punch_out_time'] = punchOut;
+    }
+    return data;
   }
 }
 
@@ -112,7 +124,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
 
   @override
   Future<PunchInResponse> punchIn(PunchInRequest request) async {
-    final encodedData = encodeData(request);
+    final payload = request.toJson();
+    debugPrint('Punch-in payload before encode: $payload');
+    final encodedData = encodeData(payload);
     debugPrint('Encoded data: $encodedData');
     try {
       final response = await apiClient.post(
@@ -126,7 +140,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           },
         ),
       );
-      debugPrint("response is ${response.data}");
+      debugPrint("response is ${response.statusCode}");
       final punchInResponse = PunchInResponse.fromJson(
         response.data as Map<String, dynamic>,
       );
@@ -150,7 +164,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
 
   @override
   Future<PunchOutResponse> punchOut(PunchOutRequest request) async {
-    final encodedData = encodeData(request);
+    final payload = request.toJson();
+    debugPrint('Punch-out payload before encode: $payload');
+    final encodedData = encodeData(payload);
     debugPrint('Punch-out encoded data: $encodedData');
     try {
       final response = await apiClient.post(
@@ -186,4 +202,3 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     }
   }
 }
-

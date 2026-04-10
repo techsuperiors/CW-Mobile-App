@@ -14,6 +14,8 @@ class AppConstants {
   static const String savedPasswordKey = 'saved_password';
   static const String rememberMeKey = 'remember_me';
   static const String savedAccountsKey = 'saved_accounts';
+  static const String userProfileCacheKey = 'user_profile_cache';
+  static const String userProfileCacheTokenKey = 'user_profile_cache_token';
 
   // Pagination
   static const int defaultPageSize = 20;

@@ -69,7 +69,11 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
   void initState() {
     super.initState();
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
+      AppNavigator.pushAndRemoveAll(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    },);
     final remoteDataSource = OnDutyRemoteDataSourceImpl(apiClient: apiClient);
     final repository = OnDutyRepositoryImpl(remoteDataSource: remoteDataSource);
 
@@ -196,7 +200,10 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
                   ),
                   bottomNavigationBar:
                       widget.isApprovalMode
-                          ? null
+                          ? BottomNavBar(
+                        currentIndex: 4,
+                        onTap: NavigationHelper.getBottomNavHandler(context),
+                      )
                           : BottomNavBar(
                             currentIndex: 3,
                             onTap: NavigationHelper.getBottomNavHandler(context),
@@ -445,19 +452,21 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
           Divider(height: screenHeight * 0.03, color: AppColors.border),
           _buildDetailRow(
             context,
-            'From:',
+            isSingleDay ? 'On:' : 'From:',
             dateFormat.format(currentRequest.fromDate),
             screenWidth,
           ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRow(
-            context,
-            'To:',
-            currentRequest.toDate != null
-                ? dateFormat.format(currentRequest.toDate!)
-                : dateFormat.format(currentRequest.fromDate),
-            screenWidth,
-          ),
+          if (!isSingleDay) ...[
+            Divider(height: screenHeight * 0.03, color: AppColors.border),
+            _buildDetailRow(
+              context,
+              'To:',
+              currentRequest.toDate != null
+                  ? dateFormat.format(currentRequest.toDate!)
+                  : dateFormat.format(currentRequest.fromDate),
+              screenWidth,
+            ),
+          ],
           if (currentRequest.startHalf != null) ...[
             Divider(height: screenHeight * 0.03, color: AppColors.border),
             _buildDetailRow(

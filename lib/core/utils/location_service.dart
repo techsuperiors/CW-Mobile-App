@@ -6,11 +6,13 @@ class LocationData {
   final double latitude;
   final double longitude;
   final String address;
+  final bool hasResolvedAddress;
 
   LocationData({
     required this.latitude,
     required this.longitude,
     required this.address,
+    required this.hasResolvedAddress,
   });
 }
 
@@ -57,22 +59,23 @@ class LocationService {
       // Request permission first
       await requestLocationPermission();
 
-      // Get current position
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
+      // Get current position. If the fresh lookup times out, fall back to the
+      // last known position so we can still preserve the punch event.
+      final position = await _getBestAvailablePosition();
 
-      // Get address from coordinates (reverse geocoding)
-      String address = await _getAddressFromCoordinates(
+      final resolvedAddress = await tryGetAddressFromCoordinates(
         position.latitude,
         position.longitude,
       );
+      final address =
+          resolvedAddress ??
+          buildCoordinateFallback(position.latitude, position.longitude);
 
       return LocationData(
         latitude: position.latitude,
         longitude: position.longitude,
         address: address,
+        hasResolvedAddress: resolvedAddress != null,
       );
     } catch (e) {
       if (e is Exception) {
@@ -82,8 +85,23 @@ class LocationService {
     }
   }
 
+  Future<Position> _getBestAvailablePosition() async {
+    try {
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+    } catch (_) {
+      final lastKnownPosition = await Geolocator.getLastKnownPosition();
+      if (lastKnownPosition != null) {
+        return lastKnownPosition;
+      }
+      rethrow;
+    }
+  }
+
   /// Get address from coordinates using reverse geocoding
-  Future<String> _getAddressFromCoordinates(
+  Future<String?> tryGetAddressFromCoordinates(
     double latitude,
     double longitude,
   ) async {
@@ -94,7 +112,7 @@ class LocationService {
       );
 
       if (placemarks.isEmpty) {
-        return 'Unknown Location';
+        return null;
       }
 
       Placemark place = placemarks[0];
@@ -124,10 +142,14 @@ class LocationService {
         addressParts.add(place.postalCode!);
       }
 
-      return addressParts.join(', ');
+      final address = addressParts.join(', ').trim();
+      return address.isEmpty ? null : address;
     } catch (e) {
-      // If reverse geocoding fails, return a basic address
-      return 'Lat: ${latitude.toStringAsFixed(6)}, Lng: ${longitude.toStringAsFixed(6)}';
+      return null;
     }
+  }
+
+  String buildCoordinateFallback(double latitude, double longitude) {
+    return 'Lat: ${latitude.toStringAsFixed(6)}, Lng: ${longitude.toStringAsFixed(6)}';
   }
 }

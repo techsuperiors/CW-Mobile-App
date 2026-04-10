@@ -111,10 +111,8 @@ class LeaveHistoryPage extends StatelessWidget {
                         ],
                         rows:
                             history.map((record) {
-                              final dateFormat = DateFormat('dd-MM-yyyy');
-                              final dateStr = dateFormat.format(
-                                record.date,
-                              );
+                              final dateFormat = DateFormat('dd-MMM-yyyy');
+                              final dateStr = dateFormat.format(record.date);
                               // Determine if this is a positive (addition) or negative (deduction/subtraction)
                               final isPositive =
                                   record.action.toLowerCase() == 'addition';
@@ -125,9 +123,7 @@ class LeaveHistoryPage extends StatelessWidget {
                                       : '- ${record.leaveCount.abs()}';
 
                               final changeColor =
-                                  isPositive
-                                      ? Colors.green
-                                      : AppColors.error;
+                                  isPositive ? Colors.green : AppColors.error;
 
                               return DataRow(
                                 cells: [
@@ -142,9 +138,7 @@ class LeaveHistoryPage extends StatelessWidget {
                                       ),
                                       decoration: BoxDecoration(
                                         color: changeColor.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(
-                                          4,
-                                        ),
+                                        borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
                                         changeLabel,
@@ -157,8 +151,7 @@ class LeaveHistoryPage extends StatelessWidget {
                                   ),
                                   DataCell(
                                     Text(
-                                      record.remainingLeaves
-                                          .toStringAsFixed(2),
+                                      record.remainingLeaves.toStringAsFixed(2),
                                     ),
                                   ),
                                   DataCell(Text(record.remarks)),

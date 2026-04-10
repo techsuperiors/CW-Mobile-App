@@ -66,8 +66,8 @@ class _AssignedAssetsPageState extends State<AssignedAssetsPage>
     final remoteDataSource = AssetRemoteDataSourceImpl(apiClient);
     final repository = AssetRepositoryImpl(remoteDataSource: remoteDataSource);
     return (
-      assets: GetAssetsUseCase(repository),
-      requests: GetAssetRequestsUseCase(repository),
+    assets: GetAssetsUseCase(repository),
+    requests: GetAssetRequestsUseCase(repository),
     );
   }
 
@@ -93,19 +93,19 @@ class _AssignedAssetsPageState extends State<AssignedAssetsPage>
       String? error;
 
       assetsResult.fold(
-        (failure) {
+            (failure) {
           error = failure.message;
         },
-        (data) {
+            (data) {
           _assets = List<AssetEntity>.from(data as List);
         },
       );
 
       requestsResult.fold(
-        (failure) {
+            (failure) {
           error ??= failure.message;
         },
-        (data) {
+            (data) {
           _assetRequests = List<AssetRequestEntity>.from(data as List);
         },
       );
@@ -205,7 +205,7 @@ class _AssignedAssetsPageState extends State<AssignedAssetsPage>
             _hasLoaded = true;
             // Schedule after current frame to avoid calling setState during build
             WidgetsBinding.instance.addPostFrameCallback(
-              (_) => _loadAll(_userId!),
+                  (_) => _loadAll(_userId!),
             );
           }
           return _buildBody(context);
@@ -247,11 +247,11 @@ class _AssignedAssetsPageState extends State<AssignedAssetsPage>
         itemCount: _assets.length,
         itemBuilder:
             (context, index) => Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).size.height < 700 ? 12 : 16,
-              ),
-              child: AssetCard(asset: _assets[index]),
-            ),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).size.height < 700 ? 12 : 16,
+          ),
+          child: AssetCard(asset: _assets[index]),
+        ),
       ),
     );
   }
@@ -271,11 +271,11 @@ class _AssignedAssetsPageState extends State<AssignedAssetsPage>
         itemCount: _assetRequests.length,
         itemBuilder:
             (context, index) => Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).size.height < 700 ? 12 : 16,
-              ),
-              child: AssetRequestCard(request: _assetRequests[index]),
-            ),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).size.height < 700 ? 12 : 16,
+          ),
+          child: AssetRequestCard(request: _assetRequests[index]),
+        ),
       ),
     );
   }
@@ -286,7 +286,7 @@ class _AssignedAssetsPageState extends State<AssignedAssetsPage>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon, color: AppColors.textSecondary.withOpacity(0.5), size: 64),
-          const SizedBox(height: 16),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.02),
           Text(
             message,
             style: AppTextStyles.bodyLarge(

@@ -72,7 +72,7 @@ class DocumentFolderCard extends StatelessWidget {
                 children: [
                   Text(
                     folder.name,
-                    style: AppTextStyles.bodyLarge(context).copyWith(
+                    style: AppTextStyles.bodyMedium(context).copyWith(
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
                     ),

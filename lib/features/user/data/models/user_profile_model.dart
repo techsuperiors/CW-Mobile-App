@@ -149,6 +149,90 @@ class UserProfileModel {
     );
   }
 
+  UserProfileModel copyWith({bool? allowAllUsers}) {
+    return UserProfileModel(
+      clientId: clientId,
+      userId: userId,
+      allowAllUsers: allowAllUsers ?? this.allowAllUsers,
+      departmentId: departmentId,
+      address: address,
+      contactDetails: contactDetails,
+      bankDetails: bankDetails,
+      educationDetails: educationDetails,
+      pastExperience: pastExperience,
+      socialLinks: socialLinks,
+      birthday: birthday,
+      bloodGroup: bloodGroup,
+      userAbout: userAbout,
+      reportingHr: reportingHr,
+      reportingManager: reportingManager,
+      skills: skills,
+      esiNumber: esiNumber,
+      uanNumber: uanNumber,
+      pfNumber: pfNumber,
+      ctc: ctc,
+      payrollEnabled: payrollEnabled,
+      belongsTo: belongsTo,
+      employmentStatus: employmentStatus,
+      familyDetails: familyDetails,
+      identityDetails: identityDetails,
+      officialPhone: officialPhone,
+      inProbation: inProbation,
+      l2Manager: l2Manager,
+      associateManagers: associateManagers,
+      legalEntityId: legalEntityId,
+      user: user,
+      reportingManagerInfo: reportingManagerInfo,
+      reportingHrInfo: reportingHrInfo,
+      userDepartment: userDepartment,
+      userDesignation: userDesignation,
+      client: client,
+      role: role,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'client_id': clientId,
+      'user_id': userId,
+      'allow_all_users': allowAllUsers,
+      'department_id': departmentId,
+      'address': address,
+      'contact_details': contactDetails,
+      'bank_details': bankDetails,
+      'education_details': educationDetails,
+      'past_experience': pastExperience,
+      'social_links': socialLinks,
+      'birthday': birthday,
+      'blood_group': bloodGroup,
+      'user_about': userAbout,
+      'reporting_hr': reportingHr,
+      'reporting_manager': reportingManager,
+      'skills': skills,
+      'esi_number': esiNumber,
+      'uan_number': uanNumber,
+      'pf_number': pfNumber,
+      'ctc': ctc,
+      'payroll_enabled': payrollEnabled,
+      'belongs_to': belongsTo,
+      'employment_status': employmentStatus,
+      'family_details': familyDetails,
+      'identity_details': identityDetails,
+      'official_phone': officialPhone,
+      'in_probation': inProbation,
+      'l2_manager': l2Manager,
+      'associate_managers': associateManagers,
+      'legal_entity_id': legalEntityId,
+      'user': user.toJson(),
+      'reportingManager': reportingManagerInfo?.toJson(),
+      'reportingHR': reportingHrInfo?.toJson(),
+      'department_name': userDepartment?.departmentName,
+      'designation_name': userDesignation?.designationName,
+      'client_name': client?.clientName,
+      'Role': role?.toJson(),
+    };
+  }
+
   static int? _asInt(dynamic value) {
     if (value is int) return value;
     if (value is String) return int.tryParse(value);
@@ -168,9 +252,7 @@ class UserProfileModel {
     if (value == null) return null;
     if (value is Map<String, dynamic>) return value;
     if (value is Map) {
-      return value.map(
-        (key, val) => MapEntry(key.toString(), val),
-      );
+      return value.map((key, val) => MapEntry(key.toString(), val));
     }
     return null;
   }
@@ -265,6 +347,31 @@ class UserInfo {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'first_name': firstName,
+      'middle_name': middleName,
+      'last_name': lastName,
+      'location': location,
+      'email': email,
+      'phone': phone,
+      'status': status,
+      'username': username,
+      'personal_email': personalEmail,
+      'image_url': imageUrl,
+      'gender': gender,
+      'joining_date': joiningDate,
+      'employee_type': employeeType,
+      'employeeID': employeeID,
+      'profile_color': profileColor,
+      'cover_image_url': coverImageUrl,
+      'work_mode': workMode,
+      'marital_status': maritalStatus,
+    };
+  }
+
   String get fullName {
     final parts = <String>[];
     if (firstName != null && firstName!.isNotEmpty) {
@@ -307,6 +414,17 @@ class ReportingManagerInfo {
       imageUrl: json['image_url'] as String?,
       profileColor: json['profile_color'] as String?,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'first_name': firstName,
+      'last_name': lastName,
+      'middle_name': middleName,
+      'email': email,
+      'image_url': imageUrl,
+      'profile_color': profileColor,
+    };
   }
 
   String get fullName {
@@ -353,6 +471,17 @@ class ReportingHrInfo {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'first_name': firstName,
+      'last_name': lastName,
+      'middle_name': middleName,
+      'email': email,
+      'image_url': imageUrl,
+      'profile_color': profileColor,
+    };
+  }
+
   String get fullName {
     final parts = <String>[];
     if (firstName != null && firstName!.isNotEmpty) {
@@ -379,6 +508,10 @@ class UserDepartmentInfo {
       departmentName: json['department_name'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {'department_name': departmentName};
+  }
 }
 
 /// User Designation Information
@@ -391,6 +524,10 @@ class UserDesignationInfo {
     return UserDesignationInfo(
       designationName: json['designation_name'] as String?,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'designation_name': designationName};
   }
 }
 
@@ -406,6 +543,10 @@ class ClientInfo {
       id: (json['id'] as int?) ?? 0,
       clientName: json['client_name'] as String?,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'id': id, 'client_name': clientName};
   }
 }
 
@@ -424,5 +565,9 @@ class RoleInfo {
               ?.map((e) => e.toString())
               .toList(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'role_name': roleName, 'permissions': permissions};
   }
 }

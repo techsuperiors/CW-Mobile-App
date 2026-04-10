@@ -112,27 +112,24 @@ class _PoliciesPageState extends State<PoliciesPage> {
             );
           }
 
-          return RefreshIndicator(
-            onRefresh: _reloadPolicies,
-            child: ListView.builder(
-              padding: EdgeInsets.symmetric(
-                horizontal: MediaQuery.of(context).size.width * 0.01,
-                vertical: 8,
-              ),
-              itemCount: policies.length,
-              itemBuilder: (context, index) {
-                final screenHeight = MediaQuery.of(context).size.height;
-                final spacing =
-                    screenHeight < 600 ? 12.0 : (screenHeight < 700 ? 14.0 : 16.0);
-                return Padding(
-                  padding: EdgeInsets.only(bottom: spacing),
-                  child: PolicyCard(
-                    policy: policies[index],
-                    onPolicyUpdated: _reloadPolicies,
-                  ),
-                );
-              },
+          return ListView.builder(
+            padding: EdgeInsets.symmetric(
+              horizontal: MediaQuery.of(context).size.width * 0.01,
+              vertical: 8,
             ),
+            itemCount: policies.length,
+            itemBuilder: (context, index) {
+              final screenHeight = MediaQuery.of(context).size.height;
+              final spacing =
+                  screenHeight < 600 ? 12.0 : (screenHeight < 700 ? 14.0 : 16.0);
+              return Padding(
+                padding: EdgeInsets.only(bottom: spacing),
+                child: PolicyCard(
+                  policy: policies[index],
+                  onPolicyUpdated: _reloadPolicies,
+                ),
+              );
+            },
           );
         },
       ),

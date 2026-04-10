@@ -262,7 +262,7 @@ class ExpenseRemoteData {
         );
       }
 
-      return body['message']?.toString() ?? 'Comments updated successfully';
+      return body['message']?.toString() ?? 'Comment updated successfully';
     } on ServerException {
       rethrow;
     } catch (e) {

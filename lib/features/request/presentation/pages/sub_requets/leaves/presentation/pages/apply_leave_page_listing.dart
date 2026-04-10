@@ -95,7 +95,8 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing>
       },
       child: ResponsiveScaffold(
         backgroundColor: AppColors.backgroundLight,
-        appBar: AppBar(
+        appBar:
+        AppBar(
           forceMaterialTransparency: true,
           elevation: 0,
           backgroundColor: AppColors.background,

@@ -12,12 +12,14 @@ import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../../core/utils/app_navigator.dart';
 import '../../../../../../../../core/utils/data_encoder.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/utils/token_storage.dart';
 import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../../core/widgets/status_tabbed_section.dart';
+import '../../../../../../../authentication/presentation/pages/login_page.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../bloc/wfh_request_bloc.dart';
 import '../../bloc/wfh_request_event.dart';
@@ -76,7 +78,11 @@ class _WfhPageListingState extends State<WfhPageListing>
     final screenHeight = MediaQuery.of(context).size.height;
 
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
+      AppNavigator.pushAndRemoveAll(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    },);
     final remoteDataSource = WfhRemoteDataSourceImpl(apiClient: apiClient);
     final repository = WfhRepositoryImpl(remoteDataSource: remoteDataSource);
     final getWfhRequestsUseCase = GetWfhRequestsUseCase(repository);

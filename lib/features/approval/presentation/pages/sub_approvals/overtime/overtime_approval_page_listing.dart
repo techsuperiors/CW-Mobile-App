@@ -33,6 +33,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../home/presentation/widgets/bottom_nav_bar.dart';
+
 class OvertimeApprovalPageListing extends StatefulWidget {
   const OvertimeApprovalPageListing({super.key});
 
@@ -94,6 +97,10 @@ class _OvertimeApprovalPageListingState
             ),
           ),
           centerTitle: true,
+        ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 4,
+          onTap: NavigationHelper.getBottomNavHandler(context),
         ),
         body: const AccessDeniedView(
           title: 'Approval Access Required',
@@ -179,6 +186,10 @@ class _OvertimeApprovalPageListingState
             ),
           ),
           centerTitle: true,
+        ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 4,
+          onTap: NavigationHelper.getBottomNavHandler(context),
         ),
         body: Builder(
           builder:

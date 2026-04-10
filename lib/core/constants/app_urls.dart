@@ -4,8 +4,8 @@ class AppUrls {
   AppUrls._(); // Private constructor to prevent instantiation
 
   // Authentication endpoints
-  static const String login = '/api/mobile/app/users/login';
   static const String logout = '/api/users/logout';
+  static const String login = '/api/mobile/app/users/login';
 
   // Forgot password flow
   static const String forgotPassword = '/api/mobile/app/users/forgot/password';
@@ -30,6 +30,8 @@ class AppUrls {
   static const String punchOut = '/api/attendance/punchOut';
   static const String attendanceDetails = '/api/attendance/details';
   static const String attendanceUserDetail = '/api/attendance/user/detail';
+  static const String attendanceUserWorkingHours =
+      '/api/attendance/user/working/hours';
   static const String attendanceRequest = '/api/attendance/request';
   static const String attendanceRange = '/api/attendance/range';
   static const String attendanceRequestComments =
@@ -41,8 +43,8 @@ class AppUrls {
 
   // Leave/Request endpoints
   static const String leaveTypesList = '/api/leaves/type/list';
+  static const String leaveUserPolicy = '/api/users/leave/type/list';
   static const String applyLeave = '/api/leaves/request';
-
 
   // static const String leaveHistory = '/api/api/mobile/app/leaves/history';
   // static const String leaveRequests = '/api/api/mobile/app/leaves/requests';
@@ -115,7 +117,8 @@ class AppUrls {
 
   // WFH request endpoints
   // static const String wfhRequests = '/api/mobile/app/users/wfh/requests'; // This causes error in the mobile
-  static const String wfhRequests = '/api/attendance/wfh/request'; // This causes error in the mobile
+  static const String wfhRequests =
+      '/api/attendance/wfh/request'; // This causes error in the mobile
   static const String wfhTeamRequests = '/api/attendance/wfh/request/team';
   static const String wfhRequestStats = '/api/attendance/wfh/request/stats';
   static const String wfhRequestRaise = '/api/attendance/wfh/request';
@@ -143,7 +146,8 @@ class AppUrls {
   static const String overtimeRequestDetails = '/api/overtime/request/details';
   static const String overtimeRequestCreate = '/api/overtime/request/create';
   static const String overtimeRequestUpdate = '/api/overtime/request/update';
-  static const String overtimeRequestStatus = '/api/overtime/request/update/status';
+  static const String overtimeRequestStatus =
+      '/api/overtime/request/update/status';
 
   // Comp-off endpoints
   static const String compOffList = '/api/leaves/compoff/list';
@@ -177,4 +181,33 @@ class AppUrls {
   static const String expenseUpdate = '/api/expense/update';
   static const String expenseUserPolicy = '/api/expense/user/policy';
   static const String userTripList = '/api/users/trip/list';
+
+  //posts
+  static const String announcementList = "/api/announcement/list";
+  static const String announcementDetails = "/api/announcement/details";
+  static const String announcementUpdate = "/api/announcement/";
+  static const String announcementAudienceDepartments =
+      "/api/admin/department/names";
+  static const String announcementAudienceUsers = "/api/users/names";
+  static const String announcementGenerateContent =
+      "/api/application/generate/content";
+  static const String announcementLike = "/api/announcement/like";
+  static const String announcementRemoveLike = "/api/announcement/like/delete";
+  static const String announcementBookmark = "/api/announcement/bookmark";
+  static const String announcementRemoveBookmark =
+      "/api/announcement/bookmark/remove";
+  static const String announcementRepost = "/api/announcement/repost";
+  static const String announcementDelete = "/api/announcement/delete";
+  static const String announcementReport = "/api/announcement/report";
+  static const String announcementAdminReportMark =
+      "/api/announcement/admin/report/mark";
+  static const String announcementComment = "/api/announcement/comment";
+  static const String announcementAnswerResponse =
+      "/api/announcement/answer/response";
+  static const String announcementCommentLike =
+      "/api/announcement/comment/like";
+  static const String announcementCommentUpdate =
+      "/api/announcement/comment/update";
+  static const String announcementCommentDelete =
+      "/api/announcement/comment/delete";
 }

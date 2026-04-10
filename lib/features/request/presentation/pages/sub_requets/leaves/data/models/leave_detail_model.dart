@@ -218,6 +218,8 @@ class LeaveDetailModel {
   final String? subject;
   final String reason;
   final String? description;
+  final String? leaveStartTime;
+  final String? leaveEndTime;
   final String status;
   final String? rejectRemark;
   final String dayType;
@@ -247,6 +249,8 @@ class LeaveDetailModel {
     this.subject,
     required this.reason,
     this.description,
+    this.leaveStartTime,
+    this.leaveEndTime,
     required this.status,
     this.rejectRemark,
     required this.dayType,
@@ -311,6 +315,8 @@ class LeaveDetailModel {
       subject: data['subject'] as String?,
       reason: data['reason'] as String? ?? '',
       description: data['description'] as String?,
+      leaveStartTime: data['leave_start_time']?.toString(),
+      leaveEndTime: data['leave_end_time']?.toString(),
       status: data['status'] as String? ?? 'Pending',
       rejectRemark: data['reject_remark'] as String?,
       dayType: data['day_type'] as String? ?? 'single',
@@ -344,6 +350,8 @@ class LeaveDetailModel {
     String? subject,
     String? reason,
     String? description,
+    String? leaveStartTime,
+    String? leaveEndTime,
     String? status,
     String? rejectRemark,
     String? dayType,
@@ -373,6 +381,8 @@ class LeaveDetailModel {
       subject: subject ?? this.subject,
       reason: reason ?? this.reason,
       description: description ?? this.description,
+      leaveStartTime: leaveStartTime ?? this.leaveStartTime,
+      leaveEndTime: leaveEndTime ?? this.leaveEndTime,
       status: status ?? this.status,
       rejectRemark: rejectRemark ?? this.rejectRemark,
       dayType: dayType ?? this.dayType,

@@ -5,11 +5,13 @@ import '../../../../../../core/constants/app_assets.dart';
 import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../core/constants/module_permissions.dart';
+import '../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../core/utils/permission_checker.dart';
 import '../../../../../../core/widgets/access_denied_view.dart';
 import '../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../core/widgets/status_tabbed_section.dart';
+import '../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../../../../request/presentation/widgets/request_listing/request_empty_state.dart';
 import '../../../../../request/presentation/widgets/request_listing/request_grouping_utils.dart';
 import '../../../../../request/presentation/widgets/request_listing/request_tab_theme.dart';
@@ -86,6 +88,10 @@ class _RegularizeApprovalPageListingState
           ),
           centerTitle: true,
         ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 4,
+          onTap: NavigationHelper.getBottomNavHandler(context),
+        ),
         body: const AccessDeniedView(
           title: 'Approval Access Required',
           message:
@@ -140,7 +146,7 @@ class _RegularizeApprovalPageListingState
                 Flexible(
                   child: Text(
                     'Back',
-                    style: AppTextStyles.bodyLarge(context).copyWith(
+                    style: AppTextStyles.bodyMedium(context).copyWith(
                       fontWeight: FontWeight.w400,
                       color: Theme.of(context).colorScheme.primary,
                     ),
@@ -159,6 +165,10 @@ class _RegularizeApprovalPageListingState
             ),
           ),
           centerTitle: true,
+        ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 4,
+          onTap: NavigationHelper.getBottomNavHandler(context),
         ),
         body: Builder(
           builder:

@@ -78,13 +78,15 @@ class LeaveTypesRepositoryImpl implements LeaveTypesRepository {
     required String endDate,
     required String subject,
     required String reason,
-    required String startHalf,
-    required String endHalf,
+    required String? startHalf,
+    required String? endHalf,
     required String dayType,
     required String description,
     required String shortCode,
     required int requestTo,
     required List<String> rHDates,
+    String? leaveStartTime,
+    String? leaveEndTime,
     List<File> attachmentFiles = const [],
   }) async {
     if (await networkInfo.isConnected) {
@@ -104,6 +106,8 @@ class LeaveTypesRepositoryImpl implements LeaveTypesRepository {
           shortCode: shortCode,
           requestTo: requestTo,
           rHDates: rHDates,
+          leaveStartTime: leaveStartTime,
+          leaveEndTime: leaveEndTime,
           attachmentFiles: attachmentFiles,
         );
 

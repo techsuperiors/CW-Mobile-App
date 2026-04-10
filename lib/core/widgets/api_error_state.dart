@@ -22,19 +22,24 @@ class ApiErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     final message = ErrorMessageMapper.toUserFriendlyMessage(rawMessage);
     final resolvedDescription = description ?? message;
+    final sw = MediaQuery.of(context).size.width;
+    final sh = MediaQuery.of(context).size.height;
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.symmetric(
+          horizontal: sw * 0.002,
+          vertical: sh * 0.002,
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               Icons.sync_problem,
               size: MediaQuery.of(context).size.width * 0.15,
-              color: AppColors.error,
+              color: AppColors.attendanceGreyDepth,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: sh * 0.01),
             Text(
               title,
               style: AppTextStyles.heading4(context).copyWith(
@@ -43,20 +48,17 @@ class ApiErrorState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: sh * 0.01),
             Text(
               resolvedDescription,
-              style: AppTextStyles.bodyMedium(context).copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: AppTextStyles.bodyMedium(
+                context,
+              ).copyWith(color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
             if (onRetry != null) ...[
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: onRetry,
-                child: const Text('Retry'),
-              ),
+              SizedBox(height: sh * 0.02),
+              ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
             ],
           ],
         ),

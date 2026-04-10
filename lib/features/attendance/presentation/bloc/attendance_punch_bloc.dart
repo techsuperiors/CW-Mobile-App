@@ -2,14 +2,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'dart:async';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../core/utils/location_service.dart';
+import '../../data/datasources/attendance_offline_local_datasource.dart';
 import '../../data/datasources/attendance_remote_datasource.dart';
 import '../../data/repositories/attendance_repository_impl.dart';
+import '../../domain/repositories/attendance_repository.dart';
 import '../../domain/usecases/punch_in_usecase.dart';
 import '../../domain/usecases/punch_out_usecase.dart';
+import '../utils/attendance_punch_reconciliation_helper.dart';
 import 'attendance_punch_event.dart';
 import 'attendance_punch_state.dart';
 
@@ -35,10 +39,24 @@ class AttendancePunchBloc
     extends Bloc<AttendancePunchEvent, AttendancePunchState> {
   /// Guard flag to prevent duplicate requests from double-taps
   bool _isProcessing = false;
+  bool _isSyncingPendingActions = false;
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
   AttendancePunchBloc() : super(const AttendancePunchInitial()) {
     on<PunchInRequested>(_onPunchInRequested);
     on<PunchOutRequested>(_onPunchOutRequested);
+    on<PendingAttendanceSyncRequested>(_onPendingAttendanceSyncRequested);
+
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
+      result,
+    ) {
+      if (result != ConnectivityResult.none) {
+        add(const PendingAttendanceSyncRequested(showFeedback: true));
+      }
+    });
+
+    add(const PendingAttendanceSyncRequested(showFeedback: false));
   }
 
   /// Handle Punch In request
@@ -66,17 +84,26 @@ class AttendancePunchBloc
         latitude: locationData.latitude,
         longitude: locationData.longitude,
         punchType: 'remote',
+        needsAddressResolution: !locationData.hasResolvedAddress,
       );
 
       // Handle Either result
       result.fold(
         (failure) => emit(AttendancePunchError(message: failure.message)),
-        (success) => emit(
-          AttendancePunchInSuccess(
-            message: success.message,
-            punchInTime: DateTime.now(),
-          ),
-        ),
+        (success) {
+          final needsReconciliation =
+              AttendancePunchReconciliationHelper.requiresPunchInReconciliation(
+                success.message,
+              );
+          emit(
+            AttendancePunchInSuccess(
+              message: success.message,
+              punchInTime: DateTime.now(),
+              requiresServerRefresh: needsReconciliation,
+              isQueuedOffline: success.data?['queued'] == true,
+            ),
+          );
+        },
       );
     } catch (e) {
       debugPrint('PunchIn error: $e');
@@ -110,18 +137,58 @@ class AttendancePunchBloc
         punchOutLocation: locationData.address,
         latitude: locationData.latitude,
         longitude: locationData.longitude,
+        needsAddressResolution: !locationData.hasResolvedAddress,
       );
 
       // Handle Either result
       result.fold(
         (failure) => emit(AttendancePunchError(message: failure.message)),
-        (success) => emit(AttendancePunchOutSuccess(message: success.message)),
+        (success) {
+          final needsReconciliation =
+              AttendancePunchReconciliationHelper.requiresPunchOutReconciliation(
+                success.message,
+              );
+          emit(
+            AttendancePunchOutSuccess(
+              message: success.message,
+              requiresServerRefresh: needsReconciliation,
+              isQueuedOffline: success.data?['queued'] == true,
+            ),
+          );
+        },
       );
     } catch (e) {
       debugPrint('PunchOut error: $e');
       emit(AttendancePunchError(message: _getReadableErrorMessage(e)));
     } finally {
       _isProcessing = false;
+    }
+  }
+
+  Future<void> _onPendingAttendanceSyncRequested(
+    PendingAttendanceSyncRequested event,
+    Emitter<AttendancePunchState> emit,
+  ) async {
+    if (_isSyncingPendingActions) return;
+    _isSyncingPendingActions = true;
+
+    try {
+      final repository = _createAttendanceRepository();
+      final hadPendingActions = await repository.hasPendingActions();
+      if (!hadPendingActions) return;
+
+      final synced = await repository.syncPendingActions();
+      if (synced && event.showFeedback) {
+        emit(
+          AttendancePendingSyncSuccess(
+            message: 'Pending attendance actions synced successfully.',
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Pending attendance sync error: $e');
+    } finally {
+      _isSyncingPendingActions = false;
     }
   }
 
@@ -138,31 +205,36 @@ class AttendancePunchBloc
       return 'No internet connection. Please check your network and try again.';
     }
     return 'Something went wrong. Please try again.';
+    // return message;
   }
 
   /// Create PunchInUseCase with full dependency chain
   PunchInUseCase _createPunchInUseCase() {
+    final repository = _createAttendanceRepository();
+    return PunchInUseCase(repository);
+  }
+
+  AttendanceRepository _createAttendanceRepository() {
     final networkInfo = NetworkInfoImpl(Connectivity());
     final dio = Dio();
     final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
     final remoteDataSource = AttendanceRemoteDataSourceImpl(apiClient);
-    final repository = AttendanceRepositoryImpl(
+    return AttendanceRepositoryImpl(
       remoteDataSource: remoteDataSource,
       networkInfo: networkInfo,
+      offlineLocalDataSource: AttendanceOfflineLocalDataSourceImpl(),
+      locationService: LocationService(),
     );
-    return PunchInUseCase(repository);
   }
 
   /// Create PunchOutUseCase with full dependency chain
   PunchOutUseCase _createPunchOutUseCase() {
-    final networkInfo = NetworkInfoImpl(Connectivity());
-    final dio = Dio();
-    final apiClient = ApiClient(dio: dio, networkInfo: networkInfo);
-    final remoteDataSource = AttendanceRemoteDataSourceImpl(apiClient);
-    final repository = AttendanceRepositoryImpl(
-      remoteDataSource: remoteDataSource,
-      networkInfo: networkInfo,
-    );
-    return PunchOutUseCase(repository);
+    return PunchOutUseCase(_createAttendanceRepository());
+  }
+
+  @override
+  Future<void> close() {
+    _connectivitySubscription?.cancel();
+    return super.close();
   }
 }

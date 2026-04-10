@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:collectivWork/features/services/presentation/pages/sub_services/policies/presentation/pages/policy_content_preview.dart';
+import 'package:collectivWork/features/services/presentation/pages/sub_services/policies/presentation/pages/policy_pdf_preview.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -59,8 +61,7 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
         backgroundColor: AppColors.backgroundMedium,
         appBar: AppBar(
           elevation: 0,
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Colors.white,
+          backgroundColor: AppColors.backgroundMedium,
           leading: GestureDetector(
             onTap: _handleBackPressed,
             child: Row(
@@ -69,7 +70,7 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
               children: [
                 Icon(
                   Icons.arrow_back_ios,
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.primary,
                   size:
                       MediaQuery.of(context).size.width *
                       0.048, // ~4.8% of screen width
@@ -77,9 +78,10 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
                 Flexible(
                   child: Text(
                     "Back",
-                    style: AppTextStyles.bodyMedium(
-                      context,
-                    ).copyWith(fontWeight: FontWeight.w400, color: Colors.white),
+                    style: AppTextStyles.bodyMedium(context).copyWith(
+                      fontWeight: FontWeight.w400,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -89,9 +91,10 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
           leadingWidth: 110,
           title: Text(
             widget.policy.name,
-            style: AppTextStyles.heading4(
-              context,
-            ).copyWith(fontWeight: FontWeight.w600, color: Colors.white),
+            style: AppTextStyles.heading4(context).copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
             overflow: TextOverflow.ellipsis,
           ),
           centerTitle: true,
@@ -422,12 +425,12 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
                 children: [
                   Text(
                     title,
-                    style: AppTextStyles.bodyLarge(context).copyWith(
+                    style: AppTextStyles.bodyMedium(context).copyWith(
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  SizedBox(height: sh * 0.006),
+                  SizedBox(height: sh * 0.004),
                   Text(
                     subtitle,
                     style: AppTextStyles.bodySmall(
@@ -452,7 +455,7 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
   Future<void> _openPolicyPreview(PolicyModel policy) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => _PolicyContentPreviewPage(policy: policy),
+        builder: (_) => PolicyContentPreviewPage(policy: policy),
       ),
     );
   }
@@ -500,7 +503,7 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
               Expanded(
                 child: Text(
                   'I have read and agree to the company policy',
-                  style: AppTextStyles.bodyMedium(context).copyWith(
+                  style: AppTextStyles.bodyMediumHeading(context).copyWith(
                     fontWeight: FontWeight.w400,
                     color: AppColors.textPrimary,
                   ),
@@ -587,9 +590,13 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
                   (_signatureBytes != null || hasExistingSignature)
                       ? 'Change Signature'
                       : 'Add Signature',
-                  style: AppTextStyles.bodyLarge(
-                    context,
-                  ).copyWith(fontWeight: FontWeight.w600),
+                  style: AppTextStyles.bodyMedium(context).copyWith(
+                    fontWeight: FontWeight.w600,
+                    color:
+                        _isAgreed
+                            ? AppColors.background
+                            : AppColors.textPrimary,
+                  ),
                 ),
               ),
             ),
@@ -617,7 +624,7 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
                 _isSubmittingAcknowledgment
                     ? 'Submitting...'
                     : 'Submit Acknowledgment',
-                style: AppTextStyles.bodyLarge(
+                style: AppTextStyles.bodyMedium(
                   context,
                 ).copyWith(fontWeight: FontWeight.w600),
               ),
@@ -653,7 +660,7 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
           children: [
             Text(
               'Signed Document',
-              style: AppTextStyles.bodyLarge(context).copyWith(
+              style: AppTextStyles.bodyMedium(context).copyWith(
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
@@ -691,7 +698,7 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
         children: [
           Text(
             'Signature',
-            style: AppTextStyles.bodyLarge(context).copyWith(
+            style: AppTextStyles.bodyMedium(context).copyWith(
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
             ),
@@ -874,7 +881,7 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.bodyMedium(context).copyWith(
+                    style: AppTextStyles.bodyMediumHeading(context).copyWith(
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
                     ),
@@ -916,7 +923,7 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
   }) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => _PolicyPdfPreviewPage(title: title, pdfUrl: url),
+        builder: (_) => PolicyPdfPreviewPage(title: title, pdfUrl: url),
       ),
     );
   }
@@ -992,245 +999,18 @@ class _PolicyDetailPageState extends State<PolicyDetailPage> {
     return document.save();
   }
 
+  //
   String _getPolicyContent(PolicyModel policy) {
-    return (policy.content != null && policy.content!.trim().isNotEmpty)
-        ? policy.content!
-        : '''At Tech Superior Consulting, we are dedicated to maintaining a professional and respectful workplace. This policy outlines the expectations for all employees to ensure a positive, productive, and secure work environment.
+    final content = policy.content?.trim().toLowerCase();
 
-Our Commitment:
-• Honesty, integrity, accountability, teamwork, transparency, and ethical behavior
-• Maintaining a safe and positive work environment
-• Adherence to company guidelines and policies
-• Respect for colleagues and professional conduct
+    if (content == null ||
+        content.isEmpty ||
+        content == 'null' ||
+        content == 'n/a' ||
+        content == 'undefined') {
+      return '';
+    }
 
-Confidentiality:
-• Protection of confidential information and client data
-• Strict prohibition against unauthorized sharing of sensitive information
-• Safeguarding internal documents and company resources
-
-Asset Usage:
-• Responsible usage of company assets (laptops, access cards, digital systems)
-• Adherence to defined work hours, attendance rules, and leave policies
-• Responsible performance of remote work with secure access to company systems
-
-Consequences:
-• Corrective action for misuse of company equipment
-• Disciplinary action for violation of IT security standards
-• Company's right to take action for policy violations
-
-By acknowledging this policy, you agree to uphold company values and contribute to a productive, secure, and supportive workplace.''';
+    return policy.content!.trim();
   }
-}
-
-class _PolicyContentPreviewPage extends StatefulWidget {
-  final PolicyModel policy;
-
-  const _PolicyContentPreviewPage({required this.policy});
-
-  @override
-  State<_PolicyContentPreviewPage> createState() =>
-      _PolicyContentPreviewPageState();
-}
-
-class _PolicyContentPreviewPageState extends State<_PolicyContentPreviewPage> {
-  late final WebViewController _webViewController;
-  bool _isHtmlLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _webViewController =
-        WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..setBackgroundColor(Colors.white)
-          ..setNavigationDelegate(
-            NavigationDelegate(
-              onPageFinished: (_) {
-                if (!mounted) return;
-                setState(() {
-                  _isHtmlLoading = false;
-                });
-              },
-            ),
-          );
-
-    if ((widget.policy.htmlContent ?? '').trim().isNotEmpty) {
-      _loadHtmlContent(widget.policy.htmlContent!);
-    }
-  }
-
-  Future<void> _loadHtmlContent(String htmlContent) async {
-    setState(() {
-      _isHtmlLoading = true;
-    });
-    await _webViewController.loadRequest(
-      Uri.dataFromString(
-        _buildPolicyHtmlDocument(htmlContent),
-        mimeType: 'text/html',
-        encoding: utf8,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isFile =
-        widget.policy.isFile &&
-        widget.policy.fileUrl != null &&
-        widget.policy.fileUrl!.isNotEmpty;
-
-    return ResponsiveScaffold(
-      backgroundColor: AppColors.backgroundMedium,
-      appBar: AppBar(
-        elevation: 0,
-        forceMaterialTransparency: true,
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        title: Text(
-          widget.policy.name,
-          style: AppTextStyles.heading4(
-            context,
-          ).copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-          overflow: TextOverflow.ellipsis,
-        ),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child:
-                isFile
-                    ? SfPdfViewer.network(widget.policy.fileUrl!)
-                    : Stack(
-                      children: [
-                        Positioned.fill(
-                          child: WebViewWidget(controller: _webViewController),
-                        ),
-                        if (_isHtmlLoading)
-                          const Center(child: CircularProgressIndicator()),
-                      ],
-                    ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PolicyPdfPreviewPage extends StatelessWidget {
-  final String title;
-  final String pdfUrl;
-
-  const _PolicyPdfPreviewPage({required this.title, required this.pdfUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    return ResponsiveScaffold(
-      backgroundColor: AppColors.backgroundMedium,
-      appBar: AppBar(
-        elevation: 0,
-        forceMaterialTransparency: true,
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        title: Text(
-          title,
-          style: AppTextStyles.heading4(
-            context,
-          ).copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-          overflow: TextOverflow.ellipsis,
-        ),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SfPdfViewer.network(pdfUrl),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-String _buildPolicyHtmlDocument(String rawHtml) {
-  final normalized =
-      rawHtml.contains('<!DOCTYPE html>')
-          ? rawHtml
-          : '''
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  </head>
-  <body>$rawHtml</body>
-</html>
-''';
-
-  final withHeadStyle = normalized.replaceFirst('</head>', '''
-  <base href="https://app.collectivwork.com/">
-  <style>
-    * {
-      box-sizing: border-box;
-      max-width: 100%;
-    }
-
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #ffffff !important;
-      color: #111111;
-      min-height: 100%;
-      width: 100%;
-      overflow-x: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.6;
-    }
-
-    body {
-      padding: 16px;
-    }
-
-    img {
-      max-width: 100%;
-      height: auto;
-      display: block;
-    }
-
-    table {
-      width: 100% !important;
-      border-collapse: collapse;
-    }
-  </style>
-</head>''');
-
-  return withHeadStyle.replaceFirst(
-    '<body>',
-    '<body style="background:#ffffff !important; margin:0; padding:16px;">',
-  );
 }

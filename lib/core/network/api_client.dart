@@ -18,8 +18,8 @@ class ApiClient {
     required Dio dio,
     required NetworkInfo networkInfo,
     this.onTokenExpired,
-  })  : _dio = dio,
-        _networkInfo = networkInfo {
+  }) : _dio = dio,
+       _networkInfo = networkInfo {
     _setupInterceptors();
   }
 
@@ -41,11 +41,13 @@ class ApiClient {
             options.headers['Authorization'] = token;
             options.headers['authorization'] = token; // Support both cases
           }
-          
+
           // Debug: Log request details
           if (kDebugMode) {
             final fullUrl = options.uri.toString();
-            developer.log('═══════════════════════════════════════════════════════');
+            developer.log(
+              '═══════════════════════════════════════════════════════',
+            );
             developer.log('API Request: ${options.method} $fullUrl');
             if (options.queryParameters.isNotEmpty) {
               developer.log('Query Parameters: ${options.queryParameters}');
@@ -55,30 +57,42 @@ class ApiClient {
               developer.log('Request Data: ${options.data}');
             }
             if (token != null && token.isNotEmpty) {
-              developer.log('Authorization: Token present (${token.length} chars)');
+              developer.log(
+                'Authorization: Token present (${token.length} chars)',
+              );
             } else {
               developer.log('Warning: No authorization token available');
             }
-            developer.log('═══════════════════════════════════════════════════════');
+            developer.log(
+              '═══════════════════════════════════════════════════════',
+            );
           }
-          
+
           return handler.next(options);
         },
         onResponse: (response, handler) {
           if (kDebugMode) {
             final fullUrl = response.requestOptions.uri.toString();
-            developer.log('═══════════════════════════════════════════════════════');
-            developer.log('API Response: ${response.requestOptions.method} $fullUrl');
+            developer.log(
+              '═══════════════════════════════════════════════════════',
+            );
+            developer.log(
+              'API Response: ${response.requestOptions.method} $fullUrl',
+            );
             developer.log('Status Code: ${response.statusCode}');
             developer.log('Response Data: ${response.data}');
-            developer.log('═══════════════════════════════════════════════════════');
+            developer.log(
+              '═══════════════════════════════════════════════════════',
+            );
           }
           return handler.next(response);
         },
         onError: (error, handler) async {
           if (kDebugMode) {
             final fullUrl = error.requestOptions.uri.toString();
-            developer.log('═══════════════════════════════════════════════════════');
+            developer.log(
+              '═══════════════════════════════════════════════════════',
+            );
             developer.log('API Error: ${error.requestOptions.method} $fullUrl');
             developer.log('Error Type: ${error.type}');
             developer.log('Error Message: ${error.message}');
@@ -86,14 +100,16 @@ class ApiClient {
               developer.log('Error Status Code: ${error.response?.statusCode}');
               developer.log('Error Response Data: ${error.response?.data}');
             }
-            developer.log('═══════════════════════════════════════════════════════');
+            developer.log(
+              '═══════════════════════════════════════════════════════',
+            );
           }
-          
+
           // Handle 401 Unauthorized - token expired
           if (error.response?.statusCode == 401) {
             await _handleTokenExpiration();
           }
-          
+
           return handler.next(error);
         },
       ),
@@ -192,9 +208,11 @@ class ApiClient {
 
   /// Handle token expiration or missing token
   Future<void> _handleTokenExpiration() async {
-    developer.log("Token expired or missing - clearing token and navigating to login");
-    await TokenStorage.clearToken();
-    
+    developer.log(
+      "Token expired or missing - clearing token and navigating to login",
+    );
+    await TokenStorage.clearAll();
+
     // Trigger callback to navigate to login
     if (onTokenExpired != null) {
       onTokenExpired!();
@@ -229,4 +247,3 @@ class ApiClient {
     }
   }
 }
-
