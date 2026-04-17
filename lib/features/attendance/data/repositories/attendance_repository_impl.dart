@@ -27,18 +27,18 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
 
   @override
   Future<Either<Failure, PunchInResult>> punchIn({
-    required String punchInLocation,
-    required double latitude,
-    required double longitude,
+    String? punchInLocation,
+    double? latitude,
+    double? longitude,
     required String punchType,
     bool needsAddressResolution = false,
   }) async {
     final action = OfflineAttendanceActionModel(
       id: _buildActionId(OfflineAttendanceActionType.punchIn),
       type: OfflineAttendanceActionType.punchIn,
-      location: punchInLocation,
-      latitude: latitude,
-      longitude: longitude,
+      location: punchInLocation ?? '',
+      latitude: latitude ?? 0,
+      longitude: longitude ?? 0,
       punchType: punchType,
       createdAt: DateTime.now(),
       needsAddressResolution: needsAddressResolution,
@@ -129,17 +129,17 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
 
   @override
   Future<Either<Failure, PunchInResult>> punchOut({
-    required String punchOutLocation,
-    required double latitude,
-    required double longitude,
+    String? punchOutLocation,
+    double? latitude,
+    double? longitude,
     bool needsAddressResolution = false,
   }) async {
     final action = OfflineAttendanceActionModel(
       id: _buildActionId(OfflineAttendanceActionType.punchOut),
       type: OfflineAttendanceActionType.punchOut,
-      location: punchOutLocation,
-      latitude: latitude,
-      longitude: longitude,
+      location: punchOutLocation ?? '',
+      latitude: latitude ?? 0,
+      longitude: longitude ?? 0,
       createdAt: DateTime.now(),
       needsAddressResolution: needsAddressResolution,
     );

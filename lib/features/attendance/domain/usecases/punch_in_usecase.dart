@@ -10,9 +10,9 @@ class PunchInUseCase {
   PunchInUseCase(this.repository);
 
   Future<Either<Failure, PunchInResult>> call({
-    required String punchInLocation,
-    required double latitude,
-    required double longitude,
+    String? punchInLocation,
+    double? latitude,
+    double? longitude,
     required String punchType,
     bool needsAddressResolution = false,
   }) {

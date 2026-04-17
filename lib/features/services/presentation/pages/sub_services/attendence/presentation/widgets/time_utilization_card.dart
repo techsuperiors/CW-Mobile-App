@@ -220,23 +220,35 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
   /// Triggers punch in via shared BLoC
   Future<void> _handlePunchIn() async {
     if (_isPunchingIn || _isPunchedIn || _isPunchInDisabled) return;
-    final hasPermission = await LocationPermissionHelper.ensureLocationAccess(
-      context,
-      actionLabel: 'punch in',
+    final shouldCaptureLocation =
+        widget.attendanceDetails?.capturePunchLocation ?? true;
+    if (shouldCaptureLocation) {
+      final hasPermission = await LocationPermissionHelper.ensureLocationAccess(
+        context,
+        actionLabel: 'punch in',
+      );
+      if (!mounted || !hasPermission) return;
+    }
+    context.read<AttendancePunchBloc>().add(
+      PunchInRequested(captureLocation: shouldCaptureLocation),
     );
-    if (!mounted || !hasPermission) return;
-    context.read<AttendancePunchBloc>().add(const PunchInRequested());
   }
 
   /// Triggers punch out via shared BLoC
   Future<void> _handlePunchOut() async {
     if (_isPunchingOut || !_isPunchedIn) return;
-    final hasPermission = await LocationPermissionHelper.ensureLocationAccess(
-      context,
-      actionLabel: 'punch out',
+    final shouldCaptureLocation =
+        widget.attendanceDetails?.capturePunchLocation ?? true;
+    if (shouldCaptureLocation) {
+      final hasPermission = await LocationPermissionHelper.ensureLocationAccess(
+        context,
+        actionLabel: 'punch out',
+      );
+      if (!mounted || !hasPermission) return;
+    }
+    context.read<AttendancePunchBloc>().add(
+      PunchOutRequested(captureLocation: shouldCaptureLocation),
     );
-    if (!mounted || !hasPermission) return;
-    context.read<AttendancePunchBloc>().add(const PunchOutRequested());
   }
 
   /// Handles BLoC state changes — updates local state and shows SnackBar

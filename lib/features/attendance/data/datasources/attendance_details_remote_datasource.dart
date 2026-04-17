@@ -33,10 +33,6 @@ class AttendanceDetailsRemoteDataSourceImpl
       final response = await apiClient.get(
         AppUrls.attendanceDetails,
       );
-      developer.log(
-        'Attendance details response: ${response.data}',
-        name: 'AttendanceDetailsAPI',
-      );
 
       final apiResponse = AttendanceDetailsResponse.fromJson(
         response.data as Map<String, dynamic>,

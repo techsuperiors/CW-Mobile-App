@@ -5,17 +5,17 @@ import '../entities/punch_in_result.dart';
 /// Attendance repository interface
 abstract class AttendanceRepository {
   Future<Either<Failure, PunchInResult>> punchIn({
-    required String punchInLocation,
-    required double latitude,
-    required double longitude,
+    String? punchInLocation,
+    double? latitude,
+    double? longitude,
     required String punchType,
     bool needsAddressResolution = false,
   });
 
   Future<Either<Failure, PunchInResult>> punchOut({
-    required String punchOutLocation,
-    required double latitude,
-    required double longitude,
+    String? punchOutLocation,
+    double? latitude,
+    double? longitude,
     bool needsAddressResolution = false,
   });
 

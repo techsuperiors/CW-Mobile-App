@@ -125,6 +125,7 @@ class AttendanceDetails {
   final Shift? shift;
   final bool? onDuty;
   final bool? wfhShowPunch;
+  final bool? capturePunchLocation;
   final bool? approvalRequired;
   final bool? punchOutRemarkRequired;
   final double? grossHours;
@@ -173,6 +174,7 @@ class AttendanceDetails {
     this.shift,
     this.onDuty,
     this.wfhShowPunch,
+    this.capturePunchLocation,
     this.approvalRequired,
     this.punchOutRemarkRequired,
     this.grossHours,

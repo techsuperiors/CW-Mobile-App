@@ -71,20 +71,30 @@ class AttendancePunchBloc
     emit(const AttendancePunchLoading());
 
     try {
-      // Fetch current location with implicit timeout from LocationService
-      final locationService = LocationService();
-      final locationData = await locationService.getCurrentLocation();
+      String? punchInLocation;
+      double? latitude;
+      double? longitude;
+      var needsAddressResolution = false;
+
+      if (event.captureLocation) {
+        final locationService = LocationService();
+        final locationData = await locationService.getCurrentLocation();
+        punchInLocation = locationData.address;
+        latitude = locationData.latitude;
+        longitude = locationData.longitude;
+        needsAddressResolution = !locationData.hasResolvedAddress;
+      }
 
       // Initialize dependency chain
       final punchInUseCase = _createPunchInUseCase();
 
       // Execute punch-in API call
       final result = await punchInUseCase(
-        punchInLocation: locationData.address,
-        latitude: locationData.latitude,
-        longitude: locationData.longitude,
+        punchInLocation: punchInLocation,
+        latitude: latitude,
+        longitude: longitude,
         punchType: 'remote',
-        needsAddressResolution: !locationData.hasResolvedAddress,
+        needsAddressResolution: needsAddressResolution,
       );
 
       // Handle Either result
@@ -125,19 +135,29 @@ class AttendancePunchBloc
     emit(const AttendancePunchLoading());
 
     try {
-      // Fetch current location
-      final locationService = LocationService();
-      final locationData = await locationService.getCurrentLocation();
+      String? punchOutLocation;
+      double? latitude;
+      double? longitude;
+      var needsAddressResolution = false;
+
+      if (event.captureLocation) {
+        final locationService = LocationService();
+        final locationData = await locationService.getCurrentLocation();
+        punchOutLocation = locationData.address;
+        latitude = locationData.latitude;
+        longitude = locationData.longitude;
+        needsAddressResolution = !locationData.hasResolvedAddress;
+      }
 
       // Initialize dependency chain
       final punchOutUseCase = _createPunchOutUseCase();
 
       // Execute punch-out API call
       final result = await punchOutUseCase(
-        punchOutLocation: locationData.address,
-        latitude: locationData.latitude,
-        longitude: locationData.longitude,
-        needsAddressResolution: !locationData.hasResolvedAddress,
+        punchOutLocation: punchOutLocation,
+        latitude: latitude,
+        longitude: longitude,
+        needsAddressResolution: needsAddressResolution,
       );
 
       // Handle Either result

@@ -226,6 +226,7 @@ class AttendanceDetailsModel {
   final ShiftModel? shift;
   final bool? onDuty;
   final bool? wfhShowPunch;
+  final bool? capturePunchLocation;
   final bool? approvalRequired;
   final bool? punchOutRemarkRequired;
   final double? grossHours;
@@ -268,6 +269,7 @@ class AttendanceDetailsModel {
     this.shift,
     this.onDuty,
     this.wfhShowPunch,
+    this.capturePunchLocation,
     this.approvalRequired,
     this.punchOutRemarkRequired,
     this.grossHours,
@@ -371,6 +373,9 @@ class AttendanceDetailsModel {
       shift: shiftModel,
       onDuty: json['onDuty'] as bool?,
       wfhShowPunch: json['wfhShowPunch'] as bool?,
+      capturePunchLocation:
+          json['capturePunchLocation'] as bool? ??
+          json['captureLocation'] as bool?,
       approvalRequired: json['approval_required'] as bool?,
       punchOutRemarkRequired: json['punch_out_remark_required'] as bool?,
       grossHours: parseDouble(json['gross_hours']),

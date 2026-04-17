@@ -10,9 +10,9 @@ class PunchOutUseCase {
   PunchOutUseCase(this.repository);
 
   Future<Either<Failure, PunchInResult>> call({
-    required String punchOutLocation,
-    required double latitude,
-    required double longitude,
+    String? punchOutLocation,
+    double? latitude,
+    double? longitude,
     bool needsAddressResolution = false,
   }) {
     return repository.punchOut(

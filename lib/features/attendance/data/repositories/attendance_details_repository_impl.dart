@@ -173,6 +173,7 @@ class AttendanceDetailsRepositoryImpl implements AttendanceDetailsRepository {
       shift: shiftEntity,
       onDuty: model.onDuty,
       wfhShowPunch: model.wfhShowPunch,
+      capturePunchLocation: model.capturePunchLocation,
       approvalRequired: model.approvalRequired,
       punchOutRemarkRequired: model.punchOutRemarkRequired,
       grossHours: model.grossHours,

@@ -9,9 +9,9 @@ import '../../../../core/utils/data_encoder.dart';
 
 /// Punch-in request model
 class PunchInRequest {
-  final String punchInLocation;
-  final double latitude;
-  final double longitude;
+  final String? punchInLocation;
+  final double? latitude;
+  final double? longitude;
   final String punchType;
   final String? punchIn;
 
@@ -25,14 +25,18 @@ class PunchInRequest {
 
   Map<String, dynamic> toJson() {
     final data = <String, dynamic>{
-      'punch_in_location': punchInLocation,
-      'userLocation': {
-        'latitude': latitude,
-        'longitude': longitude,
-      },
       'punch_type': punchType,
       'device_type': 'app',
     };
+    if (punchInLocation != null && punchInLocation!.trim().isNotEmpty) {
+      data['punch_in_location'] = punchInLocation;
+    }
+    if (latitude != null && longitude != null) {
+      data['userLocation'] = {
+        'latitude': latitude,
+        'longitude': longitude,
+      };
+    }
     if (punchIn != null && punchIn!.trim().isNotEmpty) {
       data['punch_in_time'] = punchIn;
     }
@@ -63,9 +67,9 @@ class PunchInResponse {
 
 /// Punch-out request model
 class PunchOutRequest {
-  final String punchOutLocation;
-  final double latitude;
-  final double longitude;
+  final String? punchOutLocation;
+  final double? latitude;
+  final double? longitude;
   final String? punchOut;
 
   PunchOutRequest({
@@ -77,13 +81,17 @@ class PunchOutRequest {
 
   Map<String, dynamic> toJson() {
     final data = <String, dynamic>{
-      'punch_out_location': punchOutLocation,
-      'userLocation': {
-        'latitude': latitude,
-        'longitude': longitude,
-      },
       'device_type': 'app',
     };
+    if (punchOutLocation != null && punchOutLocation!.trim().isNotEmpty) {
+      data['punch_out_location'] = punchOutLocation;
+    }
+    if (latitude != null && longitude != null) {
+      data['userLocation'] = {
+        'latitude': latitude,
+        'longitude': longitude,
+      };
+    }
     if (punchOut != null && punchOut!.trim().isNotEmpty) {
       data['punch_out_time'] = punchOut;
     }
