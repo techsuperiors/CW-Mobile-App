@@ -8,9 +8,14 @@ import 'package:collectivWork/features/services/presentation/pages/sub_services/
 import 'package:collectivWork/features/services/presentation/pages/sub_services/payslip/presentation/pages/payslip_page.dart';
 import 'package:collectivWork/features/services/presentation/pages/sub_services/document/presentation/pages/document_page.dart';
 import 'package:collectivWork/features/services/presentation/pages/sub_services/expense/presentation/pages/expense_page.dart';
+import 'package:collectivWork/features/services/presentation/pages/sub_services/visit/presentation/pages/visit_management_page.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/network_info.dart';
 import '../../../../core/widgets/responsive_scaffold.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/permission_checker.dart';
@@ -67,6 +72,21 @@ class _ServicesPageState extends State<ServicesPage> {
                 (context) => EmployeeAgreementPage(
                   serviceId: serviceId,
                   showDocumentsOnly: true,
+                ),
+          ),
+        );
+        break;
+      case 5: // Visit
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => VisitManagementPage.withDependencies(
+                  apiClient: ApiClient(
+                    dio: Dio(),
+                    networkInfo: NetworkInfoImpl(Connectivity()),
+                  ),
+                  networkInfo: NetworkInfoImpl(Connectivity()),
                 ),
           ),
         );

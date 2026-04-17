@@ -99,6 +99,10 @@ class AppAssets {
   static const String likeIcon="assets/icons/liked_icon.svg";
   static const String commentIcon="assets/icons/comment_icon.svg";
   static const String bookmarksIcon="assets/icons/bookmarks_icon.svg";
+  static const String allPostIcon="assets/icons/all_post_icon.svg";
+  static const String praiseIcon="assets/icons/praise_icon.svg";
+  static const String myProfileIcon="assets/icons/my_profile.svg";
+
 
 
 

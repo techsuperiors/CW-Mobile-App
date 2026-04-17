@@ -35,6 +35,30 @@ class DocumentRepositoryImpl implements DocumentRepository {
   }
 
   @override
+  Future<Either<Failure, String>> createFolder({
+    required String name,
+    required List<String> tags,
+    String description = '',
+  }) async {
+    if (!await networkInfo.isConnected) {
+      return Left(const NetworkFailure(AppStrings.noInternetConnection));
+    }
+
+    try {
+      final message = await remoteDataSource.createDirectory(
+        name: name,
+        tags: tags,
+        description: description,
+      );
+      return Right(message);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return Left(ServerFailure(AppStrings.unexpectedError));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<DocumentFileModel>>> getFolderFiles(
     DocumentFolderModel folder,
   ) async {
@@ -57,6 +81,28 @@ class DocumentRepositoryImpl implements DocumentRepository {
       return Right(
         details.documents.map((document) => document.toDomain(folder.id)).toList(),
       );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return Left(ServerFailure(AppStrings.unexpectedError));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> uploadFile({
+    required int directoryId,
+    required String filePath,
+  }) async {
+    if (!await networkInfo.isConnected) {
+      return Left(const NetworkFailure(AppStrings.noInternetConnection));
+    }
+
+    try {
+      final message = await remoteDataSource.uploadDocument(
+        directoryId: directoryId,
+        filePath: filePath,
+      );
+      return Right(message);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (_) {

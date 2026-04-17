@@ -29,7 +29,9 @@ class WfhRequestLoaded extends WfhRequestState {
   final List<WfhRequestModel> filteredWfhRequests;
   final String? searchQuery;
   final WfhStatus? statusFilter;
+  final bool isTeamRequestMode;
   final bool isLoadingMore;
+  final bool isRefreshing;
   final bool hasMore;
   final int currentPage;
   final int totalCount;
@@ -38,13 +40,16 @@ class WfhRequestLoaded extends WfhRequestState {
   final int rejectedCount;
   final int withdrawnCount;
   final RequestAudienceScope selectedScope;
+  final String? contentErrorMessage;
 
   const WfhRequestLoaded({
     required this.wfhRequests,
     required this.filteredWfhRequests,
     this.searchQuery,
     this.statusFilter,
+    this.isTeamRequestMode = false,
     this.isLoadingMore = false,
+    this.isRefreshing = false,
     this.hasMore = false,
     this.currentPage = 1,
     this.totalCount = 0,
@@ -53,6 +58,7 @@ class WfhRequestLoaded extends WfhRequestState {
     this.rejectedCount = 0,
     this.withdrawnCount = 0,
     this.selectedScope = RequestAudienceScope.allUsers,
+    this.contentErrorMessage,
   });
 
   @override
@@ -61,7 +67,9 @@ class WfhRequestLoaded extends WfhRequestState {
         filteredWfhRequests,
         searchQuery ?? '',
         statusFilter ?? '',
+        isTeamRequestMode,
         isLoadingMore,
+        isRefreshing,
         hasMore,
         currentPage,
         totalCount,
@@ -70,6 +78,7 @@ class WfhRequestLoaded extends WfhRequestState {
         rejectedCount,
         withdrawnCount,
         selectedScope,
+        contentErrorMessage ?? '',
       ];
 
   WfhRequestLoaded copyWith({
@@ -77,7 +86,9 @@ class WfhRequestLoaded extends WfhRequestState {
     List<WfhRequestModel>? filteredWfhRequests,
     Object? searchQuery = _unset,
     Object? statusFilter = _unset,
+    bool? isTeamRequestMode,
     bool? isLoadingMore,
+    bool? isRefreshing,
     bool? hasMore,
     int? currentPage,
     int? totalCount,
@@ -86,6 +97,7 @@ class WfhRequestLoaded extends WfhRequestState {
     int? rejectedCount,
     int? withdrawnCount,
     RequestAudienceScope? selectedScope,
+    Object? contentErrorMessage = _unset,
   }) {
     return WfhRequestLoaded(
       wfhRequests: wfhRequests ?? this.wfhRequests,
@@ -96,7 +108,9 @@ class WfhRequestLoaded extends WfhRequestState {
       identical(statusFilter, _unset)
           ? this.statusFilter
           : statusFilter as WfhStatus?,
+      isTeamRequestMode: isTeamRequestMode ?? this.isTeamRequestMode,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
       hasMore: hasMore ?? this.hasMore,
       currentPage: currentPage ?? this.currentPage,
       totalCount: totalCount ?? this.totalCount,
@@ -105,6 +119,10 @@ class WfhRequestLoaded extends WfhRequestState {
       rejectedCount: rejectedCount ?? this.rejectedCount,
       withdrawnCount: withdrawnCount ?? this.withdrawnCount,
       selectedScope: selectedScope ?? this.selectedScope,
+      contentErrorMessage:
+          identical(contentErrorMessage, _unset)
+              ? this.contentErrorMessage
+              : contentErrorMessage as String?,
     );
   }
 }

@@ -8,7 +8,6 @@ import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/utils/location_permission_helper.dart';
 import '../../../../../../../../core/utils/time_utils.dart';
 import '../../../../../../../attendance/data/datasources/attendance_offline_local_datasource.dart';
-import '../../../../../../../attendance/data/models/offline_attendance_action_model.dart';
 import '../../../../../../../attendance/domain/entities/attendance_details.dart';
 import '../../../../../../../attendance/presentation/bloc/attendance_punch_bloc.dart';
 import '../../../../../../../attendance/presentation/bloc/attendance_punch_event.dart';
@@ -64,28 +63,16 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
     return widget.attendanceDetails?.status?.toLowerCase() == 'holiday';
   }
 
-  /// Check if it's a week off day (Sunday)
-  bool get _isWeekOff {
-    if (widget.attendanceDetails?.date == null) return false;
-    try {
-      final utcDate = DateTime.parse(widget.attendanceDetails!.date!);
-      final localDate = utcDate.toLocal();
-      return localDate.weekday == 7;
-    } catch (e) {
-      return false;
-    }
-  }
-
   /// Check if punch-in button should be disabled
   bool get _isPunchInDisabled {
-    return _isHoliday || _isWeekOff || _isPunchedIn;
+    return _isPunchedIn;
   }
 
   /// Check if the main button should be disabled
   bool get _isButtonDisabled {
     if (widget.isLoading || _isPunchingIn || _isPunchingOut) return true;
     if (_isPunchedIn) return false; // Punch out is enabled when punched in
-    return _isHoliday || _isWeekOff;
+    return false;
   }
 
   /// Get formatted date from UTC date string
@@ -142,27 +129,20 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
     if (!mounted) return;
 
     setState(() {
+      _localPunchedInOverride = null;
+      _frozenWorkedHoursOverride = null;
+
       if (actions.isEmpty) {
         if (!_getServerPunchedIn()) {
-          _localPunchedInOverride = null;
           _virtualPunchInTime = null;
-          _frozenWorkedHoursOverride = null;
         }
         return;
       }
 
-      actions.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-      final queueSnapshot = _buildPendingQueueSnapshot(actions);
-
-      if (queueSnapshot.isPunchedIn) {
-        _localPunchedInOverride = true;
-        _frozenWorkedHoursOverride = null;
-        _virtualPunchInTime = queueSnapshot.virtualPunchInTime;
-      } else {
-        _localPunchedInOverride = false;
-        _virtualPunchInTime = null;
-        _frozenWorkedHoursOverride = queueSnapshot.frozenWorkedHours;
-      }
+      // Pending offline punches should not be shown as a completed
+      // attendance state until the server confirms the sync.
+      _virtualPunchInTime =
+          _getServerPunchedIn() ? _getServerVirtualPunchInTime() : null;
     });
   }
 
@@ -237,38 +217,6 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
     return serverPunchIn.subtract(Duration(seconds: _getPreviousWorkedSeconds()));
   }
 
-  _PendingQueueSnapshot _buildPendingQueueSnapshot(
-    List<OfflineAttendanceActionModel> actions,
-  ) {
-    var accumulatedSeconds = _getPreviousWorkedSeconds();
-    DateTime? activePunchInAt =
-        _getServerPunchedIn() ? _getServerPunchInDateTime() : null;
-
-    for (final action in actions) {
-      if (action.type == OfflineAttendanceActionType.punchIn) {
-        activePunchInAt ??= action.createdAt;
-      } else if (activePunchInAt != null) {
-        accumulatedSeconds +=
-            action.createdAt.difference(activePunchInAt).inSeconds;
-        activePunchInAt = null;
-      }
-    }
-
-    if (activePunchInAt != null) {
-      return _PendingQueueSnapshot(
-        isPunchedIn: true,
-        virtualPunchInTime: activePunchInAt.subtract(
-          Duration(seconds: accumulatedSeconds),
-        ),
-      );
-    }
-
-    return _PendingQueueSnapshot(
-      isPunchedIn: false,
-      frozenWorkedHours: accumulatedSeconds / 3600.0,
-    );
-  }
-
   /// Triggers punch in via shared BLoC
   Future<void> _handlePunchIn() async {
     if (_isPunchingIn || _isPunchedIn || _isPunchInDisabled) return;
@@ -305,6 +253,9 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
       if (state.isQueuedOffline) {
         setState(() {
           _isPunchingIn = false;
+          _localPunchedInOverride = null;
+          _virtualPunchInTime =
+              _getServerPunchedIn() ? _getServerVirtualPunchInTime() : null;
           _frozenWorkedHoursOverride = null;
         });
         _hydratePendingOfflineState();
@@ -342,6 +293,10 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
       if (state.isQueuedOffline) {
         setState(() {
           _isPunchingOut = false;
+          _localPunchedInOverride = null;
+          _virtualPunchInTime =
+              _getServerPunchedIn() ? _getServerVirtualPunchInTime() : null;
+          _frozenWorkedHoursOverride = null;
         });
         _hydratePendingOfflineState();
         return;
@@ -428,12 +383,12 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
         decoration: BoxDecoration(
           color: AppColors.background,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
           ],
         ),
         child: Row(
@@ -473,10 +428,10 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
                           vertical: screenHeight * 0.005,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.warning.withOpacity(0.15),
+                          color: AppColors.warning.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(
-                            color: AppColors.warning.withOpacity(0.6),
+                            color: AppColors.warning.withValues(alpha: 0.6),
                             width: 0.5,
                           ),
                         ),
@@ -567,7 +522,7 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
                     visualDensity: VisualDensity.compact,
                     backgroundColor:
                         _isButtonDisabled
-                            ? AppColors.textSecondary.withOpacity(0.3)
+                            ? AppColors.textSecondary.withValues(alpha: 0.3)
                             : AppColors.attendanceTeal,
                     foregroundColor: AppColors.textWhite,
                     padding: EdgeInsets.symmetric(
@@ -579,9 +534,9 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
                     ),
                     elevation: 0,
                     disabledBackgroundColor: AppColors.textSecondary
-                        .withOpacity(0.3),
-                    disabledForegroundColor: AppColors.textWhite.withOpacity(
-                      0.6,
+                        .withValues(alpha: 0.3),
+                    disabledForegroundColor: AppColors.textWhite.withValues(
+                      alpha: 0.6,
                     ),
                   ),
                   child:
@@ -635,16 +590,4 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
       ),
     );
   }
-}
-
-class _PendingQueueSnapshot {
-  final bool isPunchedIn;
-  final DateTime? virtualPunchInTime;
-  final double? frozenWorkedHours;
-
-  const _PendingQueueSnapshot({
-    required this.isPunchedIn,
-    this.virtualPunchInTime,
-    this.frozenWorkedHours,
-  });
 }

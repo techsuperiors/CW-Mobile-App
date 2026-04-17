@@ -280,6 +280,7 @@ class _ApplyOvertimePageState extends State<ApplyOvertimePage> {
             return Stack(
               children: [
                 ResponsiveScaffold(
+                  backgroundColor: AppColors.backgroundLight,
                   appBar: AppBar(
                     forceMaterialTransparency: true,
                     elevation: 0,

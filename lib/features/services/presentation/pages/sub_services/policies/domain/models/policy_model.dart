@@ -5,10 +5,13 @@ class PolicyModel {
   final int id;
   final String name;
   final String assignedBy;
+  final String? assignedByEmployeeId;
   final String? assignedByAvatar;
+  final String? assignedByProfileColor;
   final String assignedTo;
   final String? assignedToAvatar;
   final String assignedDate;
+  final String? updatedOn;
   final String status;
   final bool isAcknowledged;
   final String? acknowledgedDate; // Optional date if acknowledged
@@ -22,15 +25,19 @@ class PolicyModel {
   final bool isConsentSignatureEnabled;
   final String? signatureUrl;
   final int assignedUserId;
+  final bool allowDownload;
 
   const PolicyModel({
     required this.id,
     required this.name,
     required this.assignedBy,
+    this.assignedByEmployeeId,
     required this.assignedByAvatar,
+    this.assignedByProfileColor,
     required this.assignedTo,
     required this.assignedToAvatar,
     required this.assignedDate,
+    this.updatedOn,
     required this.status,
     required this.isAcknowledged,
     this.acknowledgedDate,
@@ -44,6 +51,7 @@ class PolicyModel {
     this.isConsentSignatureEnabled = false,
     this.signatureUrl,
     this.assignedUserId = 0,
+    this.allowDownload = false,
   });
 
   factory PolicyModel.fromJson(Map<String, dynamic> json) {
@@ -56,6 +64,7 @@ class PolicyModel {
             : null;
 
     final createdAt = _parseDate(json['created_at']);
+    final updatedAt = _parseDate(json['updated_at']);
     final acknowledgedAt = _parseDate(assignedUser?['acknowledged_at']);
     final status = assignedUser?['status'] as String? ?? 'Pending';
 
@@ -65,11 +74,15 @@ class PolicyModel {
       assignedBy:
           createdBy?['full_name'] as String? ??
           _buildFullName(createdBy?['first_name'], createdBy?['last_name']),
+      assignedByEmployeeId: _nullableString(createdBy?['employeeID']),
       assignedByAvatar: createdBy?['image_url'] as String?,
+      assignedByProfileColor: _nullableString(createdBy?['profile_color']),
       assignedTo: 'You',
       assignedToAvatar: _extractAssignedUserAvatar(assignedUser),
       assignedDate:
           createdAt != null ? DateFormat('dd/MM/yyyy').format(createdAt) : 'N/A',
+      updatedOn:
+          updatedAt != null ? DateFormat('dd/MM/yyyy').format(updatedAt) : null,
       status: status,
       isAcknowledged: assignedUser?['acknowledged'] as bool? ?? false,
       acknowledgedDate:
@@ -87,6 +100,7 @@ class PolicyModel {
           visibility?['is_consent_signature'] as bool? ?? false,
       signatureUrl: assignedUser?['signature_url'] as String?,
       assignedUserId: _toInt(assignedUser?['user_id']),
+      allowDownload: json['allow_download'] as bool? ?? false,
     );
   }
 }
@@ -113,6 +127,14 @@ int _toInt(dynamic value) {
 DateTime? _parseDate(dynamic value) {
   if (value is String && value.isNotEmpty) {
     return DateTime.tryParse(value)?.toLocal();
+  }
+  return null;
+}
+
+String? _nullableString(dynamic value) {
+  if (value is String) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
   return null;
 }

@@ -17,18 +17,17 @@ import 'reset_password_page.dart';
 class OtpVerificationPage extends StatefulWidget {
   final String email;
 
-  const OtpVerificationPage({
-    super.key,
-    required this.email,
-  });
+  const OtpVerificationPage({super.key, required this.email});
 
   @override
   State<OtpVerificationPage> createState() => _OtpVerificationPageState();
 }
 
 class _OtpVerificationPageState extends State<OtpVerificationPage> {
-  final List<TextEditingController> _otpControllers =
-      List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _otpControllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   Timer? _timer;
   int _remainingSeconds = 80; // 01:20 in seconds
@@ -76,8 +75,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
       _timer?.cancel();
       _startTimer();
       context.read<ForgotPasswordBloc>().add(
-            ForgotPasswordResendRequested(widget.email),
-          );
+        ForgotPasswordResendRequested(widget.email),
+      );
     }
   }
 
@@ -123,8 +122,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
       return;
     }
     context.read<ForgotPasswordBloc>().add(
-          ForgotPasswordOtpValidated(email: widget.email, otp: otp),
-        );
+      ForgotPasswordOtpValidated(email: widget.email, otp: otp),
+    );
   }
 
   @override
@@ -132,7 +131,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
     final screenWidth = mediaQuery.size.width;
-    
+
     // Responsive spacing helper
     double responsiveSpacing(double baseSpacing) {
       if (screenHeight < 600) {
@@ -142,7 +141,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
       }
       return baseSpacing;
     }
-    
+
     return BlocListener<ForgotPasswordBloc, ForgotPasswordState>(
       listener: (context, state) {
         if (state is ForgotPasswordOtpValidatedSuccess) {
@@ -155,10 +154,11 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => BlocProvider.value(
-                value: context.read<ForgotPasswordBloc>(),
-                child: const ResetPasswordPage(),
-              ),
+              builder:
+                  (_) => BlocProvider.value(
+                    value: context.read<ForgotPasswordBloc>(),
+                    child: const ResetPasswordPage(),
+                  ),
             ),
           );
         } else if (state is ForgotPasswordResendSuccess) {
@@ -182,20 +182,27 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         backgroundColor: AppColors.background,
         resizeToAvoidBottomInset: true,
         body: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     // Normal Teal Header Section with curved bottom (just back button)
                     Container(
                       decoration: BoxDecoration(
-                        color: AppColors.loginHeaderTeal,
+                        gradient: const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            AppColors.attendanceTeal, // 0xFF0B7F7F
+                            Color(0xFF073F3F), // mid blend
+                            AppColors.attendancedarkbottom, // 0xFF031e1e
+                          ],
+                          stops: [0.0, 0.85, 1.0],
+                        ),
                         borderRadius: const BorderRadius.only(
                           bottomLeft: Radius.circular(30),
                           bottomRight: Radius.circular(30),
@@ -210,7 +217,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            SizedBox(height: screenHeight * 0.015),
+                            SizedBox(height: screenHeight * 0.04),
                             // Back button and title row
                             InkWell(
                               onTap: () {
@@ -227,9 +234,9 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                                   Flexible(
                                     child: Text(
                                       AppStrings.otp,
-                                      style: AppTextStyles.bodyMedium(context).copyWith(
-                                        color: AppColors.textWhite,
-                                      ),
+                                      style: AppTextStyles.bodyMedium(
+                                        context,
+                                      ).copyWith(color: AppColors.textWhite),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -245,11 +252,12 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                     Flexible(
                       child: Padding(
                         padding: EdgeInsets.symmetric(
-                          horizontal: screenWidth * 0.064, // ~6.4% of screen width
+                          horizontal: screenWidth * 0.064,
+                          // ~6.4% of screen width
                           vertical: screenHeight * 0.04, // 4% of screen height
                         ),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             SizedBox(height: responsiveSpacing(20)),
@@ -258,30 +266,44 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                               AppStrings.getYourCode,
                               style: AppTextStyles.heading1(context).copyWith(
                                 color: AppColors.textPrimary,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w800,
                               ),
                               textAlign: TextAlign.center,
                             ),
                             SizedBox(height: responsiveSpacing(12)),
                             // Instructional text with email - on white background
                             Padding(
-                              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
+                              padding: EdgeInsets.symmetric(horizontal: 0),
                               child: RichText(
-                                textAlign: TextAlign.center,
+                                textAlign: TextAlign.start,
                                 text: TextSpan(
-                                  style: AppTextStyles.bodyMedium(context).copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
+                                  style: AppTextStyles.bodyMedium(
+                                    context,
+                                  ).copyWith(color: AppColors.textSecondary),
                                   children: [
                                     TextSpan(
                                       text: AppStrings.weveSentVerificationCode,
+                                      style: AppTextStyles.bodyMedium(
+                                        context,
+                                      ).copyWith(
+                                        fontWeight: FontWeight.w500,
+                                        color: AppColors.textSecondary,
+                                        wordSpacing: 1.6,
+                                        fontSize:
+                                            AppTextStyles.bodySmall(
+                                              context,
+                                            ).fontSize,
+                                      ),
                                     ),
                                     TextSpan(
-                                      text: ' ${widget.email}.',
+                                      text: ' ${widget.email}',
                                       style: TextStyle(
                                         fontWeight: FontWeight.w600,
                                         color: AppColors.textPrimary,
-                                        fontSize: AppTextStyles.bodyMedium(context).fontSize,
+                                        fontSize:
+                                            AppTextStyles.bodyMediumHeading(
+                                              context,
+                                            ).fontSize,
                                       ),
                                     ),
                                     const TextSpan(text: ' '),
@@ -291,13 +313,17 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                                         fontWeight: FontWeight.w600,
                                         color: AppColors.loginHeaderTeal,
                                         decoration: TextDecoration.underline,
-                                        fontSize: AppTextStyles.bodyMedium(context).fontSize,
+                                        fontSize:
+                                            AppTextStyles.bodyMediumHeading(
+                                              context,
+                                            ).fontSize,
                                       ),
-                                      recognizer: TapGestureRecognizer()
-                                        ..onTap = () {
-                                          // Pop back to forgot password page (bloc preserved)
-                                          Navigator.pop(context);
-                                        },
+                                      recognizer:
+                                          TapGestureRecognizer()
+                                            ..onTap = () {
+                                              // Pop back to forgot password page (bloc preserved)
+                                              Navigator.pop(context);
+                                            },
                                     ),
                                   ],
                                 ),
@@ -308,7 +334,10 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                             _buildOtpFields(context),
                             SizedBox(height: responsiveSpacing(32)),
                             // Verify and Proceed button
-                            BlocBuilder<ForgotPasswordBloc, ForgotPasswordState>(
+                            BlocBuilder<
+                              ForgotPasswordBloc,
+                              ForgotPasswordState
+                            >(
                               builder: (context, state) {
                                 return AppButton(
                                   label: AppStrings.verifyAndProceed,
@@ -331,14 +360,18 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                                     onTap: _canResend ? _resendCode : null,
                                     child: Text(
                                       AppStrings.resendCode,
-                                      style: AppTextStyles.bodyMedium(context).copyWith(
+                                      style: AppTextStyles.bodyMediumHeading(
+                                        context,
+                                      ).copyWith(
                                         fontWeight: FontWeight.w600,
-                                        color: _canResend
-                                            ? AppColors.loginHeaderTeal
-                                            : AppColors.textTertiary,
-                                        decoration: _canResend
-                                            ? TextDecoration.underline
-                                            : TextDecoration.none,
+                                        color:
+                                            _canResend
+                                                ? AppColors.loginHeaderTeal
+                                                : AppColors.textTertiary,
+                                        decoration:
+                                            _canResend
+                                                ? TextDecoration.underline
+                                                : TextDecoration.none,
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -348,9 +381,9 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                                 Flexible(
                                   child: Text(
                                     _formatTimer(_remainingSeconds),
-                                    style: AppTextStyles.bodyMedium(context).copyWith(
-                                      color: AppColors.textSecondary,
-                                    ),
+                                    style: AppTextStyles.bodyMediumHeading(
+                                      context,
+                                    ).copyWith(color: AppColors.textSecondary),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -364,9 +397,9 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                   ],
                 ),
               ),
-          );
-        },
-      ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -382,20 +415,18 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         // Calculate field width: (availableWidth - 5*spacing) / 6
         final fieldWidth = (availableWidth - (5 * spacing)) / 6;
         final fieldHeight = fieldWidth * 1.2; // Maintain aspect ratio
-        
+
         // Clamp values to ensure reasonable sizes on all screens
         final finalSpacing = spacing.clamp(5.0, 10.0);
         final finalFieldWidth = fieldWidth.clamp(18.0, 36.0);
         final finalFieldHeight = finalFieldWidth * 1.2;
-        
+
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: List.generate(6, (index) {
             return Padding(
-              padding: EdgeInsets.only(
-                right: index < 5 ? finalSpacing : 0,
-              ),
+              padding: EdgeInsets.only(right: index < 5 ? finalSpacing : 0),
               child: SizedBox(
                 width: finalFieldWidth,
                 height: finalFieldHeight,

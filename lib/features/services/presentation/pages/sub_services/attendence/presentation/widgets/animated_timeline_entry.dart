@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/utils/app_spacing.dart';
 
 class AnimatedTimelineEntry extends StatelessWidget {
   final TimelineLogEntry entry;
@@ -9,6 +10,7 @@ class AnimatedTimelineEntry extends StatelessWidget {
   final AnimationController controller;
 
   const AnimatedTimelineEntry({
+    super.key,
     required this.entry,
     required this.index,
     required this.totalCount,
@@ -19,6 +21,7 @@ class AnimatedTimelineEntry extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final location = entry.location?.trim();
 
     const timelineDotSize = 16.0;
     const timelineLineWidth = 2.0;
@@ -94,42 +97,67 @@ class AnimatedTimelineEntry extends StatelessWidget {
                 ),
                 if (entry.subtitle != null) ...[
                   SizedBox(height: screenHeight * 0.008),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.access_time_rounded, size: 14, color: AppColors.textPrimary),
-                      SizedBox(width: screenWidth * 0.02),
-                      Expanded(
-                        child: Text(
-                          entry.subtitle!,
-                          style: AppTextStyles.bodySmall(context).copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
+                  _TimelineInfoRow(
+                    icon: Icons.access_time_rounded,
+                    iconSize: 14,
+                    text: entry.subtitle!,
+                    screenWidth: screenWidth,
+                    textStyle: AppTextStyles.bodyMediumHeading(
+                      context,
+                    ).copyWith(color: AppColors.textSecondary),
                   ),
                 ],
-                if (entry.location != null && entry.location!.trim().isNotEmpty) ...[
+                if (location != null && location.isNotEmpty) ...[
                   SizedBox(height: screenHeight * 0.006),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.location_on_outlined, size: 18, color: AppColors.textPrimary),
-                      SizedBox(width: screenWidth * 0.02),
-                      Expanded(
-                        child: Text(
-                          entry.location!,
-                          style: AppTextStyles.bodyMedium(context).copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
+                  _TimelineInfoRow(
+                    icon: Icons.location_on_outlined,
+                    iconSize: 18,
+                    text: location,
+                    screenWidth: screenWidth,
+                    textStyle: AppTextStyles.bodySmall(
+                      context,
+                    ).copyWith(color: AppColors.textSecondary),
                   ),
                 ],
               ],
             ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TimelineInfoRow extends StatelessWidget {
+  final IconData icon;
+  final double iconSize;
+  final String text;
+  final double screenWidth;
+  final TextStyle textStyle;
+
+  const _TimelineInfoRow({
+    required this.icon,
+    required this.iconSize,
+    required this.text,
+    required this.screenWidth,
+    required this.textStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.xxs),
+          child: Icon(icon, size: iconSize, color: AppColors.textPrimary),
+        ),
+        SizedBox(width: screenWidth * 0.02),
+        Expanded(
+          child: Text(
+            text,
+            style: textStyle,
+            softWrap: true,
           ),
         ),
       ],
@@ -142,6 +170,7 @@ class AnimatedTimeline extends StatelessWidget {
   final AnimationController controller;
 
   const AnimatedTimeline({
+    super.key,
     required this.entries,
     required this.controller,
   });

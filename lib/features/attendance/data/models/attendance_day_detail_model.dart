@@ -31,6 +31,27 @@ class AttendanceDayLogModel {
     );
   }
 
+  factory AttendanceDayLogModel.fromActivityJson(Map<String, dynamic> json) {
+    String? readString(dynamic value) {
+      final text = value?.toString().trim();
+      if (text == null || text.isEmpty) {
+        return null;
+      }
+      return text;
+    }
+
+    return AttendanceDayLogModel(
+      punchIn: null,
+      punchOut: null,
+      activityAction: readString(json['action']) ?? readString(json['message']),
+      activityType:
+          readString(json['activity_type']) ?? readString(json['action_type']),
+      time: readString(json['time']) ?? readString(json['created_at']),
+      activityBy: readString(json['activity_by']),
+      location: readString(json['location']),
+    );
+  }
+
   AttendanceDayLog toEntity() {
     return AttendanceDayLog(
       punchIn: punchIn,
@@ -181,6 +202,43 @@ class AttendanceDayDetailModel {
     this.remark,
     this.approvalStatus,
   });
+
+  AttendanceDayDetailModel copyWith({
+    List<AttendanceDayLogModel>? dayLogs,
+  }) {
+    return AttendanceDayDetailModel(
+      day: day,
+      date: date,
+      holiday: holiday,
+      holidayName: holidayName,
+      weekOff: weekOff,
+      punchIn: punchIn,
+      punchOut: punchOut,
+      isLateEntries: isLateEntries,
+      status: status,
+      leaveType: leaveType,
+      firstHalf: firstHalf,
+      secondHalf: secondHalf,
+      shiftName: shiftName,
+      shiftTiming: shiftTiming,
+      dayLogs: dayLogs ?? this.dayLogs,
+      actualGrossHrs: actualGrossHrs,
+      actualEffectiveHrs: actualEffectiveHrs,
+      actualBreakTime: actualBreakTime,
+      isRegularized: isRegularized,
+      regularizePunchIn: regularizePunchIn,
+      regularizePunchOut: regularizePunchOut,
+      incompleteHours: incompleteHours,
+      overTime: overTime,
+      isManualAttendance: isManualAttendance,
+      manualPunchIn: manualPunchIn,
+      manualPunchOut: manualPunchOut,
+      approvalRequired: approvalRequired,
+      punchOutRemarkRequired: punchOutRemarkRequired,
+      remark: remark,
+      approvalStatus: approvalStatus,
+    );
+  }
 
   factory AttendanceDayDetailModel.fromJson(Map<String, dynamic> json) {
     int? parseInt(dynamic value) {

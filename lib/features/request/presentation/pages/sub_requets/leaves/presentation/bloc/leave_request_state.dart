@@ -31,6 +31,7 @@ class LeaveRequestLoaded extends LeaveRequestState {
   final String? typeFilter;
   final bool isTeamRequestMode;
   final bool isLoadingMore;
+  final bool isRefreshing;
   final bool hasMore;
   final int currentPage;
   final int totalLeaveRequest;
@@ -38,6 +39,7 @@ class LeaveRequestLoaded extends LeaveRequestState {
   final int pendingListCount;
   final int rejectListCount;
   final RequestAudienceScope selectedScope;
+  final String? contentErrorMessage;
 
   const LeaveRequestLoaded({
     required this.leaveRequests,
@@ -47,6 +49,7 @@ class LeaveRequestLoaded extends LeaveRequestState {
     this.typeFilter,
     this.isTeamRequestMode = false,
     this.isLoadingMore = false,
+    this.isRefreshing = false,
     this.hasMore = false,
     this.currentPage = 1,
     this.totalLeaveRequest = 0,
@@ -54,6 +57,7 @@ class LeaveRequestLoaded extends LeaveRequestState {
     this.pendingListCount = 0,
     this.rejectListCount = 0,
     this.selectedScope = RequestAudienceScope.allUsers,
+    this.contentErrorMessage,
   });
 
   @override
@@ -65,6 +69,7 @@ class LeaveRequestLoaded extends LeaveRequestState {
     typeFilter ?? '',
     isTeamRequestMode,
     isLoadingMore,
+    isRefreshing,
     hasMore,
     currentPage,
     totalLeaveRequest,
@@ -72,6 +77,7 @@ class LeaveRequestLoaded extends LeaveRequestState {
     pendingListCount,
     rejectListCount,
     selectedScope,
+    contentErrorMessage ?? '',
   ];
 
   LeaveRequestLoaded copyWith({
@@ -82,6 +88,7 @@ class LeaveRequestLoaded extends LeaveRequestState {
     Object? typeFilter = _unset,
     bool? isTeamRequestMode,
     bool? isLoadingMore,
+    bool? isRefreshing,
     bool? hasMore,
     int? currentPage,
     int? totalLeaveRequest,
@@ -89,6 +96,7 @@ class LeaveRequestLoaded extends LeaveRequestState {
     int? pendingListCount,
     int? rejectListCount,
     RequestAudienceScope? selectedScope,
+    Object? contentErrorMessage = _unset,
   }) {
     return LeaveRequestLoaded(
       leaveRequests: leaveRequests ?? this.leaveRequests,
@@ -104,6 +112,7 @@ class LeaveRequestLoaded extends LeaveRequestState {
           identical(typeFilter, _unset) ? this.typeFilter : typeFilter as String?,
       isTeamRequestMode: isTeamRequestMode ?? this.isTeamRequestMode,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
       hasMore: hasMore ?? this.hasMore,
       currentPage: currentPage ?? this.currentPage,
       totalLeaveRequest: totalLeaveRequest ?? this.totalLeaveRequest,
@@ -111,6 +120,10 @@ class LeaveRequestLoaded extends LeaveRequestState {
       pendingListCount: pendingListCount ?? this.pendingListCount,
       rejectListCount: rejectListCount ?? this.rejectListCount,
       selectedScope: selectedScope ?? this.selectedScope,
+      contentErrorMessage:
+          identical(contentErrorMessage, _unset)
+              ? this.contentErrorMessage
+              : contentErrorMessage as String?,
     );
   }
 }

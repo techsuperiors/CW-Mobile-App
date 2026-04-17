@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:collectivWork/core/constants/app_colors.dart';
 import 'package:collectivWork/core/constants/app_assets.dart';
 import 'package:collectivWork/core/constants/app_text_styles.dart';
@@ -200,8 +201,7 @@ class _PostCardState extends State<PostCard> {
     if (result == null || !mounted) return;
     final isRepostEdit = announcement.repostedBy != null;
     final isPollEdit =
-        !isRepostEdit &&
-        (announcement.type?.trim().toLowerCase() == 'poll');
+        !isRepostEdit && (announcement.type?.trim().toLowerCase() == 'poll');
     final unchanged =
         isRepostEdit
             ? (result.repostThought ?? '').trim() ==
@@ -623,6 +623,7 @@ class _PostCardState extends State<PostCard> {
       children: [
         SvgPicture.asset(AppAssets.alreadyrepostIcon, width: 15, height: 15),
         AppSpacing.hSm,
+
         Expanded(
           child: RichText(
             maxLines: 1,

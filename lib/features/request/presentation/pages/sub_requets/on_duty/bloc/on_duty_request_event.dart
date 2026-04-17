@@ -12,7 +12,41 @@ abstract class OnDutyRequestEvent extends Equatable {
 
 /// Load On-Duty requests event
 class LoadOnDutyRequests extends OnDutyRequestEvent {
-  const LoadOnDutyRequests();
+  final int clientId;
+  final int page;
+  final int limit;
+  final OnDutyStatus? status;
+  final bool forceRefresh;
+
+  const LoadOnDutyRequests({
+    required this.clientId,
+    this.page = 1,
+    this.limit = 5,
+    this.status,
+    this.forceRefresh = false,
+  });
+
+  @override
+  List<Object?> get props => [
+    clientId,
+    page,
+    limit,
+    status ?? '',
+    forceRefresh,
+  ];
+}
+
+class LoadMoreOnDutyRequests extends OnDutyRequestEvent {
+  final int clientId;
+  final int limit;
+
+  const LoadMoreOnDutyRequests({
+    required this.clientId,
+    this.limit = 5,
+  });
+
+  @override
+  List<Object?> get props => [clientId, limit];
 }
 
 class LoadTeamOnDutyRequests extends OnDutyRequestEvent {
@@ -20,16 +54,27 @@ class LoadTeamOnDutyRequests extends OnDutyRequestEvent {
   final int page;
   final int limit;
   final RequestAudienceScope scope;
+  final OnDutyStatus? status;
+  final bool forceRefresh;
 
   const LoadTeamOnDutyRequests({
     required this.clientId,
     this.page = 1,
     this.limit = 50,
     this.scope = RequestAudienceScope.allUsers,
+    this.status,
+    this.forceRefresh = false,
   });
 
   @override
-  List<Object?> get props => [clientId, page, limit, scope];
+  List<Object?> get props => [
+    clientId,
+    page,
+    limit,
+    scope,
+    status ?? '',
+    forceRefresh,
+  ];
 }
 
 class LoadMoreTeamOnDutyRequests extends OnDutyRequestEvent {

@@ -278,12 +278,15 @@ class _AttendancePageState extends State<AttendancePage> {
     // Call all APIs in parallel
     try {
       _notificationBloc.add(FetchNotificationCount());
-      await Future.wait([
-        _loadUserProfile(apiClient, networkInfo),
-        _loadAttendanceDetails(apiClient, networkInfo),
-        _loadUpcomingEvents(apiClient, networkInfo),
-        _loadLeaveStats(apiClient, networkInfo, targetMonth: effectiveMonth),
-      ]).timeout(_refreshTimeout);
+      if(context.mounted){
+        await Future.wait([
+          _loadUserProfile(apiClient, networkInfo),
+          _loadAttendanceDetails(apiClient, networkInfo),
+          _loadUpcomingEvents(apiClient, networkInfo),
+          _loadLeaveStats(apiClient, networkInfo, targetMonth: effectiveMonth),
+        ]).timeout(_refreshTimeout);
+      }
+
     } on TimeoutException {
       if (mounted) {
         setState(() {
@@ -357,7 +360,8 @@ class _AttendancePageState extends State<AttendancePage> {
   Future<void> _loadAttendanceDetails(
     ApiClient apiClient,
     NetworkInfo networkInfo,
-  ) async {
+  ) async
+  {
     try {
       final remoteDataSource = AttendanceDetailsRemoteDataSourceImpl(apiClient);
       final repository = AttendanceDetailsRepositoryImpl(
@@ -385,10 +389,13 @@ class _AttendancePageState extends State<AttendancePage> {
         },
       );
     } catch (e) {
-      setState(() {
-        _attendanceError = 'Error loading attendance: ${e.toString()}';
-        _isLoadingAttendance = false;
-      });
+      if(context.mounted){
+        setState(() {
+          _attendanceError = 'Error loading attendance: ${e.toString()}';
+          _isLoadingAttendance = false;
+        });
+      }
+
     }
   }
 

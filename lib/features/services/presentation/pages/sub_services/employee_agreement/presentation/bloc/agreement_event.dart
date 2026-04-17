@@ -32,14 +32,18 @@ class RefreshAgreementList extends AgreementEvent {
 class SubmitAgreementConsent extends AgreementEvent {
   final int agreementId;
   final bool agreementAcknowledged;
-  final String signatureFilePath;
+  final String signedPdfFilePath;
 
   const SubmitAgreementConsent({
     required this.agreementId,
     required this.agreementAcknowledged,
-    required this.signatureFilePath,
+    required this.signedPdfFilePath,
   });
 
   @override
-  List<Object> get props => [agreementId, agreementAcknowledged, signatureFilePath];
+  List<Object> get props => [
+    agreementId,
+    agreementAcknowledged,
+    signedPdfFilePath,
+  ];
 }

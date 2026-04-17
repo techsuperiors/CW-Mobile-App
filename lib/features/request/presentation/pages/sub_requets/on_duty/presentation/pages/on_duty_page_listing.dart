@@ -1,15 +1,17 @@
-import 'package:collectivWork/core/constants/app_assets.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:dio/dio.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../../../../../core/constants/app_assets.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
+import '../../../../../../../../core/utils/data_encoder.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/utils/token_storage.dart';
 import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../../core/widgets/status_tabbed_section.dart';
@@ -22,13 +24,13 @@ import '../../bloc/on_duty_request_event.dart';
 import '../../bloc/on_duty_request_state.dart';
 import '../../data/datasources/on_duty_remote_datasource.dart';
 import '../../data/repositories/on_duty_repository_impl.dart';
+import '../../domain/usecases/get_on_duty_request_stats.dart';
 import '../../domain/usecases/get_on_duty_requests.dart';
 import '../../models/on_duty_request_model.dart';
 import '../widgets/on_duty_request_card.dart';
 import 'on_duty_detail_page.dart';
 import 'on_duty_request_page.dart';
 
-/// On-Duty listing page showing list of On-Duty requests
 class OnDutyPageListing extends StatefulWidget {
   const OnDutyPageListing({super.key});
 
@@ -37,61 +39,105 @@ class OnDutyPageListing extends StatefulWidget {
 }
 
 class _OnDutyPageListingState extends State<OnDutyPageListing>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
+  static const int _pageSize = 5;
   final TextEditingController _searchController = TextEditingController();
-  OnDutyStatus? _selectedStatusFilter;
+  late final OnDutyRequestBloc _onDutyRequestBloc;
   late TabController _tabController;
+  late int _lastHandledTabIndex;
+
   static const List<StatusTabDefinition<OnDutyStatus>> _tabs = [
     StatusTabDefinition(label: 'All', status: null),
     StatusTabDefinition(label: 'Pending', status: OnDutyStatus.pending),
     StatusTabDefinition(label: 'Approved', status: OnDutyStatus.approved),
     StatusTabDefinition(label: 'Rejected', status: OnDutyStatus.rejected),
-    StatusTabDefinition(label: 'Withdrawn', status: OnDutyStatus.withdrawn),
   ];
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
-
-    ///For the tab bar and for controlling the behaviour of it
+    final networkInfo = NetworkInfoImpl(Connectivity());
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final remoteDataSource = OnDutyRemoteDataSourceImpl(apiClient: apiClient);
+    final repository = OnDutyRepositoryImpl(remoteDataSource: remoteDataSource);
+    _onDutyRequestBloc = OnDutyRequestBloc(
+      getOnDutyRequestsUseCase: GetOnDutyRequestsUseCase(repository),
+      getOnDutyRequestStatsUseCase: GetOnDutyRequestStatsUseCase(repository),
+    );
     _tabController = TabController(length: _tabs.length, vsync: this);
-    _tabController.addListener(() {
-      setState(() {});
-    });
+    _lastHandledTabIndex = _tabController.index;
+    _tabController.addListener(_handleTabChange);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
-
+    _onDutyRequestBloc.close();
     super.dispose();
+  }
+
+  OnDutyStatus? get _selectedTabStatus => _tabs[_tabController.index].status;
+
+  void _handleTabChange() {
+    if (!mounted || _lastHandledTabIndex == _tabController.index) {
+      return;
+    }
+
+    _lastHandledTabIndex = _tabController.index;
+    setState(() {});
+
+    _onDutyRequestBloc.add(
+      LoadOnDutyRequests(
+        clientId: _resolveClientId(),
+        status: _selectedTabStatus,
+        limit: _pageSize,
+      ),
+    );
+  }
+
+  Future<void> _refreshTabData({
+    required int clientId,
+    required OnDutyStatus? status,
+  }) async {
+    _onDutyRequestBloc.add(
+      LoadOnDutyRequests(
+        clientId: clientId,
+        status: status,
+        limit: _pageSize,
+        forceRefresh: true,
+      ),
+    );
+
+    await _onDutyRequestBloc.stream.firstWhere((state) {
+      if (state is OnDutyRequestLoaded) {
+        return !state.isRefreshing && state.statusFilter == status;
+      }
+      return state is OnDutyRequestError;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final clientId = _resolveClientId();
 
-    return BlocProvider(
-      create: (_) {
-        final networkInfo = NetworkInfoImpl(Connectivity());
-        final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
-        final remoteDataSource = OnDutyRemoteDataSourceImpl(
-          apiClient: apiClient,
-        );
-        final repository = OnDutyRepositoryImpl(
-          remoteDataSource: remoteDataSource,
-        );
+    if (_onDutyRequestBloc.state is OnDutyRequestInitial) {
+      _onDutyRequestBloc.add(
+        LoadOnDutyRequests(
+          clientId: clientId,
+          status: _selectedTabStatus,
+          limit: _pageSize,
+        ),
+      );
+    }
 
-        return OnDutyRequestBloc(
-          getOnDutyRequestsUseCase: GetOnDutyRequestsUseCase(repository),
-        )..add(const LoadOnDutyRequests());
-      },
+    return BlocProvider.value(
+      value: _onDutyRequestBloc,
       child: ResponsiveScaffold(
         backgroundColor: AppColors.backgroundLight,
-
         appBar: AppBar(
           elevation: 0,
           forceMaterialTransparency: true,
@@ -139,120 +185,97 @@ class _OnDutyPageListingState extends State<OnDutyPageListing>
           builder:
               (blocContext) => Column(
                 children: [
-                  // Search and filter section
-                  _buildSearchAndFilterSection(blocContext),
-                  SizedBox(
-                    height: 0.01 * screenHeight,
-                  ), // On-Duty requests list
+                  _buildSearchAndFilterSection(blocContext, clientId),
+                  SizedBox(height: screenHeight * 0.01),
                   Expanded(
-                    child: BlocBuilder<OnDutyRequestBloc, OnDutyRequestState>(
-                      builder: (context, state) {
-                        if (state is OnDutyRequestLoading) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-
-                        if (state is OnDutyRequestError) {
-                          return ApiErrorState(
-                            title: 'Unable to load on duty requests',
-                            rawMessage: state.message,
-                            onRetry: () {
-                              final bloc = context.read<OnDutyRequestBloc>();
-                              bloc.add(const LoadOnDutyRequests());
-                            },
-                          );
-                        }
-
-                        if (state is OnDutyRequestLoaded) {
-                          return StatusTabbedSection<
-                            OnDutyStatus,
-                            OnDutyRequestModel
-                          >(
-                            controller: _tabController,
-                            tabs: _tabs,
-                            items: state.onDutyRequests,
-                            searchQuery: state.searchQuery?.toLowerCase() ?? '',
-                            statusSelector: (item) => item.status,
-                            matchesSearch: (item, query) {
-                              if (query.isEmpty) return true;
-                              return (item.subject?.toLowerCase().contains(
-                                        query,
-                                      ) ??
-                                      false) ||
-                                  item.reason.toLowerCase().contains(query);
-                            },
-                            tabColorBuilder: RequestTabTheme.colorForIndex,
-                            emptyBuilder: (context) => RequestEmptyState(),
-                            listBuilder: (context, list) {
-                              final grouped = RequestGroupingUtils.groupByMonth(
-                                items: list,
-                                dateSelector: (item) => item.appliedDate,
+                    child:
+                        BlocBuilder<OnDutyRequestBloc, OnDutyRequestState>(
+                          builder: (context, state) {
+                            if (state is OnDutyRequestLoading ||
+                                state is OnDutyRequestInitial) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
                               );
-                              return ListView.builder(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: screenHeight * 0.012,
-                                ),
-                                itemCount: grouped.length,
-                                itemBuilder: (context, index) {
-                                  final entry = grouped[index];
-                                  if (entry is String) {
-                                    return Padding(
-                                      padding: EdgeInsets.only(
-                                        top:
-                                            index == 0
-                                                ? 0
-                                                : screenHeight * 0.014,
-                                        bottom: screenHeight * 0.010,
-                                      ),
-                                      child: Text(
-                                        entry,
-                                        style: AppTextStyles.bodySmall(
-                                          context,
-                                        ).copyWith(
-                                          fontWeight: FontWeight.w500,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  final req = entry as OnDutyRequestModel;
+                            }
 
-                                  return OnDutyRequestCard(
-                                    onDutyRequest: req,
-                                    onTap: () async {
-                                      final shouldRefresh = await Navigator.push<
-                                        bool
-                                      >(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) => OnDutyDetailPage(
-                                                onDutyRequest:
-                                                    req,
-                                              ),
-                                        ),
-                                      );
-                                      if (shouldRefresh == true &&
-                                          context.mounted) {
-                                        context.read<OnDutyRequestBloc>().add(
-                                          const LoadOnDutyRequests(),
-                                        );
-                                      }
-                                    },
+                            if (state is OnDutyRequestError) {
+                              return ApiErrorState(
+                                title: 'Unable to load on duty requests',
+                                rawMessage: state.message,
+                                onRetry:
+                                    () => context.read<OnDutyRequestBloc>().add(
+                                      LoadOnDutyRequests(
+                                        clientId: clientId,
+                                        status: _selectedTabStatus,
+                                        limit: _pageSize,
+                                        forceRefresh: true,
+                                      ),
+                                    ),
+                              );
+                            }
+
+                            final loaded = state as OnDutyRequestLoaded;
+                            return StatusTabbedSection<
+                              OnDutyStatus,
+                              OnDutyRequestModel
+                            >(
+                              controller: _tabController,
+                              tabs: _tabs,
+                              items: loaded.onDutyRequests,
+                              searchQuery:
+                                  loaded.searchQuery?.toLowerCase() ?? '',
+                              statusSelector: (item) => item.status,
+                              matchesSearch: (item, query) {
+                                if (query.isEmpty) return true;
+                                return (item.subject?.toLowerCase().contains(
+                                          query,
+                                        ) ??
+                                        false) ||
+                                    item.reason.toLowerCase().contains(query);
+                              },
+                              tabColorBuilder: RequestTabTheme.colorForIndex,
+                              countOverrides: {
+                                null: loaded.totalCount,
+                                OnDutyStatus.pending: loaded.pendingCount,
+                                OnDutyStatus.approved: loaded.approvedCount,
+                                OnDutyStatus.rejected: loaded.rejectedCount,
+                              },
+                              emptyBuilder: (_) => const RequestEmptyState(),
+                              tabContentBuilder: (context, tab) {
+                                final rawTabState =
+                                    tab.status == loaded.statusFilter
+                                        ? loaded
+                                        : _onDutyRequestBloc
+                                            .getCachedOnDutyRequests(
+                                              status: tab.status,
+                                            );
+
+                                if (rawTabState == null) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
                                   );
-                                },
-                              );
-                            },
-                          );
-                        }
+                                }
 
-                        return const SizedBox.shrink();
-                      },
-                    ),
+                                final tabState = _onDutyRequestBloc
+                                    .buildOnDutyViewState(
+                                      baseState: rawTabState,
+                                      searchQuery: loaded.searchQuery,
+                                    );
+
+                                return _buildOnDutyTabContent(
+                                  context,
+                                  clientId: clientId,
+                                  screenHeight: screenHeight,
+                                  viewState: tabState,
+                                  isCurrentTab:
+                                      tab.status == loaded.statusFilter,
+                                );
+                              },
+                              listBuilder: (_, __) => const SizedBox.shrink(),
+                            );
+                          },
+                        ),
                   ),
-
-                  // Divider before bottom nav
                 ],
               ),
         ),
@@ -260,23 +283,138 @@ class _OnDutyPageListingState extends State<OnDutyPageListing>
     );
   }
 
-  Widget _buildSearchAndFilterSection(BuildContext context) {
+  Widget _buildOnDutyTabContent(
+    BuildContext context, {
+    required int clientId,
+    required double screenHeight,
+    required OnDutyRequestLoaded viewState,
+    required bool isCurrentTab,
+  }) {
+    if (isCurrentTab && viewState.isRefreshing) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (isCurrentTab && viewState.contentErrorMessage != null) {
+      return ApiErrorState(
+        title: 'Unable to load on duty requests',
+        rawMessage: viewState.contentErrorMessage!,
+        onRetry:
+            () => context.read<OnDutyRequestBloc>().add(
+              LoadOnDutyRequests(
+                clientId: clientId,
+                status: viewState.statusFilter,
+                limit: _pageSize,
+                forceRefresh: true,
+              ),
+            ),
+      );
+    }
+
+    if (viewState.filteredOnDutyRequests.isEmpty) {
+      return const RequestEmptyState();
+    }
+
+    final grouped = RequestGroupingUtils.groupByMonth(
+      items: viewState.filteredOnDutyRequests,
+      dateSelector: (item) => item.appliedDate,
+    );
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (isCurrentTab &&
+            notification.metrics.pixels >=
+                notification.metrics.maxScrollExtent - 200 &&
+            viewState.hasMore &&
+            !viewState.isLoadingMore) {
+          context.read<OnDutyRequestBloc>().add(
+            LoadMoreOnDutyRequests(
+              clientId: clientId,
+              limit: _pageSize,
+            ),
+          );
+        }
+        return false;
+      },
+      child: RefreshIndicator(
+        onRefresh:
+            () => _refreshTabData(
+              clientId: clientId,
+              status: viewState.statusFilter,
+            ),
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(vertical: screenHeight * 0.012),
+          itemCount: grouped.length + (viewState.isLoadingMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index >= grouped.length) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final entry = grouped[index];
+            if (entry is String) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  top: index == 0 ? 0 : screenHeight * 0.014,
+                  bottom: screenHeight * 0.010,
+                ),
+                child: Text(
+                  entry,
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              );
+            }
+
+            final req = entry as OnDutyRequestModel;
+            return OnDutyRequestCard(
+              onDutyRequest: req,
+              onTap: () async {
+                final shouldRefresh = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => OnDutyDetailPage(onDutyRequest: req),
+                  ),
+                );
+                if (shouldRefresh == true && context.mounted) {
+                  context.read<OnDutyRequestBloc>().add(
+                    LoadOnDutyRequests(
+                      clientId: clientId,
+                      status: viewState.statusFilter,
+                      limit: _pageSize,
+                      forceRefresh: true,
+                    ),
+                  );
+                }
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchAndFilterSection(BuildContext context, int clientId) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Row(
       children: [
-        // Search bar
         Expanded(
           child: Container(
             height: screenHeight * 0.050,
-            // padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03),
             decoration: BoxDecoration(
-              color: const Color(0xFFF2F2F2), // light grey background
+              color: const Color(0xFFF2F2F2),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -301,20 +439,17 @@ class _OnDutyPageListingState extends State<OnDutyPageListing>
                   ),
                 ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8), // 👈 curved border
+                  borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide.none,
                 ),
-
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide.none,
                 ),
-
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide.none,
                 ),
-
                 contentPadding: EdgeInsets.symmetric(
                   vertical: screenHeight * 0.010,
                 ),
@@ -328,8 +463,7 @@ class _OnDutyPageListingState extends State<OnDutyPageListing>
             ),
           ),
         ),
-        SizedBox(width: screenWidth * 0.042), // 4.2% of screen width
-
+        SizedBox(width: screenWidth * 0.042),
         GestureDetector(
           onTap: () async {
             final refresh = await Navigator.push<bool>(
@@ -337,12 +471,18 @@ class _OnDutyPageListingState extends State<OnDutyPageListing>
               MaterialPageRoute(builder: (_) => const OnDutyRequestPage()),
             );
             if (refresh == true && context.mounted) {
-              context.read<OnDutyRequestBloc>().add(const LoadOnDutyRequests());
+              context.read<OnDutyRequestBloc>().add(
+                LoadOnDutyRequests(
+                  clientId: clientId,
+                  status: _selectedTabStatus,
+                  limit: _pageSize,
+                  forceRefresh: true,
+                ),
+              );
             }
           },
           child: SizedBox(
             height: screenHeight * 0.050,
-
             child: SvgPicture.asset(AppAssets.addIcon),
           ),
         ),
@@ -350,172 +490,16 @@ class _OnDutyPageListingState extends State<OnDutyPageListing>
     );
   }
 
-  void _showFilterBottomSheet(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final bloc = context.read<OnDutyRequestBloc>();
-    final currentState = bloc.state;
-    if (currentState is OnDutyRequestLoaded) {
-      _selectedStatusFilter = currentState.statusFilter;
+  int _resolveClientId() {
+    final token = TokenStorage.getToken();
+    if (token == null || token.isEmpty) {
+      return 0;
     }
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder:
-          (bottomSheetContext) => StatefulBuilder(
-            builder:
-                (bottomSheetContext, setModalState) => Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                  ),
-                  padding: EdgeInsets.all(screenWidth * 0.042),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Filter by Status',
-                        style: AppTextStyles.heading4(bottomSheetContext),
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'All',
-                        null,
-                        _selectedStatusFilter == null,
-                        () {
-                          setModalState(() => _selectedStatusFilter = null);
-                        },
-                      ),
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'Pending',
-                        OnDutyStatus.pending,
-                        _selectedStatusFilter == OnDutyStatus.pending,
-                        () {
-                          setModalState(
-                            () => _selectedStatusFilter = OnDutyStatus.pending,
-                          );
-                        },
-                      ),
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'Approved',
-                        OnDutyStatus.approved,
-                        _selectedStatusFilter == OnDutyStatus.approved,
-                        () {
-                          setModalState(
-                            () => _selectedStatusFilter = OnDutyStatus.approved,
-                          );
-                        },
-                      ),
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'Rejected',
-                        OnDutyStatus.rejected,
-                        _selectedStatusFilter == OnDutyStatus.rejected,
-                        () {
-                          setModalState(
-                            () => _selectedStatusFilter = OnDutyStatus.rejected,
-                          );
-                        },
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(bottomSheetContext);
-                            bloc.add(
-                              FilterOnDutyRequestsByStatus(
-                                _selectedStatusFilter,
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            padding: EdgeInsets.symmetric(
-                              vertical: screenHeight * 0.018,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text(
-                            'Apply Filter',
-                            style: AppTextStyles.buttonMedium(
-                              bottomSheetContext,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-          ),
-    );
+    final decoded = decodeData<Map<String, dynamic>>(token);
+    final clientId = decoded?['client_id'];
+    if (clientId is int) return clientId;
+    if (clientId is String) return int.tryParse(clientId) ?? 0;
+    return 0;
   }
-
-  Widget _buildFilterOption(
-    BuildContext context,
-    String label,
-    OnDutyStatus? status,
-    bool isSelected,
-    VoidCallback onTap,
-  ) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: screenHeight * 0.015),
-        child: Row(
-          children: [
-            Icon(
-              isSelected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-            SizedBox(width: MediaQuery.of(context).size.width * 0.032),
-            Text(
-              label,
-              style: AppTextStyles.bodyMedium(context).copyWith(
-                color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Custom painter for dotted line
-class _DottedLinePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint =
-        Paint()
-          ..color = AppColors.border
-          ..strokeWidth = 1
-          ..style = PaintingStyle.stroke;
-
-    const dashWidth = 3.0;
-    const dashSpace = 3.0;
-    double startX = 0;
-
-    while (startX < size.width) {
-      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
-      startX += dashWidth + dashSpace;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

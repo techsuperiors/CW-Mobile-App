@@ -7,7 +7,9 @@ import '../../../../../../../../core/constants/app_assets.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
+import '../../../../../../../../core/utils/data_encoder.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
+import '../../../../../../../../core/utils/token_storage.dart';
 import '../../../../../../../../core/widgets/api_error_state.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../../core/widgets/status_tabbed_section.dart';
@@ -15,7 +17,6 @@ import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../../../../widgets/request_listing/request_empty_state.dart';
 import '../../../../../widgets/request_listing/request_grouping_utils.dart';
 import '../../../../../widgets/request_listing/request_tab_theme.dart';
-import '../../../leaves/domain/entities/leave_entity.dart';
 import '../../bloc/regularize_request_bloc.dart';
 import '../../bloc/regularize_request_event.dart';
 import '../../bloc/regularize_request_state.dart';
@@ -35,44 +36,218 @@ class RegularizePageListing extends StatefulWidget {
 class _RegularizePageListingState extends State<RegularizePageListing>
     with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
-  RegularizeStatus? _selectedStatusFilter;
+  late final RegularizeRequestBloc _regularizeRequestBloc;
   late TabController _tabController;
-  final List<StatusTabDefinition<RegularizeStatus>> _tabsregulrize = [
+  static const int _pageSize = 5;
+  late int _lastHandledTabIndex;
+  static const List<StatusTabDefinition<RegularizeStatus>> _tabsregulrize = [
     StatusTabDefinition(label: 'All', status: null),
     StatusTabDefinition(label: 'Pending', status: RegularizeStatus.pending),
     StatusTabDefinition(label: 'Approved', status: RegularizeStatus.approved),
     StatusTabDefinition(label: 'Rejected', status: RegularizeStatus.rejected),
-    StatusTabDefinition(label: 'Withdrawn', status: RegularizeStatus.withdrawn),
   ];
 
   @override
   void initState() {
     super.initState();
+    _regularizeRequestBloc = RegularizeRequestBloc();
 
-    ///For the tab bar and for controlling the behaviour of it
     _tabController = TabController(length: _tabsregulrize.length, vsync: this);
-    _tabController.addListener(() {
-      setState(() {});
-    });
-    // BlocProvider will load regularize requests automatically in its create method
+    _lastHandledTabIndex = _tabController.index;
+    _tabController.addListener(_handleTabChange);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
-
+    _regularizeRequestBloc.close();
     super.dispose();
+  }
+
+  RegularizeStatus? get _selectedTabStatus => _tabsregulrize[_tabController.index].status;
+
+  int _resolveClientId() {
+    final token = TokenStorage.getToken();
+    if (token == null || token.isEmpty) return 0;
+    final decoded = decodeData<Map<String, dynamic>>(token);
+    final clientId = decoded?['client_id'];
+    if (clientId is int) return clientId;
+    if (clientId is String) return int.tryParse(clientId) ?? 0;
+    return 0;
+  }
+
+  void _handleTabChange() {
+    if (!mounted || _lastHandledTabIndex == _tabController.index) {
+      return;
+    }
+
+    _lastHandledTabIndex = _tabController.index;
+    setState(() {});
+
+    _regularizeRequestBloc.add(
+      LoadRegularizeRequests(
+        clientId: _resolveClientId(),
+        status: _selectedTabStatus,
+        limit: _pageSize,
+      ),
+    );
+  }
+
+  Future<void> _refreshTabData({
+    required int clientId,
+    required RegularizeStatus? status,
+  }) async {
+    _regularizeRequestBloc.add(
+      LoadRegularizeRequests(
+        clientId: clientId,
+        status: status,
+        limit: _pageSize,
+        forceRefresh: true,
+      ),
+    );
+
+    await _regularizeRequestBloc.stream.firstWhere((state) {
+      if (state is RegularizeRequestLoaded) {
+        return !state.isRefreshing && state.statusFilter == status;
+      }
+      return state is RegularizeRequestError;
+    });
+  }
+
+  Widget _buildRegularizeTabContent(
+    BuildContext context, {
+    required int clientId,
+    required double screenHeight,
+    required RegularizeRequestLoaded viewState,
+    required bool isCurrentTab,
+  }) {
+    if (isCurrentTab && viewState.isRefreshing) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (isCurrentTab && viewState.contentErrorMessage != null) {
+      return ApiErrorState(
+        title: 'Unable to load regularize requests',
+        rawMessage: viewState.contentErrorMessage!,
+        onRetry:
+            () => context.read<RegularizeRequestBloc>().add(
+              LoadRegularizeRequests(
+                clientId: clientId,
+                status: viewState.statusFilter,
+                limit: _pageSize,
+                forceRefresh: true,
+              ),
+            ),
+      );
+    }
+
+    if (viewState.filteredRegularizeRequests.isEmpty) {
+      return const RequestEmptyState();
+    }
+
+    final grouped = RequestGroupingUtils.groupByMonth(
+      items: viewState.filteredRegularizeRequests,
+      dateSelector: (item) => item.appliedDate,
+    );
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (isCurrentTab &&
+            notification.metrics.pixels >=
+                notification.metrics.maxScrollExtent - 200 &&
+            viewState.hasMore &&
+            !viewState.isLoadingMore) {
+          context.read<RegularizeRequestBloc>().add(
+            LoadMoreRegularizeRequests(
+              clientId: clientId,
+              limit: _pageSize,
+            ),
+          );
+        }
+        return false;
+      },
+      child: RefreshIndicator(
+        onRefresh: () => _refreshTabData(clientId: clientId, status: viewState.statusFilter),
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(vertical: screenHeight * 0.012),
+          itemCount: grouped.length + (viewState.isLoadingMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index >= grouped.length) {
+              return Padding(
+                padding: EdgeInsets.symmetric(vertical: screenHeight * 0.02),
+                child: const Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final entry = grouped[index];
+            if (entry is String) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  top: index == 0 ? 0 : screenHeight * 0.014,
+                  bottom: screenHeight * 0.010,
+                ),
+                child: Text(
+                  entry,
+                  style: AppTextStyles.bodySmall(context).copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              );
+            }
+
+            final req = entry as RegularizeRequestModel;
+            return RegularizeRequestCard(
+              regularizeRequest: req,
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => RegularizeDetailPage(
+                          regularizeRequest: req,
+                        ),
+                  ),
+                );
+                if (result == true && context.mounted) {
+                  context.read<RegularizeRequestBloc>().add(
+                    LoadRegularizeRequests(
+                      clientId: clientId,
+                      status: viewState.statusFilter,
+                      limit: _pageSize,
+                      forceRefresh: true,
+                    ),
+                  );
+                }
+              },
+            );
+          },
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final clientId = _resolveClientId();
 
-    return BlocProvider(
-      create:
-          (_) => RegularizeRequestBloc()..add(const LoadRegularizeRequests()),
+    if (_regularizeRequestBloc.state is RegularizeRequestInitial) {
+      _regularizeRequestBloc.add(
+        LoadRegularizeRequests(
+          clientId: clientId,
+          status: _selectedTabStatus,
+          limit: _pageSize,
+        ),
+      );
+    }
+
+    return BlocProvider.value(
+      value: _regularizeRequestBloc,
       child: ResponsiveScaffold(
         backgroundColor: AppColors.backgroundLight,
 
@@ -141,16 +316,19 @@ class _RegularizePageListingState extends State<RegularizePageListing>
                         }
 
                         if (state is RegularizeRequestError) {
-                          return
-                            ApiErrorState(
-                              title: 'Unable to load regularize requests',
-                              rawMessage: state.message,
-                              onRetry: () {
-                                final bloc =
-                                context.read<RegularizeRequestBloc>();
-                                bloc.add(const LoadRegularizeRequests());
-                              },
-                            );
+                          return ApiErrorState(
+                            title: 'Unable to load regularize requests',
+                            rawMessage: state.message,
+                            onRetry:
+                                () => context.read<RegularizeRequestBloc>().add(
+                                  LoadRegularizeRequests(
+                                    clientId: clientId,
+                                    status: _selectedTabStatus,
+                                    limit: _pageSize,
+                                    forceRefresh: true,
+                                  ),
+                                ),
+                          );
                         }
 
                         if (state is RegularizeRequestLoaded) {
@@ -162,6 +340,12 @@ class _RegularizePageListingState extends State<RegularizePageListing>
                             tabs: _tabsregulrize,
                             items: state.regularizeRequests,
                             searchQuery: state.searchQuery?.toLowerCase() ?? '',
+                            countOverrides: {
+                              null: state.totalCount,
+                              RegularizeStatus.pending: state.pendingCount,
+                              RegularizeStatus.approved: state.approvedCount,
+                              RegularizeStatus.rejected: state.rejectedCount,
+                            },
                             statusSelector: (item) => item.status,
                             matchesSearch: (item, query) {
                               if (query.isEmpty) return true;
@@ -181,65 +365,36 @@ class _RegularizePageListingState extends State<RegularizePageListing>
                                       false);
                             },
                             tabColorBuilder: RequestTabTheme.colorForIndex,
-                            emptyBuilder: (context) => RequestEmptyState(),
-                            listBuilder: (context, list) {
-                              final grouped = RequestGroupingUtils.groupByMonth(
-                                items: list,
-                                dateSelector: (item) => item.appliedDate,
-                              );
-                              return ListView.builder(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: screenHeight * 0.012,
-                                ),
-                                itemCount: grouped.length,
-                                itemBuilder: (context, index) {
-                                  final entry = grouped[index];
-                                  if (entry is String) {
-                                    return Padding(
-                                      padding: EdgeInsets.only(
-                                        top:
-                                            index == 0
-                                                ? 0
-                                                : screenHeight * 0.014,
-                                        bottom: screenHeight * 0.010,
-                                      ),
-                                      child: Text(
-                                        entry,
-                                        style: AppTextStyles.bodySmall(
-                                          context,
-                                        ).copyWith(
-                                          fontWeight: FontWeight.w500,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  final req = entry as RegularizeRequestModel;
-
-                                  return RegularizeRequestCard(
-                                    regularizeRequest: req,
-                                    onTap: () async {
-                                      final result = await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) => RegularizeDetailPage(
-                                                regularizeRequest: req,
-                                              ),
-                                        ),
+                            tabContentBuilder: (context, tab) {
+                              final rawTabState =
+                                  tab.status == state.statusFilter
+                                      ? state
+                                      : _regularizeRequestBloc.getCachedRegularizeRequests(
+                                        status: tab.status,
                                       );
-                                      if (result == true && context.mounted) {
-                                        context
-                                            .read<RegularizeRequestBloc>()
-                                            .add(
-                                              const LoadRegularizeRequests(),
-                                            );
-                                      }
-                                    },
-                                  );
-                                },
+
+                              if (rawTabState == null) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
+
+                              final tabState = _regularizeRequestBloc.buildRegularizeViewState(
+                                baseState: rawTabState,
+                                searchQuery: state.searchQuery,
+                              );
+
+                              return _buildRegularizeTabContent(
+                                context,
+                                clientId: clientId,
+                                screenHeight: screenHeight,
+                                viewState: tabState,
+                                isCurrentTab: tab.status == state.statusFilter,
                               );
                             },
+                            emptyBuilder: (context) => const RequestEmptyState(),
+                            listBuilder: (context, list) =>
+                                const SizedBox.shrink(),
                           );
                         }
 
@@ -269,7 +424,7 @@ class _RegularizePageListingState extends State<RegularizePageListing>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -344,7 +499,12 @@ class _RegularizePageListingState extends State<RegularizePageListing>
                   );
                   if (result == true && context.mounted) {
                     context.read<RegularizeRequestBloc>().add(
-                      const LoadRegularizeRequests(),
+                      LoadRegularizeRequests(
+                        clientId: _resolveClientId(),
+                        status: _selectedTabStatus,
+                        limit: _pageSize,
+                        forceRefresh: true,
+                      ),
                     );
                   }
                 },
@@ -357,195 +517,4 @@ class _RegularizePageListingState extends State<RegularizePageListing>
       ],
     );
   }
-
-  void _showFilterBottomSheet(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    // Get current filter state from bloc using the context that has BlocProvider
-    final bloc = context.read<RegularizeRequestBloc>();
-    final currentState = bloc.state;
-    RegularizeStatus? currentFilter;
-    if (currentState is RegularizeRequestLoaded) {
-      currentFilter = currentState.statusFilter;
-      // Sync local state with bloc state
-      _selectedStatusFilter = currentFilter;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder:
-          (bottomSheetContext) => StatefulBuilder(
-            builder:
-                (bottomSheetContext, setModalState) => Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                  ),
-                  padding: EdgeInsets.all(screenWidth * 0.042),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Filter by Status',
-                        style: AppTextStyles.heading4(bottomSheetContext),
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      // Filter options
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'All',
-                        null,
-                        _selectedStatusFilter == null,
-                        () {
-                          setModalState(() {
-                            _selectedStatusFilter = null;
-                          });
-                        },
-                      ),
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'Pending',
-                        RegularizeStatus.pending,
-                        _selectedStatusFilter == RegularizeStatus.pending,
-                        () {
-                          setModalState(() {
-                            _selectedStatusFilter = RegularizeStatus.pending;
-                          });
-                        },
-                      ),
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'Approved',
-                        RegularizeStatus.approved,
-                        _selectedStatusFilter == RegularizeStatus.approved,
-                        () {
-                          setModalState(() {
-                            _selectedStatusFilter = RegularizeStatus.approved;
-                          });
-                        },
-                      ),
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'Rejected',
-                        RegularizeStatus.rejected,
-                        _selectedStatusFilter == RegularizeStatus.rejected,
-                        () {
-                          setModalState(() {
-                            _selectedStatusFilter = RegularizeStatus.rejected;
-                          });
-                        },
-                      ),
-                      _buildFilterOption(
-                        bottomSheetContext,
-                        'Withdrawn',
-                        RegularizeStatus.withdrawn,
-                        _selectedStatusFilter == RegularizeStatus.withdrawn,
-                        () {
-                          setModalState(() {
-                            _selectedStatusFilter = RegularizeStatus.withdrawn;
-                          });
-                        },
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      // Apply button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(bottomSheetContext);
-                            // Use the bloc instance from the outer context
-                            bloc.add(
-                              FilterRegularizeRequestsByStatus(
-                                _selectedStatusFilter,
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            padding: EdgeInsets.symmetric(
-                              vertical: screenHeight * 0.018,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text(
-                            'Apply Filter',
-                            style: AppTextStyles.buttonMedium(
-                              bottomSheetContext,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-          ),
-    );
-  }
-
-  Widget _buildFilterOption(
-    BuildContext context,
-    String label,
-    RegularizeStatus? status,
-    bool isSelected,
-    VoidCallback onTap,
-  ) {
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: screenHeight * 0.015),
-        child: Row(
-          children: [
-            Icon(
-              isSelected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-            SizedBox(width: MediaQuery.of(context).size.width * 0.032),
-            Text(
-              label,
-              style: AppTextStyles.bodyMedium(context).copyWith(
-                color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Custom painter for dotted line
-class DottedLinePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint =
-        Paint()
-          ..color = AppColors.border
-          ..strokeWidth = 1
-          ..style = PaintingStyle.stroke;
-
-    const dashWidth = 3.0;
-    const dashSpace = 3.0;
-    double startX = 0;
-
-    while (startX < size.width) {
-      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
-      startX += dashWidth + dashSpace;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

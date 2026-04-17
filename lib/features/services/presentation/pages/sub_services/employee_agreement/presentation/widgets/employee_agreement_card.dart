@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../domain/models/employee_agreement_model.dart';
@@ -25,7 +26,7 @@ class EmployeeAgreementCard extends StatelessWidget {
         // Navigate to agreement detail page when tapped
         // Pass the bloc using BlocProvider.value so the detail page can access it
         final bloc = context.read<AgreementBloc>();
-        final result = await Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder:
@@ -54,7 +55,7 @@ class EmployeeAgreementCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: AppColors.backgroundLight.withOpacity(0.3),
+                color: AppColors.backgroundLight.withValues(alpha: 0.3),
                 blurRadius: 4,
                 offset: const Offset(0, 1),
               ),
@@ -81,6 +82,7 @@ class EmployeeAgreementCard extends StatelessWidget {
                 'Employee Name',
                 agreement.employeeName,
                 agreement.employeeAvatar,
+                agreement.employeeProfileColor,
               ),
               Divider(
                 color: AppColors.loginInputBorder,
@@ -94,6 +96,7 @@ class EmployeeAgreementCard extends StatelessWidget {
                 context,
                 'Agreement Type',
                 agreement.agreementType,
+                null,
                 null,
               ),
               Divider(
@@ -109,6 +112,7 @@ class EmployeeAgreementCard extends StatelessWidget {
                 'Assigned By',
                 agreement.assignedBy,
                 agreement.assignedByAvatar,
+                agreement.assignedByProfileColor,
               ),
               Divider(
                 color: AppColors.loginInputBorder,
@@ -122,6 +126,7 @@ class EmployeeAgreementCard extends StatelessWidget {
                 context,
                 'Expiry Date',
                 agreement.expiryDate,
+                null,
                 null,
               ),
               Divider(
@@ -179,6 +184,7 @@ class EmployeeAgreementCard extends StatelessWidget {
     String label,
     String value,
     String? avatarPath,
+    String? profileColor,
   )
   {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -206,17 +212,12 @@ class EmployeeAgreementCard extends StatelessWidget {
             children: [
               if (avatarPath != null) ...[
                 SizedBox(width: screenWidth * 0.021), // ~2.1% of screen width
-                // Image.network(agreement.)
-                CircleAvatar(
-                  backgroundColor: AppColors.backgroundMediumLight,
+                _buildAvatar(
+                  context: context,
+                  name: value,
+                  avatarPath: avatarPath,
                   radius: smallerDimension * 0.033,
-                  // Agar avatarUrl (http) hai toh NetworkImage, warna placeholder icon
-                  backgroundImage: (avatarPath != null && avatarPath.startsWith('http'))
-                      ? NetworkImage(avatarPath)
-                      : null,
-                  child: (avatarPath == null || !avatarPath.startsWith('http'))
-                      ? const Icon(Icons.person, size: 19, color: Colors.white)
-                      : null,
+                  profileColor: profileColor,
                 ),
               ],
               SizedBox(width: screenWidth * 0.021), // ~2.1% of screen width
@@ -236,5 +237,123 @@ class EmployeeAgreementCard extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Widget _buildAvatar({
+    required BuildContext context,
+    required String name,
+    required String? avatarPath,
+    required double radius,
+    String? profileColor,
+  }) {
+    final avatarSize = radius * 2;
+    final trimmedAvatarPath = avatarPath?.trim();
+
+    if (trimmedAvatarPath != null && trimmedAvatarPath.startsWith('http')) {
+      return SizedBox(
+        width: avatarSize,
+        height: avatarSize,
+        child: ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: trimmedAvatarPath,
+            width: avatarSize,
+            height: avatarSize,
+            fit: BoxFit.cover,
+            errorWidget:
+                (_, __, ___) => _buildAvatarFallback(
+                  context,
+                  name,
+                  radius,
+                  profileColor,
+                ),
+          ),
+        ),
+      );
+    }
+
+    if (trimmedAvatarPath != null && trimmedAvatarPath.isNotEmpty) {
+      return SizedBox(
+        width: avatarSize,
+        height: avatarSize,
+        child: ClipOval(
+          child: Image.asset(
+            trimmedAvatarPath,
+            width: avatarSize,
+            height: avatarSize,
+            fit: BoxFit.cover,
+            errorBuilder:
+                (_, __, ___) => _buildAvatarFallback(
+                  context,
+                  name,
+                  radius,
+                  profileColor,
+                ),
+          ),
+        ),
+      );
+    }
+
+    return _buildAvatarFallback(context, name, radius, profileColor);
+  }
+
+  Widget _buildAvatarFallback(
+    BuildContext context,
+    String name,
+    double radius,
+    String? profileColor,
+  ) {
+    final trimmedName = name.trim();
+    final condensedName = trimmedName.replaceAll(RegExp(r'\s+'), '');
+    final initials =
+        condensedName.isEmpty
+            ? ''
+            : condensedName.length == 1
+            ? condensedName.substring(0, 1).toUpperCase()
+            : '${condensedName.substring(0, 1)}${condensedName.substring(condensedName.length - 1)}'
+                .toUpperCase();
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: _parseProfileColor(profileColor),
+      child:
+          initials.isEmpty
+              ? Icon(
+                Icons.person,
+                size: radius,
+                color: Colors.white,
+              )
+              : Text(
+                initials,
+                style: AppTextStyles.bodySmall(context).copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+    );
+  }
+
+  Color _parseProfileColor(String? profileColor) {
+    final normalized = profileColor?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return AppColors.backgroundMediumLight;
+    }
+
+    final hex = normalized.replaceFirst('#', '');
+    if (hex.length != 6 && hex.length != 8) {
+      return AppColors.backgroundMediumLight;
+    }
+
+    final buffer = StringBuffer();
+    if (hex.length == 6) {
+      buffer.write('FF');
+    }
+    buffer.write(hex);
+
+    final colorValue = int.tryParse(buffer.toString(), radix: 16);
+    if (colorValue == null) {
+      return AppColors.backgroundMediumLight;
+    }
+
+    return Color(colorValue);
   }
 }

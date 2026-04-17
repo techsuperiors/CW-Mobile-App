@@ -16,13 +16,17 @@ class WfhRepositoryImpl implements WfhRepository {
 
   @override
   Future<Either<Failure, WfhRequestsPageModel>> getWfhRequests({
+    required int clientId,
     int page = 1,
     int limit = 5,
+    WfhStatus? status,
   }) async {
     try {
       final requests = await remoteDataSource.getWfhRequests(
+        clientId: clientId,
         page: page,
         limit: limit,
+        status: status,
       );
       return Right(requests);
     } on AppException catch (e) {
@@ -52,15 +56,19 @@ class WfhRepositoryImpl implements WfhRepository {
 
   @override
   Future<Either<Failure, List<WfhRequestModel>>> getTeamWfhRequests({
+    required int clientId,
     int page = 1,
     int limit = 50,
     RequestAudienceScope scope = RequestAudienceScope.allUsers,
+    WfhStatus? status,
   }) async {
     try {
       final requests = await remoteDataSource.getTeamWfhRequests(
+        clientId: clientId,
         page: page,
         limit: limit,
         scope: scope,
+        status: status,
       );
       return Right(requests);
     } on AppException catch (e) {

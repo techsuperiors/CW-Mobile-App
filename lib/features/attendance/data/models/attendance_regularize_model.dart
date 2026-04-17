@@ -1,45 +1,52 @@
 /// Attendance Regularize Request Model
 class AttendanceRegularizeRequest {
   final String requestDate;
-  final String requestFor; // 'Punch-In', 'Punch-Out', 'both'
+  final String requestFor; // 'checkIn', 'checkOut', 'both'
   final String modeType; // 'Remote', 'Office', etc.
-  final String checkIn; // Format: 'yyyy-MM-dd HH:mm:ss+05:30'
-  final String checkOut; // Format: 'yyyy-MM-dd HH:mm:ss+05:30'
+  final String? checkIn; // Format: 'yyyy-MM-dd HH:mm:ss+05:30'
+  final String? checkOut; // Format: 'yyyy-MM-dd HH:mm:ss+05:30'
   final String reason;
   final String? otherReason;
   final String description;
   final int userId;
   final bool isOther;
-  final int statusUpdatedBy;
+  final int? statusUpdatedBy;
 
   AttendanceRegularizeRequest({
     required this.requestDate,
     required this.requestFor,
     required this.modeType,
-    required this.checkIn,
-    required this.checkOut,
+    this.checkIn,
+    this.checkOut,
     required this.reason,
     this.otherReason,
     required this.description,
     required this.userId,
     required this.isOther,
-    required this.statusUpdatedBy,
+    this.statusUpdatedBy,
   });
 
   Map<String, dynamic> toJson() {
-    return {
+    final json = <String, dynamic>{
       'request_date': requestDate,
       'request_for': requestFor,
       'mode_type': modeType,
-      'check_in': checkIn,
-      'check_out': checkOut,
       'reason': reason,
-      'other_reason': otherReason,
       'description': description,
       'user_id': userId,
       'is_Other': isOther,
-      'status_updated_by': statusUpdatedBy,
     };
+
+    json['check_in'] = checkIn;
+    json['check_out'] = checkOut;
+    if (otherReason != null && otherReason!.trim().isNotEmpty) {
+      json['other_reason'] = otherReason;
+    }
+    if (statusUpdatedBy != null) {
+      json['status_updated_by'] = statusUpdatedBy;
+    }
+
+    return json;
   }
 }
 

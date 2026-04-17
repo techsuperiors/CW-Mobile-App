@@ -30,6 +30,7 @@ class AppUrls {
   static const String punchOut = '/api/attendance/punchOut';
   static const String attendanceDetails = '/api/attendance/details';
   static const String attendanceUserDetail = '/api/attendance/user/detail';
+  static const String attendanceActivity = '/api/attendance/activity';
   static const String attendanceUserWorkingHours =
       '/api/attendance/user/working/hours';
   static const String attendanceRequest = '/api/attendance/request';
@@ -60,8 +61,18 @@ class AppUrls {
       '/api/admin/policies/employee/mapper/update';
   static const String documents = '/api/documents';
   static const String documentUserDirectory = '/api/documents/user/directory';
+  static const String documentDirectoryCreate = '/api/documents/directory';
   static const String documentDirectoryDetails =
       '/api/documents/directory/details';
+  static const String documentUpload = '/api/documents/upload';
+
+  // Visit & Geo Tracking endpoints
+  static const String visitCreate = '/api/field/tracking/visit/create';
+  static const String visitList = '/api/field/tracking/visit/list';
+  static const String visitActivityCreate =
+      '/api/field/tracking/visit/activity/create';
+  static const String visitCustomerList = '/api/field/tracking/customer/list';
+  static const String visitAddressList = '/api/field/tracking/address/list';
 
   // Posts endpoints
   // static const String posts = '/api/api/mobile/app/posts';

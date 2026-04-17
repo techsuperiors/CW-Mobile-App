@@ -48,8 +48,10 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
     with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
+  late final OnDutyRequestBloc _onDutyRequestBloc;
   RequestAudienceScope _selectedScope = RequestAudienceScope.allUsers;
-  static const int _pageSize = 50;
+  static const int _pageSize = 5;
+  late int _lastHandledTabIndex;
 
   static const List<StatusTabDefinition<OnDutyStatus>> _tabs = [
     StatusTabDefinition(label: 'All', status: null),
@@ -61,15 +63,213 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
   @override
   void initState() {
     super.initState();
+    final networkInfo = NetworkInfoImpl(Connectivity());
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final remoteDataSource = OnDutyRemoteDataSourceImpl(
+      apiClient: apiClient,
+    );
+    final repository = OnDutyRepositoryImpl(
+      remoteDataSource: remoteDataSource,
+    );
+    _onDutyRequestBloc = OnDutyRequestBloc(
+      getOnDutyRequestsUseCase: GetOnDutyRequestsUseCase(repository),
+      getOnDutyRequestStatsUseCase: GetOnDutyRequestStatsUseCase(repository),
+      getTeamOnDutyRequestsUseCase: GetTeamOnDutyRequestsUseCase(repository),
+    );
     _tabController = TabController(length: _tabs.length, vsync: this);
-    _tabController.addListener(() => setState(() {}));
+    _lastHandledTabIndex = _tabController.index;
+    _tabController.addListener(_handleTabChange);
   }
+
+  OnDutyStatus? get _selectedTabStatus => _tabs[_tabController.index].status;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
+    _onDutyRequestBloc.close();
     super.dispose();
+  }
+
+  Future<void> _refreshTabData({
+    required int clientId,
+    required RequestAudienceScope scope,
+    required OnDutyStatus? status,
+  }) async {
+    _onDutyRequestBloc.add(
+      LoadTeamOnDutyRequests(
+        clientId: clientId,
+        scope: scope,
+        status: status,
+        limit: _pageSize,
+        forceRefresh: true,
+      ),
+    );
+
+    await _onDutyRequestBloc.stream.firstWhere((state) {
+      if (state is OnDutyRequestLoaded) {
+        return !state.isRefreshing &&
+            state.selectedScope == scope &&
+            state.statusFilter == status;
+      }
+
+      return state is OnDutyRequestError;
+    });
+  }
+
+  void _handleTabChange() {
+    if (!mounted || _lastHandledTabIndex == _tabController.index) {
+      return;
+    }
+
+    _lastHandledTabIndex = _tabController.index;
+    setState(() {});
+
+    final currentState = _onDutyRequestBloc.state;
+    final scope =
+        currentState is OnDutyRequestLoaded
+            ? currentState.selectedScope
+            : _selectedScope;
+
+    _onDutyRequestBloc.add(
+      LoadTeamOnDutyRequests(
+        clientId: _resolveClientId(context),
+        scope: scope,
+        status: _selectedTabStatus,
+        limit: _pageSize,
+      ),
+    );
+  }
+
+  Widget _buildOnDutyTabContent(
+    BuildContext context, {
+    required int clientId,
+    required double screenHeight,
+    required OnDutyRequestLoaded viewState,
+    required bool isCurrentTab,
+  }) {
+    if (isCurrentTab && viewState.isRefreshing) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (isCurrentTab && viewState.contentErrorMessage != null) {
+      return ApiErrorState(
+        rawMessage: viewState.contentErrorMessage!,
+        onRetry:
+            () => context.read<OnDutyRequestBloc>().add(
+              LoadTeamOnDutyRequests(
+                clientId: clientId,
+                scope: viewState.selectedScope,
+                status: viewState.statusFilter,
+                limit: _pageSize,
+                forceRefresh: true,
+              ),
+            ),
+      );
+    }
+
+    final visibleRequests =
+        viewState.statusFilter == null
+            ? viewState.filteredOnDutyRequests
+            : viewState.filteredOnDutyRequests
+                .where((request) => request.status != OnDutyStatus.withdrawn)
+                .toList();
+
+    if (visibleRequests.isEmpty) {
+      return const RequestEmptyState();
+    }
+
+    final grouped = RequestGroupingUtils.groupByMonth(
+      items: visibleRequests,
+      dateSelector: (item) => item.appliedDate,
+    );
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (isCurrentTab &&
+            notification.metrics.pixels >=
+                notification.metrics.maxScrollExtent - 200 &&
+            viewState.hasMore &&
+            !viewState.isLoadingMore) {
+          context.read<OnDutyRequestBloc>().add(
+            LoadMoreTeamOnDutyRequests(
+              clientId: clientId,
+              limit: _pageSize,
+            ),
+          );
+        }
+        return false;
+      },
+      child: RefreshIndicator(
+        onRefresh:
+            () => _refreshTabData(
+              clientId: clientId,
+              scope: viewState.selectedScope,
+              status: viewState.statusFilter,
+            ),
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(vertical: screenHeight * 0.012),
+          itemCount: grouped.length + (viewState.isLoadingMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index >= grouped.length) {
+              return Padding(
+                padding: EdgeInsets.symmetric(vertical: screenHeight * 0.02),
+                child: const Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final entry = grouped[index];
+            if (entry is String) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  top: index == 0 ? 0 : screenHeight * 0.014,
+                  bottom: screenHeight * 0.010,
+                ),
+                child: Text(
+                  entry,
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              );
+            }
+
+            final req = entry as OnDutyRequestModel;
+            return OnDutyRequestCard(
+              onDutyRequest: req,
+              onTap: () async {
+                final shouldRefresh = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => OnDutyDetailPage(
+                          onDutyRequest: req,
+                          isApprovalMode: true,
+                        ),
+                  ),
+                );
+                if (shouldRefresh == true && context.mounted) {
+                  context.read<OnDutyRequestBloc>().add(
+                    LoadTeamOnDutyRequests(
+                      clientId: clientId,
+                      scope: viewState.selectedScope,
+                      status: viewState.statusFilter,
+                      limit: _pageSize,
+                      forceRefresh: true,
+                    ),
+                  );
+                }
+              },
+            );
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -124,31 +324,19 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
       _selectedScope = RequestAudienceScope.myReportees;
     }
 
-    return BlocProvider(
-      create: (_) {
-        final networkInfo = NetworkInfoImpl(Connectivity());
-        final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
-        final remoteDataSource = OnDutyRemoteDataSourceImpl(
-          apiClient: apiClient,
-        );
-        final repository = OnDutyRepositoryImpl(
-          remoteDataSource: remoteDataSource,
-        );
+    if (_onDutyRequestBloc.state is OnDutyRequestInitial) {
+      _onDutyRequestBloc.add(
+        LoadTeamOnDutyRequests(
+          clientId: clientId,
+          scope: _selectedScope,
+          status: _selectedTabStatus,
+          limit: _pageSize,
+        ),
+      );
+    }
 
-        return OnDutyRequestBloc(
-          getOnDutyRequestsUseCase: GetOnDutyRequestsUseCase(repository),
-          getOnDutyRequestStatsUseCase: GetOnDutyRequestStatsUseCase(
-            repository,
-          ),
-          getTeamOnDutyRequestsUseCase: GetTeamOnDutyRequestsUseCase(repository),
-        )..add(
-          LoadTeamOnDutyRequests(
-            clientId: clientId,
-            scope: _selectedScope,
-            limit: _pageSize,
-          ),
-        );
-      },
+    return BlocProvider.value(
+      value: _onDutyRequestBloc,
       child: ResponsiveScaffold(
         backgroundColor: AppColors.backgroundLight,
         appBar: AppBar(
@@ -220,20 +408,15 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
                                       LoadTeamOnDutyRequests(
                                         clientId: clientId,
                                         scope: _selectedScope,
+                                        status: _selectedTabStatus,
                                         limit: _pageSize,
+                                        forceRefresh: true,
                                       ),
                                     ),
                           );
                         }
 
                         final loaded = state as OnDutyRequestLoaded;
-                        final items =
-                            loaded.onDutyRequests
-                                .where(
-                                  (request) =>
-                                      request.status != OnDutyStatus.withdrawn,
-                                )
-                                .toList();
 
                         return StatusTabbedSection<
                           OnDutyStatus,
@@ -241,7 +424,7 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
                         >(
                           controller: _tabController,
                           tabs: _tabs,
-                          items: items,
+                          items: loaded.onDutyRequests,
                           searchQuery: loaded.searchQuery?.toLowerCase() ?? '',
                           countOverrides: {
                             null: loaded.totalCount,
@@ -259,99 +442,39 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
                                 item.reason.toLowerCase().contains(query);
                           },
                           tabColorBuilder: RequestTabTheme.colorForIndex,
-                          emptyBuilder: (context) => const RequestEmptyState(),
-                          listBuilder: (context, list) {
-                            final grouped = RequestGroupingUtils.groupByMonth(
-                              items: list,
-                              dateSelector: (item) => item.appliedDate,
-                            );
-                            return NotificationListener<ScrollNotification>(
-                              onNotification: (notification) {
-                                if (notification.metrics.pixels >=
-                                    notification.metrics.maxScrollExtent -
-                                        200) {
-                                  context.read<OnDutyRequestBloc>().add(
-                                    LoadMoreTeamOnDutyRequests(
-                                      clientId: clientId,
-                                      limit: _pageSize,
-                                    ),
-                                  );
-                                }
-                                return false;
-                              },
-                              child: ListView.builder(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: screenHeight * 0.012,
-                                ),
-                                itemCount:
-                                    grouped.length +
-                                    (loaded.isLoadingMore ? 1 : 0),
-                                itemBuilder: (context, index) {
-                                  if (index >= grouped.length) {
-                                    return Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: screenHeight * 0.02,
-                                      ),
-                                      child: const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    );
-                                  }
-
-                                  final entry = grouped[index];
-                                  if (entry is String) {
-                                    return Padding(
-                                      padding: EdgeInsets.only(
-                                        top:
-                                            index == 0
-                                                ? 0
-                                                : screenHeight * 0.014,
-                                        bottom: screenHeight * 0.010,
-                                      ),
-                                      child: Text(
-                                        entry,
-                                        style: AppTextStyles.bodySmall(
-                                          context,
-                                        ).copyWith(
-                                          fontWeight: FontWeight.w500,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    );
-                                  }
-
-                                  final req = entry as OnDutyRequestModel;
-                                  return OnDutyRequestCard(
-                                    onDutyRequest: req,
-                                    onTap: () async {
-                                      final shouldRefresh = await Navigator.push<
-                                        bool
-                                      >(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) => OnDutyDetailPage(
-                                                onDutyRequest: req,
-                                                isApprovalMode: true,
-                                              ),
-                                        ),
-                                      );
-                                      if (shouldRefresh == true &&
-                                          context.mounted) {
-                                        context.read<OnDutyRequestBloc>().add(
-                                          LoadTeamOnDutyRequests(
-                                            clientId: clientId,
-                                            scope: _selectedScope,
-                                            limit: _pageSize,
-                                          ),
+                          tabContentBuilder: (context, tab) {
+                            final rawTabState =
+                                tab.status == loaded.statusFilter
+                                    ? loaded
+                                    : _onDutyRequestBloc
+                                        .getCachedTeamOnDutyRequests(
+                                          scope: _selectedScope,
+                                          status: tab.status,
                                         );
-                                      }
-                                    },
-                                  );
-                                },
-                              ),
+
+                            if (rawTabState == null) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+
+                            final tabState =
+                                _onDutyRequestBloc.buildTeamOnDutyViewState(
+                                  baseState: rawTabState,
+                                  searchQuery: loaded.searchQuery,
+                                );
+
+                            return _buildOnDutyTabContent(
+                              context,
+                              clientId: clientId,
+                              screenHeight: screenHeight,
+                              viewState: tabState,
+                              isCurrentTab: tab.status == loaded.statusFilter,
                             );
                           },
+                          emptyBuilder: (context) => const RequestEmptyState(),
+                          listBuilder: (context, list) =>
+                              const SizedBox.shrink(),
                         );
                       },
                     ),
@@ -398,7 +521,7 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -452,6 +575,7 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
           selectedScope: _selectedScope,
           availableScopes: availableScopes,
           onSelected: (scope) {
+            if (scope == _selectedScope) return;
             setState(() {
               _selectedScope = scope;
             });
@@ -459,6 +583,7 @@ class _OnDutyApprovalPageListingState extends State<OnDutyApprovalPageListing>
               LoadTeamOnDutyRequests(
                 clientId: _resolveClientId(context),
                 scope: scope,
+                status: _selectedTabStatus,
                 limit: _pageSize,
               ),
             );

@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:collectivWork/core/usecase/usecase.dart';
+import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 import '../../domain/entities/leave_entity.dart';
 import '../../domain/entities/apply_leave_entity.dart';
 import '../../domain/usecases/apply_leave_usecase.dart';
@@ -13,6 +14,9 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
   final GetLeavesUseCase getLeavesUseCase;
   final GetTeamLeaveRequestsUseCase? getTeamLeaveRequestsUseCase;
   final ApplyLeaveUseCase applyLeaveUseCase;
+  final Map<String, LeaveRequestLoaded> _teamLeaveRequestsCache = {};
+  int _latestTeamRequestSequence = 0;
+  String? _activeTeamRequestKey;
 
   LeaveRequestBloc({
     required this.getLeavesUseCase,
@@ -39,24 +43,97 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
       return;
     }
 
-    emit(const LeaveRequestLoading());
+    final previousLoadedState =
+        state is LeaveRequestLoaded && (state as LeaveRequestLoaded).isTeamRequestMode
+            ? state as LeaveRequestLoaded
+            : null;
+
+    if (event.forceRefresh && event.page == 1) {
+      _teamLeaveRequestsCache.clear();
+    }
+
+    final cacheKey = _teamLeaveCacheKey(event.scope, event.status);
+    final requestSequence = ++_latestTeamRequestSequence;
+    _activeTeamRequestKey = cacheKey;
+    final cachedState = _teamLeaveRequestsCache[cacheKey];
+
+    if (event.page == 1 && !event.forceRefresh && cachedState != null) {
+      emit(
+        _buildLoadedState(
+          cachedState.copyWith(
+            searchQuery: previousLoadedState?.searchQuery,
+            typeFilter: previousLoadedState?.typeFilter,
+            isRefreshing: false,
+            isLoadingMore: false,
+            contentErrorMessage: null,
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (previousLoadedState != null) {
+      emit(
+        previousLoadedState.copyWith(
+          isRefreshing: true,
+          isLoadingMore: false,
+          statusFilter: event.status,
+          selectedScope: event.scope,
+          contentErrorMessage: null,
+        ),
+      );
+    } else {
+      emit(const LeaveRequestLoading());
+    }
 
     final failureOrLeaves = await teamUseCase(
       GetTeamLeaveRequestsParams(
         clientId: event.clientId,
         scope: event.scope,
+        status: event.status,
         page: event.page,
         limit: event.limit,
       ),
     );
 
     failureOrLeaves.fold(
-      (failure) => emit(LeaveRequestError(failure.message)),
-      (pageData) => emit(
-        LeaveRequestLoaded(
+      (failure) {
+        if (requestSequence != _latestTeamRequestSequence ||
+            _activeTeamRequestKey != cacheKey) {
+          return;
+        }
+
+        if (previousLoadedState != null) {
+          emit(
+            previousLoadedState.copyWith(
+              leaveRequests: const [],
+              filteredLeaveRequests: const [],
+              isRefreshing: false,
+              isLoadingMore: false,
+              hasMore: false,
+              currentPage: event.page,
+              statusFilter: event.status,
+              selectedScope: event.scope,
+              contentErrorMessage: failure.message,
+            ),
+          );
+          return;
+        }
+
+        emit(LeaveRequestError(failure.message));
+      },
+      (pageData) {
+        if (requestSequence != _latestTeamRequestSequence ||
+            _activeTeamRequestKey != cacheKey) {
+          return;
+        }
+
+        final loadedState = LeaveRequestLoaded(
           leaveRequests: pageData.requests,
           filteredLeaveRequests: pageData.requests,
           isTeamRequestMode: true,
+          statusFilter: event.status,
+          isRefreshing: false,
           hasMore: pageData.requests.length < pageData.totalLeaveRequest,
           currentPage: event.page,
           totalLeaveRequest: pageData.totalLeaveRequest,
@@ -64,8 +141,11 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
           pendingListCount: pageData.pendingListCount,
           rejectListCount: pageData.rejectListCount,
           selectedScope: event.scope,
-        ),
-      ),
+        );
+
+        _teamLeaveRequestsCache[cacheKey] = loadedState;
+        emit(loadedState);
+      },
     );
   }
 
@@ -79,9 +159,14 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
     }
 
     final currentState = state as LeaveRequestLoaded;
+    final requestKey = _teamLeaveCacheKey(
+      currentState.selectedScope,
+      currentState.statusFilter,
+    );
     if (!currentState.isTeamRequestMode ||
         currentState.isLoadingMore ||
-        !currentState.hasMore) {
+        !currentState.hasMore ||
+        _activeTeamRequestKey != requestKey) {
       return;
     }
 
@@ -91,33 +176,47 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
       GetTeamLeaveRequestsParams(
         clientId: event.clientId,
         scope: currentState.selectedScope,
+        status: currentState.statusFilter,
         page: currentState.currentPage + 1,
         limit: event.limit,
       ),
     );
 
     failureOrLeaves.fold(
-      (_) => emit(currentState.copyWith(isLoadingMore: false)),
+      (_) {
+        if (_activeTeamRequestKey != requestKey || state is! LeaveRequestLoaded) {
+          return;
+        }
+
+        final latestState = state as LeaveRequestLoaded;
+        emit(latestState.copyWith(isLoadingMore: false));
+      },
       (pageData) {
+        if (_activeTeamRequestKey != requestKey || state is! LeaveRequestLoaded) {
+          return;
+        }
+
+        final latestState = state as LeaveRequestLoaded;
         final merged = _mergeUniqueById(
-          currentState.leaveRequests,
+          latestState.leaveRequests,
           pageData.requests,
         );
 
-        emit(
-          _buildLoadedState(
-            currentState.copyWith(
-              leaveRequests: merged,
-              isLoadingMore: false,
-              hasMore: merged.length < pageData.totalLeaveRequest,
-              currentPage: currentState.currentPage + 1,
-              totalLeaveRequest: pageData.totalLeaveRequest,
-              approvedListCount: pageData.approvedListCount,
-              pendingListCount: pageData.pendingListCount,
-              rejectListCount: pageData.rejectListCount,
-            ),
+        final nextState = _buildLoadedState(
+          latestState.copyWith(
+            leaveRequests: merged,
+            isLoadingMore: false,
+            hasMore: merged.length < pageData.totalLeaveRequest,
+            currentPage: latestState.currentPage + 1,
+            totalLeaveRequest: pageData.totalLeaveRequest,
+            approvedListCount: pageData.approvedListCount,
+            pendingListCount: pageData.pendingListCount,
+            rejectListCount: pageData.rejectListCount,
           ),
         );
+
+        emit(nextState);
+        _teamLeaveRequestsCache[requestKey] = nextState;
       },
     );
   }
@@ -233,6 +332,19 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
     return state.copyWith(filteredLeaveRequests: filtered);
   }
 
+  LeaveRequestLoaded buildTeamLeaveViewState({
+    required LeaveRequestLoaded baseState,
+    String? searchQuery,
+    String? typeFilter,
+  }) {
+    return _buildLoadedState(
+      baseState.copyWith(
+        searchQuery: searchQuery,
+        typeFilter: typeFilter,
+      ),
+    );
+  }
+
   List<LeaveEntity> _applySearch(List<LeaveEntity> requests, String? query) {
     final normalizedQuery = query?.trim().toLowerCase();
     if (normalizedQuery == null || normalizedQuery.isEmpty) {
@@ -264,6 +376,18 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
     }
 
     return merged;
+  }
+
+  String _teamLeaveCacheKey(
+    RequestAudienceScope scope,
+    LeaveStatus? status,
+  ) => '${scope.name}:${status?.name ?? 'all'}';
+
+  LeaveRequestLoaded? getCachedTeamLeaveRequests({
+    required RequestAudienceScope scope,
+    required LeaveStatus? status,
+  }) {
+    return _teamLeaveRequestsCache[_teamLeaveCacheKey(scope, status)];
   }
 
   List<LeaveEntity> _applyFilters(

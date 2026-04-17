@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/cupertino.dart';
 
 import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_urls.dart';
@@ -15,14 +14,18 @@ import '../models/overtime_detail_model.dart';
 
 abstract class OvertimeRemoteDataSource {
   Future<List<OvertimeRequestModel>> getOvertimeRequests({
+    required int clientId,
     int page = 1,
-    int limit = 20,
+    int limit = 5,
+    OvertimeStatus? status,
   });
 
   Future<List<OvertimeRequestModel>> getTeamOvertimeRequests({
+    required int clientId,
     int page = 1,
     int limit = 20,
     String requestType = 'All',
+    OvertimeStatus? status,
   });
 
   Future<OvertimeRequestStatsModel> getOvertimeRequestStats({
@@ -72,16 +75,28 @@ class OvertimeRemoteDataSourceImpl implements OvertimeRemoteDataSource {
 
   @override
   Future<List<OvertimeRequestModel>> getOvertimeRequests({
+    required int clientId,
     int page = 1,
-    int limit = 20,
+    int limit = 5,
+    OvertimeStatus? status,
   }) async {
     try {
-      final payload = encodeData({'page': page, 'limit': limit});
+      final payload = encodeData({
+        'client_id': clientId,
+        'users': <dynamic>[],
+        'status':
+            status == null ? <dynamic>[] : <String>[status.displayName],
+        'date': <dynamic>[],
+        'approved_by': <dynamic>[],
+        'rejected_by': <dynamic>[],
+        'request_type': 'All',
+        'page': page,
+        'limit': limit,
+      });
       final response = await apiClient.get(
         '${AppUrls.overtimeRequests}?payload=$payload',
         options: Options(headers: const {'Content-Type': 'application/json'}),
       );
-      debugPrint("payload:-- $payload");
       final data = response.data as Map<String, dynamic>?;
       if (data == null) throw const ServerException('Invalid server response');
       if (data['success'] != true) {
@@ -105,12 +120,20 @@ class OvertimeRemoteDataSourceImpl implements OvertimeRemoteDataSource {
 
   @override
   Future<List<OvertimeRequestModel>> getTeamOvertimeRequests({
+    required int clientId,
     int page = 1,
     int limit = 20,
     String requestType = 'All',
+    OvertimeStatus? status,
   }) async {
     try {
       final payload = encodeData({
+        'client_id': clientId,
+        'users': <dynamic>[],
+        'status': status == null ? <dynamic>[] : <String>[status.displayName],
+        'date': <dynamic>[],
+        'approved_by': <dynamic>[],
+        'rejected_by': <dynamic>[],
         'request_type': requestType,
         'page': page,
         'limit': limit,

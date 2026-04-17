@@ -156,16 +156,19 @@ class AgreementListApiResponse {
 class AgreementConsentRequest {
   final int agreementId;
   final bool agreementAcknowledged;
+  final String type;
 
   AgreementConsentRequest({
     required this.agreementId,
     required this.agreementAcknowledged,
+    this.type = 'signed_pdf',
   });
 
   Map<String, dynamic> toJson() {
     return {
       'agreement_id': agreementId,
       'agreement_acknowledged': agreementAcknowledged,
+      'type': type,
     };
   }
 }

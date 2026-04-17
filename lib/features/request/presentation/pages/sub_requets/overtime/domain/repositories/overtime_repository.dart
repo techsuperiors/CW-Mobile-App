@@ -8,14 +8,18 @@ import '../entities/overtime_detail.dart';
 
 abstract class OvertimeRepository {
   Future<Either<Failure, List<OvertimeRequestModel>>> getOvertimeRequests({
+    required int clientId,
     int page = 1,
-    int limit = 20,
+    int limit = 5,
+    OvertimeStatus? status,
   });
 
   Future<Either<Failure, List<OvertimeRequestModel>>> getTeamOvertimeRequests({
+    required int clientId,
     int page = 1,
     int limit = 20,
     String requestType = 'All',
+    OvertimeStatus? status,
   });
 
   Future<Either<Failure, OvertimeRequestStatsModel>> getOvertimeRequestStats({

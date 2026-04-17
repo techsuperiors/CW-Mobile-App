@@ -42,7 +42,7 @@ class OnDutyRequestCard extends StatelessWidget {
             children: [
               // Colored left border
               Container(
-                width: screenWidth * 0.032,
+                width: screenWidth * 0.018,
                 decoration: BoxDecoration(
                   color: statusColor,
                   borderRadius: const BorderRadius.only(

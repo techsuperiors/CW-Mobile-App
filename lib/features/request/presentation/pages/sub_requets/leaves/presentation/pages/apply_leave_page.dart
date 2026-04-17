@@ -752,7 +752,7 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
               Navigator.of(context).pop(_hasDeletedExistingAttachment);
             },
             child: ResponsiveScaffold(
-              backgroundColor: AppColors.backgroundMedium,
+              backgroundColor: AppColors.backgroundLight,
               appBar:
               AppBar(
                 forceMaterialTransparency: true,

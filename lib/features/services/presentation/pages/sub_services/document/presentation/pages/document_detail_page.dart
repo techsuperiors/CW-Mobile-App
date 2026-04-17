@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:open_filex/open_filex.dart';
@@ -16,6 +17,7 @@ import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/network/api_client.dart';
 import '../../../../../../../../core/network/network_info.dart';
 import '../../../../../../../../core/utils/app_navigator.dart';
+import '../../../../../../../../core/utils/app_spacing.dart';
 import '../../../../../../../../core/utils/navigation_helper.dart';
 import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../authentication/presentation/pages/login_page.dart';
@@ -34,6 +36,7 @@ import '../../domain/models/document_file_model.dart';
 import '../../domain/models/document_folder_model.dart';
 import '../../domain/usecases/delete_document_usecase.dart';
 import '../../domain/usecases/get_document_folder_files_usecase.dart';
+import '../../domain/usecases/upload_document_file_usecase.dart';
 import '../cubit/document_detail_cubit.dart';
 import '../cubit/document_detail_state.dart';
 import '../widgets/document_file_card.dart';
@@ -57,6 +60,8 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
   late final DocumentDetailCubit _detailCubit;
   late final AgreementBloc _agreementBloc;
   late final DeleteDocumentUseCase _deleteDocumentUseCase;
+  bool _isUploadingFile = false;
+  bool _shouldRefreshParent = false;
 
   bool get _isEmployeeAgreementsFolder =>
       widget.folder.name.trim().toLowerCase() == 'employee agreements' ||
@@ -66,11 +71,15 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
   void initState() {
     super.initState();
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
-      AppNavigator.pushAndRemoveAll(
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-      );
-    },);
+    final apiClient = ApiClient(
+      dio: Dio(),
+      networkInfo: networkInfo,
+      onTokenExpired: () {
+        AppNavigator.pushAndRemoveAll(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      },
+    );
     final remoteDataSource = DocumentRemoteDataSourceImpl(apiClient);
     final repository = DocumentRepositoryImpl(
       remoteDataSource: remoteDataSource,
@@ -80,6 +89,7 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
 
     _detailCubit = DocumentDetailCubit(
       getDocumentFolderFilesUseCase: GetDocumentFolderFilesUseCase(repository),
+      uploadDocumentFileUseCase: UploadDocumentFileUseCase(repository),
     )..loadFolder(widget.folder);
 
     final agreementRemoteDataSource = AgreementRemoteDataSourceImpl(apiClient);
@@ -106,103 +116,125 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
 
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider.value(value: _detailCubit),
-        BlocProvider.value(value: _agreementBloc),
-      ],
-      child: ResponsiveScaffold(
-        backgroundColor: AppColors.backgroundMedium,
-        appBar: AppBar(
-          forceMaterialTransparency: true,
-          elevation: 0,
-          backgroundColor: AppColors.background,
-          foregroundColor: AppColors.textPrimary,
-          leading: GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.arrow_back_ios,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: screenWidth * 0.048,
-                ),
-                Flexible(
-                  child: Text(
-                    AppStrings.back,
-                    style: AppTextStyles.bodyMedium(context).copyWith(
-                      fontWeight: FontWeight.w400,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.of(context).pop(_shouldRefreshParent);
+      },
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider.value(value: _detailCubit),
+          BlocProvider.value(value: _agreementBloc),
+        ],
+        child: ResponsiveScaffold(
+          backgroundColor: AppColors.backgroundMedium,
+          appBar: AppBar(
+            forceMaterialTransparency: true,
+            elevation: 0,
+            backgroundColor: AppColors.background,
+            foregroundColor: AppColors.textPrimary,
+            leading: GestureDetector(
+              onTap: () => Navigator.of(context).pop(_shouldRefreshParent),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.arrow_back_ios,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: screenWidth * 0.048,
                   ),
-                ),
-              ],
-            ),
-          ),
-          leadingWidth: 110,
-          title: Text(
-            widget.folder.name,
-            style: AppTextStyles.heading4(context).copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          centerTitle: true,
-        ),
-        bottomNavigationBar: BottomNavBar(
-          currentIndex: 0,
-          onTap: NavigationHelper.getBottomNavHandler(context),
-        ),
-        body: BlocBuilder<DocumentDetailCubit, DocumentDetailState>(
-          builder: (context, state) {
-            if (state is DocumentDetailInitial ||
-                state is DocumentDetailLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            if (state is DocumentDetailError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.insert_drive_file_outlined,
-                      color: AppColors.error,
-                      size: 56,
-                    ),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Text(
-                        state.message,
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.bodyMedium(
-                          context,
-                        ).copyWith(color: AppColors.error),
+                  Flexible(
+                    child: Text(
+                      AppStrings.back,
+                      style: AppTextStyles.bodyMedium(context).copyWith(
+                        fontWeight: FontWeight.w400,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => _detailCubit.loadFolder(widget.folder),
-                      child: const Text('Retry'),
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+            leadingWidth: 110,
+            title: Text(
+              widget.folder.name,
+              style: AppTextStyles.heading4(context).copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            centerTitle: true,
+            actions: [
+              if (!_isEmployeeAgreementsFolder)
+                IconButton(
+                  onPressed: _isUploadingFile ? null : _handleUploadFile,
+                  icon:
+                      _isUploadingFile
+                          ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : Icon(Icons.add, color: AppColors.iconprofilecolor),
                 ),
+              AppSpacing.hSm,
+            ],
+          ),
+          bottomNavigationBar: BottomNavBar(
+            currentIndex: 0,
+            onTap: NavigationHelper.getBottomNavHandler(context),
+          ),
+          body: BlocBuilder<DocumentDetailCubit, DocumentDetailState>(
+            builder: (context, state) {
+              if (state is DocumentDetailInitial ||
+                  state is DocumentDetailLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (state is DocumentDetailError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.insert_drive_file_outlined,
+                        color: AppColors.error,
+                        size: 56,
+                      ),
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          state.message,
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.bodyMedium(
+                            context,
+                          ).copyWith(color: AppColors.error),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => _detailCubit.loadFolder(widget.folder),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final files = (state as DocumentDetailLoaded).files;
+              if (_isEmployeeAgreementsFolder) {
+                return _buildAgreementList(context, files);
+              }
+
+              return Column(
+                children: [Expanded(child: _buildFileList(context, files))],
               );
-            }
-
-            final files = (state as DocumentDetailLoaded).files;
-            if (_isEmployeeAgreementsFolder) {
-              return _buildAgreementList(context, files);
-            }
-
-            return Column(
-              children: [Expanded(child: _buildFileList(context, files))],
-            );
-          },
+            },
+          ),
         ),
       ),
     );
@@ -277,6 +309,64 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
     );
   }
 
+  Future<void> _handleUploadFile() async {
+    if (_isUploadingFile) return;
+
+    try {
+      setState(() => _isUploadingFile = true);
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        type: FileType.custom,
+        allowedExtensions: const [
+          'png',
+          'jpg',
+          'jpeg',
+          'pdf',
+          'doc',
+          'xlsx',
+          'xls',
+        ],
+      );
+
+      final selectedPath =
+          result != null && result.files.isNotEmpty
+              ? result.files.first.path
+              : null;
+      if (selectedPath == null || selectedPath.isEmpty) {
+        return;
+      }
+
+      final error = await _detailCubit.uploadFile(
+        folder: widget.folder,
+        filePath: selectedPath,
+      );
+      if (!mounted) return;
+
+      if (error == null) {
+        _shouldRefreshParent = true;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'File uploaded successfully.'),
+          backgroundColor: error == null ? AppColors.success : AppColors.error,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to select file: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingFile = false);
+      }
+    }
+  }
+
   Widget _buildAgreementList(
     BuildContext context,
     List<DocumentFileModel> files,
@@ -291,9 +381,8 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
       ),
       itemCount: agreements.length,
       itemBuilder: (context, index) {
-        final spacing = screenHeight < 600
-            ? 12.0
-            : (screenHeight < 700 ? 14.0 : 16.0);
+        final spacing =
+            screenHeight < 600 ? 12.0 : (screenHeight < 700 ? 14.0 : 16.0);
         return Padding(
           padding: EdgeInsets.only(bottom: spacing),
           child: EmployeeAgreementCard(agreement: agreements[index]),
@@ -357,7 +446,10 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
                   Icons.download,
                   color: Theme.of(context).colorScheme.primary,
                 ),
-                title: Text('Download', style: AppTextStyles.bodyLarge(context)),
+                title: Text(
+                  'Download',
+                  style: AppTextStyles.bodyLarge(context),
+                ),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _handleDownload(file);
@@ -474,13 +566,11 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
       directoryId: directoryId,
       documentId: documentId,
     );
-    result.fold(
-      (failure) => _showSnack(failure.message),
-      (_) {
-        _showSnack('File deleted successfully.', isError: false);
-        _detailCubit.loadFolder(widget.folder);
-      },
-    );
+    result.fold((failure) => _showSnack(failure.message), (_) {
+      _shouldRefreshParent = true;
+      _showSnack('File deleted successfully.', isError: false);
+      _detailCubit.loadFolder(widget.folder);
+    });
   }
 
   Future<File> _downloadToFile({
@@ -622,9 +712,10 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
   }
 
   String _resolveExtension(DocumentFileModel file) {
-    final urlExtension = file.downloadUrl == null
-        ? ''
-        : path.extension(Uri.parse(file.downloadUrl!).path);
+    final urlExtension =
+        file.downloadUrl == null
+            ? ''
+            : path.extension(Uri.parse(file.downloadUrl!).path);
 
     if (urlExtension.isNotEmpty) {
       return urlExtension;
@@ -658,10 +749,11 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
 
   String _sanitizeFileName(String rawName, String extension) {
     final cleanBase = rawName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
-    final baseWithoutExtension = extension.isNotEmpty &&
-            cleanBase.toLowerCase().endsWith(extension.toLowerCase())
-        ? cleanBase.substring(0, cleanBase.length - extension.length)
-        : cleanBase;
+    final baseWithoutExtension =
+        extension.isNotEmpty &&
+                cleanBase.toLowerCase().endsWith(extension.toLowerCase())
+            ? cleanBase.substring(0, cleanBase.length - extension.length)
+            : cleanBase;
     final fallback =
         baseWithoutExtension.isEmpty ? 'document_file' : baseWithoutExtension;
     return '$fallback$extension';
@@ -712,11 +804,15 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
     }
 
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
-      AppNavigator.pushAndRemoveAll(
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-      );
-    },);
+    final apiClient = ApiClient(
+      dio: Dio(),
+      networkInfo: networkInfo,
+      onTokenExpired: () {
+        AppNavigator.pushAndRemoveAll(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      },
+    );
     final remoteDataSource = AgreementRemoteDataSourceImpl(apiClient);
     final repository = AgreementRepositoryImpl(
       remoteDataSource: remoteDataSource,
@@ -740,6 +836,7 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
                 content: file.agreementContent,
                 signatureUrl: file.agreementSignatureUrl,
                 documentUrl: file.downloadUrl,
+                useLegacyHtmlPreview: file.fileType.toLowerCase() == 'html',
               ),
             ),
       ),

@@ -15,6 +15,7 @@ abstract class LeavesRepository {
   Future<Either<Failure, TeamLeaveRequestsPageEntity>> getTeamLeaveRequests({
     required int clientId,
     RequestAudienceScope scope = RequestAudienceScope.allUsers,
+    LeaveStatus? status,
     int page = 1,
     int limit = 50,
   });

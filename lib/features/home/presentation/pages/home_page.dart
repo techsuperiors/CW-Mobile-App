@@ -315,7 +315,6 @@ class _HomePageState extends State<HomePage> {
                   if (showStaleBanner)
                     _UserProfileStaleBanner(
                       message:
-                          userProfileState.warningMessage ??
                           AppStrings.accountSyncWarning,
                       onRetry:
                           () => context.read<UserProfileBloc>().add(
@@ -518,7 +517,7 @@ class _UserProfileRecoveryView extends StatelessWidget {
                     AppStrings.accountLoadFailedTitle,
                     style: AppTextStyles.heading3(
                       context,
-                    ).copyWith(fontWeight: FontWeight.w700),
+                    ).copyWith(fontWeight: FontWeight.w700,color: AppColors.textPrimary),
                     textAlign: TextAlign.center,
                   ),
                   AppSpacing.vMd,
@@ -530,13 +529,13 @@ class _UserProfileRecoveryView extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   AppSpacing.vSm,
-                  Text(
-                    message,
-                    style: AppTextStyles.bodySmall(
-                      context,
-                    ).copyWith(color: AppColors.textTertiary),
-                    textAlign: TextAlign.center,
-                  ),
+                  // Text(
+                  //   message,
+                  //   style: AppTextStyles.bodySmall(
+                  //     context,
+                  //   ).copyWith(color: AppColors.textTertiary),
+                  //   textAlign: TextAlign.center,
+                  // ),
                   AppSpacing.vXl,
                   Row(
                     children: [

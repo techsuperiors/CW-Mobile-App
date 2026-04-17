@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:signature/signature.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
+import 'package:signature/signature.dart';
 
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
@@ -19,12 +20,11 @@ class _SignatureDialogState extends State<SignatureDialog> {
   final SignatureController _signatureController = SignatureController(
     penStrokeWidth: 2,
     penColor: Colors.black,
-    exportBackgroundColor: Colors.white,
+    exportBackgroundColor: Colors.transparent,
   );
 
   bool _isDrawMode = true;
   Uint8List? _uploadedSignature;
-  File? _uploadedFile;
 
   @override
   void dispose() {
@@ -46,7 +46,6 @@ class _SignatureDialogState extends State<SignatureDialog> {
         final File file = File(image.path);
         final Uint8List bytes = await file.readAsBytes();
         setState(() {
-          _uploadedFile = file;
           _uploadedSignature = bytes;
         });
       }
@@ -62,12 +61,13 @@ class _SignatureDialogState extends State<SignatureDialog> {
     }
   }
 
-  void _confirmSignature() {
+  Future<void> _confirmSignature() async {
     if (_isDrawMode) {
-      if (!_signatureController.isEmpty) {
-        _signatureController.toPngBytes().then((bytes) {
-          Navigator.of(context).pop(bytes);
-        });
+      if (_signatureController.isNotEmpty) {
+        final bytes = await _signatureController.toPngBytes();
+        final croppedBytes = _cropDrawnSignature(bytes);
+        if (!mounted) return;
+        Navigator.of(context).pop(croppedBytes);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -88,6 +88,56 @@ class _SignatureDialogState extends State<SignatureDialog> {
         );
       }
     }
+  }
+
+  Uint8List? _cropDrawnSignature(Uint8List? bytes) {
+    if (bytes == null || bytes.isEmpty) {
+      return bytes;
+    }
+
+    final image = img.decodePng(bytes);
+    if (image == null) {
+      return bytes;
+    }
+
+    var minX = image.width;
+    var minY = image.height;
+    var maxX = -1;
+    var maxY = -1;
+
+    for (var y = 0; y < image.height; y++) {
+      for (var x = 0; x < image.width; x++) {
+        final pixel = image.getPixel(x, y);
+        if (pixel.a > 0) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    if (maxX < minX || maxY < minY) {
+      return bytes;
+    }
+
+    const padding = 12;
+    final cropX = (minX - padding).clamp(0, image.width - 1);
+    final cropY = (minY - padding).clamp(0, image.height - 1);
+    final cropRight = (maxX + padding).clamp(0, image.width - 1);
+    final cropBottom = (maxY + padding).clamp(0, image.height - 1);
+    final cropWidth = cropRight - cropX + 1;
+    final cropHeight = cropBottom - cropY + 1;
+
+    final cropped = img.copyCrop(
+      image,
+      x: cropX,
+      y: cropY,
+      width: cropWidth,
+      height: cropHeight,
+    );
+
+    return Uint8List.fromList(img.encodePng(cropped));
   }
 
   @override
@@ -132,7 +182,6 @@ class _SignatureDialogState extends State<SignatureDialog> {
                       setState(() {
                         _isDrawMode = true;
                         _uploadedSignature = null;
-                        _uploadedFile = null;
                       });
                     },
                   ),
@@ -421,4 +470,3 @@ class DottedBorderPainter extends CustomPainter {
   bool shouldRepaint(DottedBorderPainter oldDelegate) =>
       oldDelegate.color != color;
 }
-

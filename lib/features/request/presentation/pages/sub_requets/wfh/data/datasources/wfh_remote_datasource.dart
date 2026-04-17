@@ -12,17 +12,21 @@ import '../../models/wfh_requests_page_model.dart';
 
 abstract class WfhRemoteDataSource {
   Future<WfhRequestsPageModel> getWfhRequests({
+    required int clientId,
     int page = 1,
     int limit = 5,
+    WfhStatus? status,
   });
   Future<WfhRequestStatsModel> getWfhRequestStats({
     required int clientId,
     String requestType = 'User',
   });
   Future<List<WfhRequestModel>> getTeamWfhRequests({
+    required int clientId,
     int page = 1,
     int limit = 50,
     RequestAudienceScope scope = RequestAudienceScope.allUsers,
+    WfhStatus? status,
   });
   Future<void> updateWfhStatus({
     required int requestId,
@@ -37,11 +41,21 @@ class WfhRemoteDataSourceImpl implements WfhRemoteDataSource {
 
   @override
   Future<WfhRequestsPageModel> getWfhRequests({
+    required int clientId,
     int page = 1,
     int limit = 5,
+    WfhStatus? status,
   }) async {
     try {
       final encodedData = encodeData({
+        'client_id': clientId,
+        'request_for': <dynamic>[],
+        'status':
+            status == null ? <dynamic>[] : <String>[status.displayName],
+        'date': <dynamic>[],
+        'approved_by': <dynamic>[],
+        'rejected_by': <dynamic>[],
+        'request_type': 'All',
         'page': page,
         'limit': limit,
       });
@@ -101,9 +115,10 @@ class WfhRemoteDataSourceImpl implements WfhRemoteDataSource {
     try {
       final encodedData = encodeData({
         'client_id': clientId,
+        'request_for': <dynamic>[],
         'users': <dynamic>[],
         'status': <dynamic>[],
-        'date': '',
+        'date': <dynamic>[],
         'approved_by': <dynamic>[],
         'rejected_by': <dynamic>[],
         'request_type': requestType,
@@ -156,12 +171,21 @@ class WfhRemoteDataSourceImpl implements WfhRemoteDataSource {
 
   @override
   Future<List<WfhRequestModel>> getTeamWfhRequests({
+    required int clientId,
     int page = 1,
     int limit = 50,
     RequestAudienceScope scope = RequestAudienceScope.allUsers,
+    WfhStatus? status,
   }) async {
     try {
       final encodedData = encodeData({
+        'client_id': clientId,
+        'request_for': <dynamic>[],
+        'status':
+            status == null ? <dynamic>[] : <String>[status.displayName],
+        'date': <dynamic>[],
+        'approved_by': <dynamic>[],
+        'rejected_by': <dynamic>[],
         'request_type': scope.attendanceRequestType,
         'page': page,
         'limit': limit,

@@ -111,7 +111,7 @@ class _ApplyCompOffPageState extends State<ApplyCompOffPage> {
             return Stack(
               children: [
                 ResponsiveScaffold(
-                  backgroundColor: AppColors.backgroundMedium,
+                  backgroundColor: AppColors.backgroundLight,
                   appBar: AppBar(
                     forceMaterialTransparency: true,
                     elevation: 0,

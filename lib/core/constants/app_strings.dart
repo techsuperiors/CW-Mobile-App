@@ -45,8 +45,9 @@ class AppStrings {
   static const String password = 'Password';
   static const String username = 'Username';
   static const String emailOrMobile = 'Email or Mobile';
+  static const String registeredemail = 'Registered Email';
   static const String enterUsername = 'Enter username';
-  static const String enterEmailOrMobile = 'Enter email or mobile number';
+  static const String enterEmailOrMobile = 'Enter Registered Email';
   static const String enterPassword = 'Enter password';
   static const String pleaseEnterUsername = 'Please enter your username';
   static const String pleaseEnterEmailOrMobile =
@@ -60,7 +61,7 @@ class AppStrings {
   static const String pleaseResetPassword =
       'Please reset your password to restore access to your account.';
   static const String enterEmail = 'Enter email';
-  static const String enterYourEmail = 'enter your email';
+  static const String enterYourEmail = 'Enter your registered email';
   static const String pleaseEnterEmail = 'Please enter your email';
   static const String pleaseEnterValidEmail = 'Please enter a valid email';
   static const String pleaseEnterValidMobile =
@@ -82,8 +83,8 @@ class AppStrings {
   static const String otpSentToEmail =
       'We\'ve sent a verification code to email address';
   static const String weveSentVerificationCode =
-      'We\'ve sent a verification code to email address';
-  static const String wrongEmail = 'Wrong Email?';
+      'We\'ve sent a verification code to your registered email address';
+  static const String wrongEmail = 'Wrong Email ?';
   static const String resendCode = 'Resend Code';
   static const String verificationCodeSent =
       'Verification code sent successfully';
@@ -154,7 +155,7 @@ class AppStrings {
   static const String policies = 'Policies';
   static const String employeeAgreement = 'Employee Agreement';
   static const String trackAttendanceEasilyDescription =
-      'Track attendance easily';
+      'Employment terms';
   static const String visit = 'Visit';
   static const String visitDescription = 'All your company visits';
   static const String expenses = 'Expenses';
@@ -163,6 +164,7 @@ class AppStrings {
   static const String approveRequestsInstantly = 'Approve Requests Instantly';
   static const String payslips = 'Payslips';
   static const String payslipAtFingertips = 'Payslip at Your Fingertips';
+  static const String preview = 'Preview';
   static const String leave = 'Leave';
   static const String quickLeaveRequests = 'Quick Leave Requests';
   static const String tickets = 'Tickets';

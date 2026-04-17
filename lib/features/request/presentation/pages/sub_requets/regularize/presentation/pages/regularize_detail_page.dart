@@ -85,19 +85,20 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
         repository,
       ),
       updateRegularizeRequestStatusUseCase:
-          UpdateRegularizeRequestStatusUseCase(repository),
+      UpdateRegularizeRequestStatusUseCase(repository),
       getAttendanceRequestCommentsUseCase: GetAttendanceRequestCommentsUseCase(
         repository,
       ),
       addAttendanceRequestCommentUseCase: AddAttendanceRequestCommentUseCase(
         repository,
       ),
-    )..add(
-      LoadRegularizeDetail(
-        requestId: int.tryParse(widget.regularizeRequest.id) ?? 0,
-        clientId: _clientId,
-      ),
-    );
+    )
+      ..add(
+        LoadRegularizeDetail(
+          requestId: int.tryParse(widget.regularizeRequest.id) ?? 0,
+          clientId: _clientId,
+        ),
+      );
   }
 
   @override
@@ -109,7 +110,10 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+    final screenWidth = MediaQuery
+        .of(context)
+        .size
+        .width;
 
     return BlocProvider.value(
       value: _regularizeDetailBloc,
@@ -118,8 +122,8 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
           if (current is! RegularizeDetailError) return true;
           final isInitialLoadFailure =
               current.detail == null &&
-              (previous is RegularizeDetailInitial ||
-                  previous is RegularizeDetailLoading);
+                  (previous is RegularizeDetailInitial ||
+                      previous is RegularizeDetailLoading);
           return !isInitialLoadFailure;
         },
         listener: (context, state) {
@@ -143,15 +147,18 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
           }
         },
         builder: (context, state) {
-          final screenHeight = MediaQuery.of(context).size.height;
+          final screenHeight = MediaQuery
+              .of(context)
+              .size
+              .height;
           final detail = _detailFromState(state);
           final currentRequest = _currentRequest(detail);
           final currentStatus = currentRequest.status;
           final comments = _commentsFromState(state);
           final isBusy =
               state is RegularizeDetailLoading ||
-              state is RegularizeDetailStatusUpdating ||
-              state is RegularizeCommentSubmitting;
+                  state is RegularizeDetailStatusUpdating ||
+                  state is RegularizeCommentSubmitting;
 
           return WillPopScope(
             onWillPop: () async {
@@ -170,14 +177,17 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                     leading: GestureDetector(
                       onTap:
                           () =>
-                              Navigator.of(context).pop(_shouldRefreshListing),
+                          Navigator.of(context).pop(_shouldRefreshListing),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
                             Icons.arrow_back_ios,
-                            color: Theme.of(context).colorScheme.primary,
+                            color: Theme
+                                .of(context)
+                                .colorScheme
+                                .primary,
                             size: screenWidth * 0.048,
                           ),
                           Flexible(
@@ -185,7 +195,10 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                               'Back',
                               style: AppTextStyles.bodyMedium(context).copyWith(
                                 fontWeight: FontWeight.w400,
-                                color: Theme.of(context).colorScheme.primary,
+                                color: Theme
+                                    .of(context)
+                                    .colorScheme
+                                    .primary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -206,54 +219,55 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                     centerTitle: true,
                   ),
                   bottomNavigationBar:
-                      widget.isApprovalMode
-                          ? (currentStatus == RegularizeStatus.pending &&
-                                  currentRequest.isEligibleToApprove
-                              ? ApprovalActionBar(
-                                isLoading:
-                                    state is RegularizeDetailStatusUpdating,
-                                onApprove:
-                                    () => _updateRequestStatus('Approved'),
-                                onReject: () => _showRejectRemarkSheet(context),
-                              )
-                              : BottomNavBar(
-                                currentIndex: 4,
-                                onTap: NavigationHelper.getBottomNavHandler(
-                                  context,
-                                ),
-                              ))
-                          : BottomNavBar(
-                            currentIndex: 3,
-                            onTap: NavigationHelper.getBottomNavHandler(
-                              context,
-                            ),
-                          ),
+                  widget.isApprovalMode
+                      ? (currentStatus == RegularizeStatus.pending &&
+                      currentRequest.isEligibleToApprove
+                      ? ApprovalActionBar(
+                    isLoading:
+                    state is RegularizeDetailStatusUpdating,
+                    onApprove:
+                        () => _updateRequestStatus('Approved'),
+                    onReject: () => _showRejectRemarkSheet(context),
+                  )
+                      : BottomNavBar(
+                    currentIndex: 4,
+                    onTap: NavigationHelper.getBottomNavHandler(
+                      context,
+                    ),
+                  ))
+                      : BottomNavBar(
+                    currentIndex: 3,
+                    onTap: NavigationHelper.getBottomNavHandler(
+                      context,
+                    ),
+                  ),
                   body:
-                      state is RegularizeDetailError && state.detail == null
-                          ? ApiErrorState(
-                            title: 'Unable to load regularize details',
-                            rawMessage: state.message,
-                            onRetry:
-                                () => context.read<RegularizeDetailBloc>().add(
-                                  LoadRegularizeDetail(
-                                    requestId:
-                                        int.tryParse(
-                                          widget.regularizeRequest.id,
-                                        ) ??
-                                        0,
-                                    clientId: _clientId,
-                                  ),
-                                ),
-                          )
-                          : _buildDetailsContent(
-                            context,
-                            screenWidth,
-                            screenHeight,
-                            detail,
-                            currentRequest,
-                            comments,
-                            state,
+                  state is RegularizeDetailError && state.detail == null
+                      ? ApiErrorState(
+                    title: 'Unable to load regularize details',
+                    rawMessage: state.message,
+                    onRetry:
+                        () =>
+                        context.read<RegularizeDetailBloc>().add(
+                          LoadRegularizeDetail(
+                            requestId:
+                            int.tryParse(
+                              widget.regularizeRequest.id,
+                            ) ??
+                                0,
+                            clientId: _clientId,
                           ),
+                        ),
+                  )
+                      : _buildDetailsContent(
+                    context,
+                    screenWidth,
+                    screenHeight,
+                    detail,
+                    currentRequest,
+                    comments,
+                    state,
+                  ),
                 ),
                 if (isBusy)
                   Container(
@@ -268,27 +282,25 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     );
   }
 
-  Widget _buildDetailsContent(
-    BuildContext context,
-    double screenWidth,
-    double screenHeight,
-    AttendanceRegularizeDetail? detail,
-    RegularizeRequestModel currentRequest,
-    List<AttendanceRequestComment> comments,
-    RegularizeDetailState state,
-  ) {
+  Widget _buildDetailsContent(BuildContext context,
+      double screenWidth,
+      double screenHeight,
+      AttendanceRegularizeDetail? detail,
+      RegularizeRequestModel currentRequest,
+      List<AttendanceRequestComment> comments,
+      RegularizeDetailState state,) {
     final statusColor = _getStatusColor(currentRequest.status);
     final dateFormat = DateFormat('dd-MMM-yyyy');
     final dateTimeFormat = DateFormat('dd-MMM-yyyy hh:mm a');
 
     // Calculate number of days
     final numberOfDays =
-        currentRequest.toDate != null
-            ? currentRequest.toDate!
-                    .difference(currentRequest.fromDate)
-                    .inDays +
-                1
-            : 1;
+    currentRequest.toDate != null
+        ? currentRequest.toDate!
+        .difference(currentRequest.fromDate)
+        .inDays +
+        1
+        : 1;
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(screenWidth * 0.002),
@@ -315,26 +327,24 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     );
   }
 
-  Widget _buildDetailsCard(
-    BuildContext context,
-    double screenWidth,
-    double screenHeight,
-    Color statusColor,
-    DateFormat dateFormat,
-    DateFormat dateTimeFormat,
-    int numberOfDays,
-    RegularizeRequestModel currentRequest,
-    RegularizeDetailState state,
-  ) {
+  Widget _buildDetailsCard(BuildContext context,
+      double screenWidth,
+      double screenHeight,
+      Color statusColor,
+      DateFormat dateFormat,
+      DateFormat dateTimeFormat,
+      int numberOfDays,
+      RegularizeRequestModel currentRequest,
+      RegularizeDetailState state,) {
     final requestId = int.tryParse(widget.regularizeRequest.id) ?? 0;
     final detail = _detailFromState(state);
     final isPending = currentRequest.status == RegularizeStatus.pending;
     final requestToDate = currentRequest.toDate;
     final isSingleDayRequest =
         requestToDate == null ||
-        (requestToDate.year == currentRequest.fromDate.year &&
-            requestToDate.month == currentRequest.fromDate.month &&
-            requestToDate.day == currentRequest.fromDate.day);
+            (requestToDate.year == currentRequest.fromDate.year &&
+                requestToDate.month == currentRequest.fromDate.month &&
+                requestToDate.day == currentRequest.fromDate.day);
     final menuActions = <Map<String, String>>[
       if (isPending && !widget.isApprovalMode)
         {'value': 'Edit', 'icon': AppAssets.editIconwfh},
@@ -344,288 +354,284 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     ];
 
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      padding: EdgeInsets.all(screenWidth * 0.042),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        padding: EdgeInsets.all(screenWidth * 0.042),
+        child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Flexible(
-                child: Text(
-                  currentRequest.reason,
-                  style: AppTextStyles.heading4(context).copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: statusColor, // Green color for title
-                  ),
-                ),
-              ),
-              if (menuActions.length >= 2)
-                PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
-                  onSelected: (value) async {
-                    if (value == 'Edit') {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (context) => ApplyRegularizePage(
-                                regularizeRequest: currentRequest,
-                              ),
-                        ),
-                      );
-                      if (result == true && context.mounted) {
-                        _shouldRefreshListing = true;
-                        context.read<RegularizeDetailBloc>().add(
-                          LoadRegularizeDetail(
-                            requestId: requestId,
-                            clientId: _clientId,
-                          ),
-                        );
-                      }
-                    } else if (value == 'Withdraw') {
-                      context.read<RegularizeDetailBloc>().add(
-                        UpdateRegularizeRequestStatus(
-                          requestId: requestId,
-                          clientId: _clientId,
-                          status: 'Withdrawn',
-                        ),
-                      );
-                    } else if (value == 'Activity') {
-                      _showActivityBottomSheet(
-                        context,
-                        detail?.activity ?? const [],
-                      );
-                    }
-                  },
-                  itemBuilder: (context) {
-                    return menuActions.map((action) {
-                      return PopupMenuItem(
-                        value: action['value'],
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: screenWidth * 0.05,
-                              height: screenHeight * 0.05,
-                              child: SvgPicture.asset(action['icon']!),
-                            ),
-                            SizedBox(width: screenWidth * 0.02),
-                            Text(
-                              action['value']!,
-                              style: AppTextStyles.heading5(context).copyWith(
-                                fontWeight: FontWeight.w400,
-                                color: AppColors.textHeading,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList();
-                  },
-                )
-              else if (menuActions.length == 1)
-                InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () async {
-                    final action = menuActions.first['value'];
-                    if (action == 'Edit') {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (context) => ApplyRegularizePage(
-                                regularizeRequest: currentRequest,
-                              ),
-                        ),
-                      );
-                      if (result == true && context.mounted) {
-                        _shouldRefreshListing = true;
-                        context.read<RegularizeDetailBloc>().add(
-                          LoadRegularizeDetail(
-                            requestId: requestId,
-                            clientId: _clientId,
-                          ),
-                        );
-                      }
-                    } else if (action == 'Withdraw') {
-                      context.read<RegularizeDetailBloc>().add(
-                        UpdateRegularizeRequestStatus(
-                          requestId: requestId,
-                          clientId: _clientId,
-                          status: 'Withdrawn',
-                        ),
-                      );
-                    } else if (action == 'Activity') {
-                      _showActivityBottomSheet(
-                        context,
-                        detail?.activity ?? const [],
-                      );
-                    }
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: SizedBox(
-                      width: screenWidth * 0.06,
-                      height: screenHeight * 0.03,
-                      child: SvgPicture.asset(menuActions.first['icon']!),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    child: Text(
+                      currentRequest.reason,
+                      style: AppTextStyles.heading4(context).copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: statusColor, // Green color for title
+                      ),
                     ),
                   ),
+                  if (menuActions.length >= 2)
+                    PopupMenuButton<String>(
+                      icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
+                      onSelected: (value) async {
+                        if (value == 'Edit') {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) =>
+                                  ApplyRegularizePage(
+                                    regularizeRequest: currentRequest,
+                                  ),
+                            ),
+                          );
+                          if (result == true && context.mounted) {
+                            _shouldRefreshListing = true;
+                            context.read<RegularizeDetailBloc>().add(
+                              LoadRegularizeDetail(
+                                requestId: requestId,
+                                clientId: _clientId,
+                              ),
+                            );
+                          }
+                        } else if (value == 'Withdraw') {
+                          context.read<RegularizeDetailBloc>().add(
+                            UpdateRegularizeRequestStatus(
+                              requestId: requestId,
+                              clientId: _clientId,
+                              status: 'Withdrawn',
+                            ),
+                          );
+                        } else if (value == 'Activity') {
+                          _showActivityBottomSheet(
+                            context,
+                            detail?.activity ?? const [],
+                          );
+                        }
+                      },
+                      itemBuilder: (context) {
+                        return menuActions.map((action) {
+                          return PopupMenuItem(
+                            value: action['value'],
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: screenWidth * 0.05,
+                                  height: screenHeight * 0.05,
+                                  child: SvgPicture.asset(action['icon']!),
+                                ),
+                                SizedBox(width: screenWidth * 0.02),
+                                Text(
+                                  action['value']!,
+                                  style: AppTextStyles
+                                      .heading5(context)
+                                      .copyWith(
+                                    fontWeight: FontWeight.w400,
+                                    color: AppColors.textHeading,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList();
+                      },
+                    )
+                  else
+                    if (menuActions.length == 1)
+                      InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () async {
+                          final action = menuActions.first['value'];
+                          if (action == 'Edit') {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) =>
+                                    ApplyRegularizePage(
+                                      regularizeRequest: currentRequest,
+                                    ),
+                              ),
+                            );
+                            if (result == true && context.mounted) {
+                              _shouldRefreshListing = true;
+                              context.read<RegularizeDetailBloc>().add(
+                                LoadRegularizeDetail(
+                                  requestId: requestId,
+                                  clientId: _clientId,
+                                ),
+                              );
+                            }
+                          } else if (action == 'Withdraw') {
+                            context.read<RegularizeDetailBloc>().add(
+                              UpdateRegularizeRequestStatus(
+                                requestId: requestId,
+                                clientId: _clientId,
+                                status: 'Withdrawn',
+                              ),
+                            );
+                          } else if (action == 'Activity') {
+                            _showActivityBottomSheet(
+                              context,
+                              detail?.activity ?? const [],
+                            );
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: SizedBox(
+                            width: screenWidth * 0.06,
+                            height: screenHeight * 0.03,
+                            child: SvgPicture.asset(menuActions.first['icon']!),
+                          ),
+                        ),
+                      ),
+                ],
+              ),
+              SizedBox(height: screenHeight * 0.02),
+              _buildDetailRow(
+                context,
+                'Leave Type:',
+                currentRequest.reason,
+                screenWidth,
+                screenHeight,
+              ),
+              Divider(height: screenHeight * 0.03, color: AppColors.border),
+
+              _buildDetailRow(
+                context,
+                'Request For:',
+                currentRequest.requestType.displayName,
+                screenWidth,
+                screenHeight,
+              ),
+              Divider(height: screenHeight * 0.03, color: AppColors.border),
+              _buildDetailRow(
+                context,
+                isSingleDayRequest ? 'On:' : 'From:',
+                dateFormat.format(currentRequest.fromDate),
+                screenWidth,
+                screenHeight,
+              ),
+              if (!isSingleDayRequest) ...[
+                Divider(height: screenHeight * 0.03, color: AppColors.border),
+                _buildDetailRow(
+                  context,
+                  'To:',
+                  currentRequest.toDate != null
+                      ? dateFormat.format(currentRequest.toDate!)
+                      : dateFormat.format(currentRequest.fromDate),
+                  screenWidth,
+                  screenHeight,
                 ),
+              ],
+              Divider(height: screenHeight * 0.03, color: AppColors.border),
+              if(currentRequest.checkIn != null) ...[
+                _buildDetailRow(
+                  context,
+                  'Check-In:',
+                  dateTimeFormat.format(currentRequest.checkIn!),
+                  screenWidth,
+                  screenHeight,
+                ),
+                Divider(height: screenHeight * 0.03, color: AppColors.border),
+              ],
+              if (currentRequest.checkOut != null) ...[
+                _buildDetailRow(
+                  context,
+                  'Check-Out:',
+                  dateTimeFormat.format(currentRequest.checkOut!),
+                  screenWidth,
+                  screenHeight,
+                ),
+                Divider(height: screenHeight * 0.03, color: AppColors.border),
+
             ],
-          ),
-          SizedBox(height: screenHeight * 0.02),
-          _buildDetailRow(
-            context,
-            'Leave Type:',
-            currentRequest.reason,
-            screenWidth,
-            screenHeight,
-          ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
-
-          _buildDetailRow(
-            context,
-            'Request For:',
-            currentRequest.requestType.displayName,
-            screenWidth,
-            screenHeight,
-          ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
-
-          _buildDetailRow(
-            context,
-            'No. of Days:',
-            numberOfDays.toString().padLeft(2, '0'),
-            screenWidth,
-            screenHeight,
-          ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRow(
-            context,
-            isSingleDayRequest ? 'On:' : 'From:',
-            dateFormat.format(currentRequest.fromDate),
-            screenWidth,
-            screenHeight,
-          ),
-          if (!isSingleDayRequest) ...[
-            Divider(height: screenHeight * 0.03, color: AppColors.border),
+            // Divider(height: screenHeight * 0.03, color: AppColors.border),
             _buildDetailRow(
               context,
-              'To:',
-              currentRequest.toDate != null
-                  ? dateFormat.format(currentRequest.toDate!)
-                  : dateFormat.format(currentRequest.fromDate),
+              'Applied On:',
+              dateTimeFormat.format(currentRequest.appliedDate),
               screenWidth,
               screenHeight,
             ),
-          ],
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRow(
-            context,
-            'Check-In:',
-            currentRequest.checkIn != null
-                ? dateTimeFormat.format(currentRequest.checkIn!)
-                : 'N/A',
-            screenWidth,
-            screenHeight,
-          ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRow(
-            context,
-            'Check-Out:',
-            currentRequest.checkOut != null
-                ? dateTimeFormat.format(currentRequest.checkOut!)
-                : 'N/A',
-            screenWidth,
-            screenHeight,
-          ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildDetailRow(
-            context,
-            'Applied On:',
-            dateTimeFormat.format(currentRequest.appliedDate),
-            screenWidth,
-            screenHeight,
-          ),
-          // Show reject remark if rejected
-          if (currentRequest.status == RegularizeStatus.rejected &&
-              currentRequest.rejectRemark != null) ...[
-            Divider(height: screenHeight * 0.03, color: AppColors.border),
-            _buildDetailRow(
-              context,
-              'Reject Remark:',
-              currentRequest.rejectRemark!,
-              screenWidth,
-              screenHeight,
-            ),
-          ],
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
-          _buildApproversRow(context, screenWidth, screenHeight, detail),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: screenWidth * 0.3,
-                child: Text(
-                  'Status:',
-                  style: AppTextStyles.bodyMediumHeading(context).copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textHeading,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.032,
-                  vertical: screenHeight * 0.008,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  currentRequest.status.displayName,
-                  style: AppTextStyles.bodySmall(
-                    context,
-                  ).copyWith(fontWeight: FontWeight.w500, color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-          Divider(height: screenHeight * 0.03, color: AppColors.border),
+            // Show reject remark if rejected
+            if (currentRequest.status == RegularizeStatus.rejected &&
+        currentRequest.rejectRemark != null) ...[
+        Divider(height: screenHeight * 0.03, color: AppColors.border),
+    _buildDetailRow(
+    context,
+    'Reject Remark:',
+    currentRequest.rejectRemark!,
+    screenWidth,
+    screenHeight,
+    ),
+    ],
+    Divider(height: screenHeight * 0.03, color: AppColors.border),
+    _buildApproversRow(context, screenWidth, screenHeight, detail),
+    Divider(height: screenHeight * 0.03, color: AppColors.border),
+    Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+    SizedBox(
+    width: screenWidth * 0.3,
+    child: Text(
+    'Status:',
+    style: AppTextStyles.bodyMediumHeading(context).copyWith(
+    fontWeight: FontWeight.w500,
+    color: AppColors.textHeading,
+    ),
+    ),
+    ),
+    const Spacer(),
+    Container(
+    padding: EdgeInsets.symmetric(
+    horizontal: screenWidth * 0.032,
+    vertical: screenHeight * 0.008,
+    ),
+    decoration: BoxDecoration(
+    color: statusColor,
+    borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+    currentRequest.status.displayName,
+    style: AppTextStyles.bodySmall(
+    context,
+    ).copyWith(fontWeight: FontWeight.w500, color: Colors.white),
+    ),
+    ),
+    ],
+    ),
+    Divider(height: screenHeight * 0.03, color: AppColors.border),
 
-          _buildDescriptionSection(
-            context,
-            screenWidth,
-            screenHeight,
-            currentRequest,
-          ),
-        ],
-      ),
+    _buildDescriptionSection(
+    context,
+    screenWidth,
+    screenHeight,
+    currentRequest,
+    ),
+    ],
+    ),
     );
   }
 
-  Widget _buildApproversRow(
-    BuildContext context,
-    double screenWidth,
-    double screenHeight,
-    AttendanceRegularizeDetail? detail,
-  ) {
+  Widget _buildApproversRow(BuildContext context,
+      double screenWidth,
+      double screenHeight,
+      AttendanceRegularizeDetail? detail,) {
     final approvers =
         detail?.approvers.expand((level) => level.users).toList() ?? const [];
 
@@ -678,12 +684,14 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder:
-          (context) => DraggableScrollableSheet(
+          (context) =>
+          DraggableScrollableSheet(
             initialChildSize: 0.5,
             minChildSize: 0.3,
             maxChildSize: 0.9,
             builder:
-                (context, scrollController) => Container(
+                (context, scrollController) =>
+                Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.only(
@@ -696,7 +704,8 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                       final apiService = ApiService(
                         networkInfo: NetworkInfoImpl(Connectivity()),
                         onTokenExpired:
-                            () => AppNavigator.pushAndRemoveAll(
+                            () =>
+                            AppNavigator.pushAndRemoveAll(
                               MaterialPageRoute(
                                 builder: (_) => const LoginPage(),
                               ),
@@ -717,7 +726,7 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                       endpoint: AppUrls.regularizeRequestDetails,
                       payload: {
                         'request_id':
-                            int.tryParse(widget.regularizeRequest.id) ?? 0,
+                        int.tryParse(widget.regularizeRequest.id) ?? 0,
                       },
                     ),
                   ),
@@ -726,13 +735,11 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     );
   }
 
-  Widget _buildDetailRow(
-    BuildContext context,
-    String label,
-    String value,
-    double screenWidth,
-    double screenHeight,
-  ) {
+  Widget _buildDetailRow(BuildContext context,
+      String label,
+      String value,
+      double screenWidth,
+      double screenHeight,) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -761,12 +768,10 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     );
   }
 
-  Widget _buildDescriptionSection(
-    BuildContext context,
-    double screenWidth,
-    double screenHeight,
-    RegularizeRequestModel currentRequest,
-  ) {
+  Widget _buildDescriptionSection(BuildContext context,
+      double screenWidth,
+      double screenHeight,
+      RegularizeRequestModel currentRequest,) {
     return Container(
       decoration: BoxDecoration(color: Colors.white),
       padding: EdgeInsets.all(screenWidth * 0.042),
@@ -795,12 +800,10 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     );
   }
 
-  Widget _buildCommentsSection(
-    BuildContext context,
-    double screenWidth,
-    double screenHeight,
-    List<AttendanceRequestComment> comments,
-  ) {
+  Widget _buildCommentsSection(BuildContext context,
+      double screenWidth,
+      double screenHeight,
+      List<AttendanceRequestComment> comments,) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -851,15 +854,16 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
           SizedBox(height: screenHeight * 0.015),
 
           ...comments.map(
-            (comment) => Padding(
-              padding: EdgeInsets.only(bottom: screenHeight * 0.012),
-              child: _buildCommentTile(
-                context,
-                screenWidth,
-                screenHeight,
-                comment,
-              ),
-            ),
+                (comment) =>
+                Padding(
+                  padding: EdgeInsets.only(bottom: screenHeight * 0.012),
+                  child: _buildCommentTile(
+                    context,
+                    screenWidth,
+                    screenHeight,
+                    comment,
+                  ),
+                ),
           ),
           SizedBox(height: screenHeight * 0.01),
           TextField(
@@ -927,23 +931,21 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     );
   }
 
-  Widget _buildCommentTile(
-    BuildContext context,
-    double screenWidth,
-    double screenHeight,
-    AttendanceRequestComment comment,
-  ) {
+  Widget _buildCommentTile(BuildContext context,
+      double screenWidth,
+      double screenHeight,
+      AttendanceRequestComment comment,) {
     final userName =
-        comment.user?.fullName.isNotEmpty == true
-            ? comment.user!.fullName
-            : 'User';
+    comment.user?.fullName.isNotEmpty == true
+        ? comment.user!.fullName
+        : 'User';
     final initials =
-        userName
-            .split(' ')
-            .where((part) => part.isNotEmpty)
-            .take(2)
-            .map((part) => part[0].toUpperCase())
-            .join();
+    userName
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .map((part) => part[0].toUpperCase())
+        .join();
 
     return Container(
       padding: EdgeInsets.all(screenWidth * 0.035),
@@ -958,13 +960,13 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
           CircleAvatar(
             radius: screenWidth * 0.04,
             backgroundColor:
-                comment.user?.profileColor != null
-                    ? Color(
-                      int.parse(
-                        comment.user!.profileColor!.replaceFirst('#', '0xff'),
-                      ),
-                    )
-                    : AppColors.attendanceTeal,
+            comment.user?.profileColor != null
+                ? Color(
+              int.parse(
+                comment.user!.profileColor!.replaceFirst('#', '0xff'),
+              ),
+            )
+                : AppColors.attendanceTeal,
             child: Text(
               initials.isEmpty ? 'U' : initials,
               style: AppTextStyles.bodySmall(
@@ -994,8 +996,8 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
                 Text(
                   comment.createdAt != null
                       ? DateFormat(
-                        'dd MMM yyyy, hh:mm a',
-                      ).format(comment.createdAt!)
+                    'dd MMM yyyy, hh:mm a',
+                  ).format(comment.createdAt!)
                       : 'N/A',
                   style: AppTextStyles.bodySmall(
                     context,
@@ -1009,17 +1011,16 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
     );
   }
 
-  void _showActivityBottomSheet(
-    BuildContext context,
-    List<AttendanceRegularizeActivity> activity,
-  ) {
+  void _showActivityBottomSheet(BuildContext context,
+      List<AttendanceRegularizeActivity> activity,) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       isDismissible: true,
       builder:
-          (context) => DraggableScrollableSheet(
+          (context) =>
+          DraggableScrollableSheet(
             initialChildSize: 0.5,
             // Start at half screen
             minChildSize: 0.3,
@@ -1028,7 +1029,8 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
             // Maximum 90% of screen (can be dragged up)
             expand: false,
             builder:
-                (context, scrollController) => Container(
+                (context, scrollController) =>
+                Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.only(
@@ -1064,9 +1066,13 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder:
-          (sheetContext) => Padding(
+          (sheetContext) =>
+          Padding(
             padding: EdgeInsets.only(
-              bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+              bottom: MediaQuery
+                  .of(sheetContext)
+                  .viewInsets
+                  .bottom,
             ),
             child: RejectRemarkSheet(
               onSubmit: (_) async {
@@ -1099,8 +1105,7 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
   }
 
   List<AttendanceRequestComment> _commentsFromState(
-    RegularizeDetailState state,
-  ) {
+      RegularizeDetailState state,) {
     if (state is RegularizeDetailLoaded) return state.comments;
     if (state is RegularizeDetailStatusUpdating) return state.comments;
     if (state is RegularizeCommentSubmitting) return state.comments;
@@ -1129,7 +1134,9 @@ class _RegularizeDetailPageState extends State<RegularizeDetailPage> {
   }
 
   int _resolveClientId() {
-    final profileState = context.read<UserProfileBloc>().state;
+    final profileState = context
+        .read<UserProfileBloc>()
+        .state;
     if (profileState is UserProfileLoaded) {
       return profileState.profile.clientId;
     }
@@ -1169,22 +1176,22 @@ class _RegularizeApproverAvatar extends StatelessWidget {
       radius: size / 2,
       backgroundColor: bgColor,
       backgroundImage:
-          approver.imageUrl != null && approver.imageUrl!.isNotEmpty
-              ? NetworkImage(approver.imageUrl!)
-              : null,
+      approver.imageUrl != null && approver.imageUrl!.isNotEmpty
+          ? NetworkImage(approver.imageUrl!)
+          : null,
       child:
-          approver.imageUrl == null || approver.imageUrl!.isEmpty
-              ? Text(
-                approver.firstName.isNotEmpty
-                    ? approver.firstName[0].toUpperCase()
-                    : '?',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: size * 0.45,
-                  fontWeight: FontWeight.w600,
-                ),
-              )
-              : null,
+      approver.imageUrl == null || approver.imageUrl!.isEmpty
+          ? Text(
+        approver.firstName.isNotEmpty
+            ? approver.firstName[0].toUpperCase()
+            : '?',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: size * 0.45,
+          fontWeight: FontWeight.w600,
+        ),
+      )
+          : null,
     );
   }
 }
@@ -1205,11 +1212,11 @@ class _RegularizeApproverAvatarStack extends StatelessWidget {
     final edgePadding = avatarSize * 0.08;
 
     final width =
-        visibleApprovers.length == 1
-            ? avatarSize + (edgePadding * 2)
-            : avatarSize +
-                ((visibleApprovers.length - 1) * (avatarSize - overlap)) +
-                (edgePadding * 2);
+    visibleApprovers.length == 1
+        ? avatarSize + (edgePadding * 2)
+        : avatarSize +
+        ((visibleApprovers.length - 1) * (avatarSize - overlap)) +
+        (edgePadding * 2);
 
     return SizedBox(
       width: width,

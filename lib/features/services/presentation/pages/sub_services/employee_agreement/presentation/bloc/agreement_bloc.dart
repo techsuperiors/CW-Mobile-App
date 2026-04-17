@@ -61,7 +61,7 @@ class AgreementBloc extends Bloc<AgreementEvent, AgreementState> {
     final result = await submitAgreementConsentUseCase(
       event.agreementId,
       event.agreementAcknowledged,
-      event.signatureFilePath,
+      event.signedPdfFilePath,
     );
 
     result.fold(

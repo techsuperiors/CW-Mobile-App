@@ -7,7 +7,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:webcontent_converter/webcontent_converter.dart';
 
 import '../../../../../../../../core/constants/app_colors.dart';
@@ -30,45 +30,51 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
     'collectivwork/downloads',
   );
   bool _isDownloading = false;
-  late final WebViewController _webViewController;
-  bool _isPageLoading = true;
-  late final String _htmlDocument;
   late final String _pdfHtmlDocument;
+  File? _previewPdfFile;
+  bool _isPreparingPreview = true;
+  String? _previewError;
 
   String get _htmlContent => widget.payslip.template.trim();
 
   @override
   void initState() {
     super.initState();
-    _htmlDocument = _buildHtmlDocument(_htmlContent);
     _pdfHtmlDocument = _buildPdfHtmlDocument(_htmlContent);
-    _webViewController =
-    WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.white)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageFinished: (_) {
-            if (mounted) {
-              setState(() {
-                _isPageLoading = false;
-              });
-            }
-          },
-        ),
-      );
+    _preparePreviewPdf();
+  }
 
-    if (_htmlContent.isNotEmpty) {
-      _webViewController.loadRequest(
-        Uri.dataFromString(
-          _htmlDocument,
-          mimeType: 'text/html',
-          encoding: utf8,
-        ),
-      );
-    } else
-    {
-      _isPageLoading = false;
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  Future<void> _preparePreviewPdf() async {
+    if (_htmlContent.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _isPreparingPreview = false;
+          _previewError = null;
+        });
+      }
+      return;
+    }
+
+    try {
+      final file = await _getOrCreatePreviewPdf();
+
+      if (!mounted) return;
+      setState(() {
+        _previewPdfFile = file;
+        _previewError = null;
+        _isPreparingPreview = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _previewError = ErrorMessageMapper.toUserFriendlyMessage(e.toString());
+        _isPreparingPreview = false;
+      });
     }
   }
 
@@ -95,22 +101,7 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
 
       final fileName =
           'Payslip_${_sanitizeFileName(widget.payslip.displayName, '.pdf')}';
-      final directory = await _resolveGenerationDirectory();
-      await directory.create(recursive: true);
-      final filePath = path.join(directory.path, fileName);
-      final savedPath = await WebcontentConverter.contentToPDF(
-        content: _pdfHtmlDocument,
-        savedPath: filePath,
-        format: PaperFormat.a4,
-        margins: PdfMargins.px(top: 16, bottom: 16, right: 16, left: 16),
-      );
-      if (savedPath == null || savedPath.isEmpty) {
-        throw Exception('Could not generate payslip PDF.');
-      }
-      final file = File(savedPath);
-      if (!await file.exists()) {
-        throw Exception('Downloaded file could not be found.');
-      }
+      final file = await _getOrCreateDownloadFile(fileName);
 
       if (Platform.isAndroid) {
         await _saveToDownloads(file: file, fileName: fileName);
@@ -208,6 +199,124 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
     );
   }
 
+  Future<Directory> _resolvePreviewDirectory() async {
+    final temporaryDirectory = await getTemporaryDirectory();
+    return Directory(path.join(temporaryDirectory.path, 'Payslips'));
+  }
+
+  Future<File> _getOrCreatePreviewPdf() async {
+    final inMemoryPreview = _previewPdfFile;
+    if (inMemoryPreview != null && await inMemoryPreview.exists()) {
+      return inMemoryPreview;
+    }
+
+    final previewDirectory = await _resolvePreviewDirectory();
+    final cachedPreviewFile = File(
+      path.join(previewDirectory.path, _previewFileName),
+    );
+    if (await cachedPreviewFile.exists()) {
+      _previewPdfFile = cachedPreviewFile;
+      return cachedPreviewFile;
+    }
+
+    final generatedFile = await _generatePdfFile(
+      directory: previewDirectory,
+      fileName: _previewFileName,
+    );
+    _previewPdfFile = generatedFile;
+    return generatedFile;
+  }
+
+  String get _previewFileName {
+    final normalizedMonth =
+        widget.payslip.payrollMonth.trim().isEmpty
+            ? 'unknown_month'
+            : widget.payslip.payrollMonth.trim();
+    final templateHash = _stableTemplateHash(_htmlContent);
+    return 'Payslip_preview_${widget.payslip.id}_${_sanitizeFileName(normalizedMonth, '')}_$templateHash.pdf';
+  }
+
+  String _stableTemplateHash(String value) {
+    const int fnvOffsetBasis = 0x811C9DC5;
+    const int fnvPrime = 0x01000193;
+
+    var hash = fnvOffsetBasis;
+    for (final byte in utf8.encode(value)) {
+      hash ^= byte;
+      hash = (hash * fnvPrime) & 0xFFFFFFFF;
+    }
+
+    return hash.toRadixString(16).padLeft(8, '0');
+  }
+
+  Future<File> _getOrCreateDownloadFile(String fileName) async {
+    final previewFile = _previewPdfFile;
+    if (previewFile != null && await previewFile.exists()) {
+      if (Platform.isIOS) {
+        return _copyPdfToDirectory(
+          sourceFile: previewFile,
+          directory: await _resolveGenerationDirectory(),
+          fileName: fileName,
+        );
+      }
+      return previewFile;
+    }
+
+    final cachedPreviewFile = await _getOrCreatePreviewPdf();
+    if (Platform.isIOS) {
+      return _copyPdfToDirectory(
+        sourceFile: cachedPreviewFile,
+        directory: await _resolveGenerationDirectory(),
+        fileName: fileName,
+      );
+    }
+
+    return cachedPreviewFile;
+  }
+
+  Future<File> _copyPdfToDirectory({
+    required File sourceFile,
+    required Directory directory,
+    required String fileName,
+  }) async {
+    await directory.create(recursive: true);
+    final destinationPath = path.join(directory.path, fileName);
+    final destinationFile = File(destinationPath);
+
+    if (destinationFile.existsSync()) {
+      destinationFile.deleteSync();
+    }
+
+    return sourceFile.copy(destinationPath);
+  }
+
+  Future<File> _generatePdfFile({
+    required Directory directory,
+    required String fileName,
+  }) async {
+    await directory.create(recursive: true);
+    final filePath = path.join(directory.path, fileName);
+    final savedPath = await WebcontentConverter.contentToPDF(
+      content: _pdfHtmlDocument,
+      savedPath: filePath,
+      format: PaperFormat.a4,
+      // Keep converter margins at zero and control printable space via CSS.
+      // Applying margins in both places can push an otherwise single-page
+      // payslip onto a second page on mobile PDF generation.
+      margins: PdfMargins.px(top: 0, bottom: 0, right: 0, left: 0),
+    );
+    if (savedPath == null || savedPath.isEmpty) {
+      throw Exception('Could not generate payslip PDF.');
+    }
+
+    final file = File(savedPath);
+    if (!await file.exists()) {
+      throw Exception('Generated payslip PDF could not be found.');
+    }
+
+    return file;
+  }
+
   String _sanitizeFileName(String rawName, String extension) {
     final normalizedName =
         rawName.trim().isEmpty ? 'payslip' : rawName.trim();
@@ -259,45 +368,6 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
     );
   }
 
-  String _buildHtmlDocument(String rawHtml) {
-    final normalized = _wrapHtmlDocument(rawHtml);
-    final withHeadStyle = normalized.replaceFirst('</head>', '''
-  <base href="https://app.collectivwork.com/">
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #ffffff !important;
-      color: #111111;
-      min-height: 100%;
-      width: 100%;
-      overflow-x: hidden;
-    }
-
-    img {
-      max-width: 100%;
-      height: auto;
-      display: block;
-    }
-
-    .container {
-      background: #ffffff !important;
-      min-height: 100vh;
-      margin: 0 auto;
-    }
-  </style>
-</head>''');
-
-    return withHeadStyle.replaceFirst(
-      '<body>',
-      '<body style="background:#ffffff !important; margin:0; padding:0;">',
-    );
-  }
-
   String _buildPdfHtmlDocument(String rawHtml) {
     final normalized = _wrapHtmlDocument(rawHtml);
     final withHeadStyle = normalized.replaceFirst('</head>', '''
@@ -305,7 +375,7 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
   <style>
     @page {
       size: A4;
-      margin: 12mm;
+      margin: 8mm;
     }
 
     * {
@@ -319,6 +389,7 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
       padding: 0 !important;
       background: #ffffff !important;
       color: #111111 !important;
+      font-size: 100% !important;
       width: 100% !important;
       min-height: 0 !important;
       height: auto !important;
@@ -353,6 +424,15 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
       max-width: 100% !important;
       height: auto !important;
       display: block;
+    }
+
+    body {
+      zoom: 0.97;
+      -webkit-text-size-adjust: 100% !important;
+    }
+
+    body > * {
+      width: calc(100% / 0.97) !important;
     }
 
     table {
@@ -466,36 +546,75 @@ class _PayslipPdfViewerPageState extends State<PayslipPdfViewerPage> {
           ).copyWith(color: AppColors.textPrimary),
         ),
       )
-          : Stack(
-        children: [
-          Padding(
-            padding: EdgeInsets.all(screenWidth * 0.03),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                color: Colors.white,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: WebViewWidget(
-                    controller: _webViewController,
-                  ),
-                ),
+          : _buildPdfPreview(screenWidth),
+    );
+  }
+
+  Widget _buildPdfPreview(double screenWidth) {
+    if (_isPreparingPreview) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_previewError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _previewError!,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodyLarge(
+                  context,
+                ).copyWith(color: AppColors.textPrimary),
               ),
-            ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _isPreparingPreview = true;
+                    _previewError = null;
+                  });
+                  _preparePreviewPdf();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
           ),
-          if (_isPageLoading)
-            const Center(child: CircularProgressIndicator()),
-        ],
+        ),
+      );
+    }
+
+    final previewFile = _previewPdfFile;
+    if (previewFile == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Padding(
+      padding: EdgeInsets.all(screenWidth * 0.03),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: SfPdfViewer.file(
+            previewFile,
+            canShowScrollHead: true,
+            canShowScrollStatus: true,
+            enableDoubleTapZooming: true,
+            enableTextSelection: false,
+          ),
+        ),
       ),
     );
   }

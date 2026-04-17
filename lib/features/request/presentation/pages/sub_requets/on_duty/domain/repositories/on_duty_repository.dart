@@ -7,13 +7,19 @@ import '../../models/on_duty_request_stats_model.dart';
 import '../entities/on_duty_detail.dart';
 
 abstract class OnDutyRepository {
-  Future<Either<Failure, List<OnDutyRequestModel>>> getOnDutyRequests();
+  Future<Either<Failure, List<OnDutyRequestModel>>> getOnDutyRequests({
+    required int clientId,
+    int page = 1,
+    int limit = 5,
+    OnDutyStatus? status,
+  });
 
   Future<Either<Failure, List<OnDutyRequestModel>>> getTeamOnDutyRequests({
     required int clientId,
     int page = 1,
     int limit = 50,
     String requestType = 'All',
+    OnDutyStatus? status,
   });
 
   Future<Either<Failure, OnDutyRequestStatsModel>> getOnDutyRequestStats({

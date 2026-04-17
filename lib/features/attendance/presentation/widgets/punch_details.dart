@@ -107,7 +107,7 @@ class PunchDetails extends StatelessWidget {
                   ),
                   _buildPunchCard(
                     context,
-                    time: attendanceDetails?.overTime?.total.toString() ?? '-',
+                    time: _formatOvertime(),
                     label: AppStrings.overtime,
                     icon: AppAssets.iconOvertime,
                     iconColor: AppColors.error,
@@ -164,6 +164,18 @@ class PunchDetails extends StatelessWidget {
     }
 
     return attendanceDetails?.formattedPunchOut ?? notYet;
+  }
+
+  String _formatOvertime() {
+    final overtimeSeconds = attendanceDetails?.overTime?.total;
+    if (overtimeSeconds == null || overtimeSeconds <= 0) {
+      return '0';
+    }
+
+    final hours = overtimeSeconds ~/ 3600;
+    final minutes = (overtimeSeconds % 3600) ~/ 60;
+
+    return '${hours.toString().padLeft(2, '0')}h ${minutes.toString().padLeft(2, '0')}m';
   }
 
   Widget _buildPunchCard(

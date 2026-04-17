@@ -9,10 +9,11 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/location_permission_helper.dart';
+import '../../../../core/utils/app_spacing.dart';
 import '../../../../core/utils/time_utils.dart';
 import '../../../../core/widgets/attendance_timer_circle.dart';
+import '../../../../core/widgets/common/app_button.dart';
 import '../../data/datasources/attendance_offline_local_datasource.dart';
-import '../../data/models/offline_attendance_action_model.dart';
 import '../../domain/entities/attendance_details.dart';
 import '../bloc/attendance_punch_bloc.dart';
 import '../bloc/attendance_punch_event.dart';
@@ -61,12 +62,16 @@ class _AttendanceCardState extends State<AttendanceCard> {
   bool _isPunchingOut = false;
   Timer? _updateTimer;
   double _workedHours = 0.0;
-  double _shiftHours = 8.0; // Default shift hours
+  final double _shiftHours = 8.0; // Default shift hours
   double? _frozenWorkedHoursOverride;
   bool?
   _localPunchedInOverride; // null = use server data, true/false = override
   final AttendanceOfflineLocalDataSource _offlineLocalDataSource =
       AttendanceOfflineLocalDataSourceImpl();
+  Timer? _slowNetworkDialogTimer;
+  bool _isSlowNetworkDialogVisible = false;
+  bool _didShowSlowNetworkDialog = false;
+  BuildContext? _slowNetworkDialogContext;
 
   /// Check if user is already punched in
   /// Uses punchIn as primary indicator (has punch-in time, no punch-out)
@@ -81,28 +86,14 @@ class _AttendanceCardState extends State<AttendanceCard> {
     return widget.attendanceDetails?.status?.toLowerCase() == 'holiday';
   }
 
-  /// Check if it's a week off day (Sunday)
-  bool get _isWeekOff {
-    if (widget.attendanceDetails?.date == null) return false;
-    try {
-      final utcDate = DateTime.parse(widget.attendanceDetails!.date!);
-      final localDate = utcDate.toLocal();
-      return localDate.weekday == 7;
-    } catch (e) {
-      return false;
-    }
-  }
-
   /// Check if punch-in button should be disabled
   bool get _isPunchInDisabled {
-    return _isHoliday || _isWeekOff || _isPunchedIn;
+    return _isPunchedIn;
   }
 
   /// Check if the main button should be disabled
   bool get _isButtonDisabled {
-    if (widget.isLoading || _isPunchingIn || _isPunchingOut) return true;
-    if (_isPunchedIn) return false;
-    return _isHoliday || _isWeekOff;
+    return widget.isLoading || _isPunchingIn || _isPunchingOut;
   }
 
   /// Get formatted date from UTC date string
@@ -171,27 +162,20 @@ class _AttendanceCardState extends State<AttendanceCard> {
     if (!mounted) return;
 
     setState(() {
+      _localPunchedInOverride = null;
+      _frozenWorkedHoursOverride = null;
+
       if (actions.isEmpty) {
         if (!_getServerPunchedIn()) {
-          _localPunchedInOverride = null;
           _virtualPunchInTime = null;
-          _frozenWorkedHoursOverride = null;
         }
         return;
       }
 
-      actions.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-      final queueSnapshot = _buildPendingQueueSnapshot(actions);
-
-      if (queueSnapshot.isPunchedIn) {
-        _localPunchedInOverride = true;
-        _frozenWorkedHoursOverride = null;
-        _virtualPunchInTime = queueSnapshot.virtualPunchInTime;
-      } else {
-        _localPunchedInOverride = false;
-        _virtualPunchInTime = null;
-        _frozenWorkedHoursOverride = queueSnapshot.frozenWorkedHours;
-      }
+      // Pending offline actions should not be shown as a completed punch
+      // state. Keep the card aligned with the last confirmed server state.
+      _virtualPunchInTime =
+          _getServerPunchedIn() ? _getServerVirtualPunchInTime() : null;
     });
   }
 
@@ -208,7 +192,215 @@ class _AttendanceCardState extends State<AttendanceCard> {
   @override
   void dispose() {
     _updateTimer?.cancel();
+    _slowNetworkDialogTimer?.cancel();
     super.dispose();
+  }
+
+  void _startSlowNetworkDialogWatcher() {
+    _slowNetworkDialogTimer?.cancel();
+    _didShowSlowNetworkDialog = false;
+    _slowNetworkDialogTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted || !(_isPunchingIn || _isPunchingOut)) return;
+      _didShowSlowNetworkDialog = true;
+      unawaited(_showSlowNetworkDialog());
+    });
+  }
+
+  void _cancelSlowNetworkDialogWatcher() {
+    _slowNetworkDialogTimer?.cancel();
+    _slowNetworkDialogTimer = null;
+  }
+
+  Future<void> _showSlowNetworkDialog() async {
+    if (!mounted || _isSlowNetworkDialogVisible) return;
+    _isSlowNetworkDialogVisible = true;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (dialogContext) {
+            _slowNetworkDialogContext = dialogContext;
+            return PopScope(
+              canPop: false,
+              child: Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.md),
+                ),
+                child: Padding(
+                  padding: AppSpacing.cardPadding,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AppSpacing.vSm,
+                      const CircularProgressIndicator(),
+                      AppSpacing.vXl,
+                      Text(
+                        'Capturing Your Attendance...',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.bodyMediumHeading(
+                          dialogContext,
+                        ).copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      AppSpacing.vMd,
+                      Text(
+                        'Your internet connection seems slow. We’re trying to record your attendance. Please wait a few seconds.',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.bodySmall(dialogContext).copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+    );
+
+    _isSlowNetworkDialogVisible = false;
+    _slowNetworkDialogContext = null;
+  }
+
+  Future<void> _dismissSlowNetworkDialogIfVisible() async {
+    if (!_isSlowNetworkDialogVisible || !mounted) return;
+    final dialogContext = _slowNetworkDialogContext;
+    if (dialogContext == null) return;
+    final navigator = Navigator.of(dialogContext);
+    if (!navigator.mounted || !navigator.canPop()) return;
+    navigator.pop();
+    await Future<void>.delayed(Duration.zero);
+  }
+
+  Future<void> _showPunchFailureDialog(String message) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (dialogContext) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.md),
+            ),
+            child: Padding(
+              padding: AppSpacing.cardPadding,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    color: AppColors.error,
+                    size: AppSpacing.section,
+                  ),
+                  AppSpacing.vLg,
+                  Text(
+                    AppStrings.error,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodyMediumHeading(
+                      dialogContext,
+                    ).copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  AppSpacing.vLg,
+                  Text(
+                    AttendancePunchReconciliationHelper.toUserMessage(message),
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodyMedium(dialogContext).copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                  AppSpacing.vXl,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 140),
+                    child: AppButton(
+                      label: 'Close',
+                      onPressed:
+                          () =>
+                              Navigator.of(dialogContext, rootNavigator: true)
+                                  .pop(),
+                      width: double.infinity,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+  }
+
+  Future<void> _showQueuedOfflineDialog(String title, String message) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (dialogContext) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.md),
+            ),
+            child: Padding(
+              padding: AppSpacing.cardPadding,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.cloud_off_outlined,
+                    color: AppColors.warning,
+                    size: AppSpacing.section,
+                  ),
+                  AppSpacing.vLg,
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodyMediumHeading(
+                      dialogContext,
+                    ).copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  AppSpacing.vLg,
+                  Text(
+                    AttendancePunchReconciliationHelper.toUserMessage(message),
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodyMedium(dialogContext).copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                  AppSpacing.vMd,
+                  Text(
+                    'Please sync when the network is available so your attendance is recorded on the server.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodySmall(dialogContext).copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                  AppSpacing.vXl,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 140),
+                    child: AppButton(
+                      label: 'Close',
+                      onPressed:
+                          () =>
+                              Navigator.of(dialogContext, rootNavigator: true)
+                                  .pop(),
+                      width: double.infinity,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
   }
 
   void _updateWorkedHours() {
@@ -272,38 +464,6 @@ class _AttendanceCardState extends State<AttendanceCard> {
     return serverPunchIn.subtract(Duration(seconds: _getPreviousWorkedSeconds()));
   }
 
-  _PendingQueueSnapshot _buildPendingQueueSnapshot(
-    List<OfflineAttendanceActionModel> actions,
-  ) {
-    var accumulatedSeconds = _getPreviousWorkedSeconds();
-    DateTime? activePunchInAt =
-        _getServerPunchedIn() ? _getServerPunchInDateTime() : null;
-
-    for (final action in actions) {
-      if (action.type == OfflineAttendanceActionType.punchIn) {
-        activePunchInAt ??= action.createdAt;
-      } else if (activePunchInAt != null) {
-        accumulatedSeconds +=
-            action.createdAt.difference(activePunchInAt).inSeconds;
-        activePunchInAt = null;
-      }
-    }
-
-    if (activePunchInAt != null) {
-      return _PendingQueueSnapshot(
-        isPunchedIn: true,
-        virtualPunchInTime: activePunchInAt.subtract(
-          Duration(seconds: accumulatedSeconds),
-        ),
-      );
-    }
-
-    return _PendingQueueSnapshot(
-      isPunchedIn: false,
-      frozenWorkedHours: accumulatedSeconds / 3600.0,
-    );
-  }
-
   /// Triggers punch in via shared BLoC
   Future<void> _handlePunchIn() async {
     if (_isPunchingIn || _isPunchedIn || _isPunchInDisabled) return;
@@ -336,14 +496,26 @@ class _AttendanceCardState extends State<AttendanceCard> {
           _isPunchingIn = true;
         }
       });
+      _startSlowNetworkDialogWatcher();
     } else if (state is AttendancePunchInSuccess) {
+      _cancelSlowNetworkDialogWatcher();
       if (state.isQueuedOffline) {
         setState(() {
           _isPunchingIn = false;
+          _localPunchedInOverride = null;
+          _virtualPunchInTime =
+              _getServerPunchedIn() ? _getServerVirtualPunchInTime() : null;
           _frozenWorkedHoursOverride = null;
         });
         _hydratePendingOfflineState();
+        unawaited(() async {
+          await _dismissSlowNetworkDialogIfVisible();
+          await _showQueuedOfflineDialog('Punch-In Saved Offline', state.message);
+        }());
         return;
+      }
+      if (_didShowSlowNetworkDialog) {
+        unawaited(_dismissSlowNetworkDialogIfVisible());
       }
       setState(() {
         _isPunchingIn = false;
@@ -363,23 +535,28 @@ class _AttendanceCardState extends State<AttendanceCard> {
       if (!state.isQueuedOffline || state.requiresServerRefresh) {
         widget.onRefresh();
       }
-      // if (mounted) {
-      //   ScaffoldMessenger.of(context).showSnackBar(
-      //     SnackBar(
-      //       content: Text(
-      //         AttendancePunchReconciliationHelper.toUserMessage(state.message),
-      //       ),
-      //       backgroundColor: AppColors.success,
-      //     ),
-      //   );
-      // }
     } else if (state is AttendancePunchOutSuccess) {
+      _cancelSlowNetworkDialogWatcher();
       if (state.isQueuedOffline) {
         setState(() {
           _isPunchingOut = false;
+          _localPunchedInOverride = null;
+          _virtualPunchInTime =
+              _getServerPunchedIn() ? _getServerVirtualPunchInTime() : null;
+          _frozenWorkedHoursOverride = null;
         });
         _hydratePendingOfflineState();
+        unawaited(() async {
+          await _dismissSlowNetworkDialogIfVisible();
+          await _showQueuedOfflineDialog(
+            'Punch-Out Saved Offline',
+            state.message,
+          );
+        }());
         return;
+      }
+      if (_didShowSlowNetworkDialog) {
+        unawaited(_dismissSlowNetworkDialogIfVisible());
       }
       final frozenWorkedHours =
           _virtualPunchInTime != null
@@ -395,25 +572,22 @@ class _AttendanceCardState extends State<AttendanceCard> {
       if (!state.isQueuedOffline || state.requiresServerRefresh) {
         widget.onRefresh();
       }
-      // widget.onRefresh();
-      // if (mounted) {
-      //   ScaffoldMessenger.of(context).showSnackBar(
-      //     SnackBar(
-      //       content: Text(
-      //         AttendancePunchReconciliationHelper.toUserMessage(state.message),
-      //       ),
-      //       backgroundColor: AppColors.success,
-      //     ),
-      //   );
-      // }
+
     } else if (state is AttendancePunchError) {
+      _cancelSlowNetworkDialogWatcher();
+      final shouldShowErrorDialog = _didShowSlowNetworkDialog;
       setState(() {
         _isPunchingIn = false;
         _isPunchingOut = false;
         _localPunchedInOverride = null;
       });
       widget.onRefresh();
-      if (mounted) {
+      if (shouldShowErrorDialog) {
+        unawaited(() async {
+          await _dismissSlowNetworkDialogIfVisible();
+          await _showPunchFailureDialog(state.message);
+        }());
+      } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -436,6 +610,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
         );
       }
     } else if (state is AttendancePendingSyncSuccess) {
+      _cancelSlowNetworkDialogWatcher();
       setState(() {
         _isPunchingIn = false;
         _isPunchingOut = false;
@@ -490,7 +665,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.textPrimary.withOpacity(0.1),
+                color: AppColors.textPrimary.withValues(alpha: 0.1),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -498,7 +673,6 @@ class _AttendanceCardState extends State<AttendanceCard> {
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
-
             children: [
               // Left side - Date, time, and button
               Expanded(
@@ -537,10 +711,10 @@ class _AttendanceCardState extends State<AttendanceCard> {
                           vertical: MediaQuery.of(context).size.height * 0.006,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.error.withOpacity(0.2),
+                          color: AppColors.error.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: AppColors.error.withOpacity(0.4),
+                            color: AppColors.error.withValues(alpha: 0.4),
                             width: 1,
                           ),
                         ),
@@ -575,11 +749,11 @@ class _AttendanceCardState extends State<AttendanceCard> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor:
                             _isButtonDisabled
-                                ? AppColors.textSecondary.withOpacity(0.2)
+                                ? AppColors.textSecondary.withValues(alpha: 0.2)
                                 : AppColors.background,
                         foregroundColor:
                             _isButtonDisabled
-                                ? AppColors.textSecondary.withOpacity(0.7)
+                                ? AppColors.textSecondary.withValues(alpha: 0.7)
                                 : AppColors.textPrimary,
                         padding: EdgeInsets.symmetric(
                           horizontal: MediaQuery.of(context).size.width * 0.053,
@@ -590,16 +764,16 @@ class _AttendanceCardState extends State<AttendanceCard> {
                           side: BorderSide(
                             color:
                                 _isButtonDisabled
-                                    ? AppColors.textSecondary.withOpacity(0.3)
+                                    ? AppColors.textSecondary.withValues(alpha: 0.3)
                                     : Colors.transparent,
                             width: 1,
                           ),
                         ),
                         elevation: 0,
                         disabledBackgroundColor: AppColors.textSecondary
-                            .withOpacity(0.2),
+                            .withValues(alpha: 0.2),
                         disabledForegroundColor: AppColors.textSecondary
-                            .withOpacity(0.7),
+                            .withValues(alpha: 0.7),
                       ),
 
                       child:
@@ -619,14 +793,13 @@ class _AttendanceCardState extends State<AttendanceCard> {
                               : Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Container(
+                                  SizedBox(
                                     width:
                                         MediaQuery.of(context).size.width *
                                         0.080,
                                     height:
                                         MediaQuery.of(context).size.width *
                                         0.070,
-
                                     child: SvgPicture.asset(
                                       !_isPunchedIn
                                           ? AppAssets.iconPunchIn
@@ -668,16 +841,4 @@ class _AttendanceCardState extends State<AttendanceCard> {
       ),
     );
   }
-}
-
-class _PendingQueueSnapshot {
-  final bool isPunchedIn;
-  final DateTime? virtualPunchInTime;
-  final double? frozenWorkedHours;
-
-  const _PendingQueueSnapshot({
-    required this.isPunchedIn,
-    this.virtualPunchInTime,
-    this.frozenWorkedHours,
-  });
 }

@@ -16,26 +16,38 @@ class LoadWfhRequests extends WfhRequestEvent {
   final int clientId;
   final int page;
   final int limit;
+  final WfhStatus? status;
+  final bool forceRefresh;
 
   const LoadWfhRequests({
     required this.clientId,
     this.page = 1,
     this.limit = 5,
+    this.status,
+    this.forceRefresh = false,
   });
 
   @override
-  List<Object> get props => [clientId, page, limit];
+  List<Object> get props => [
+    clientId,
+    page,
+    limit,
+    status ?? '',
+    forceRefresh,
+  ];
 }
 
 class LoadMoreWfhRequests extends WfhRequestEvent {
+  final int clientId;
   final int limit;
 
   const LoadMoreWfhRequests({
+    required this.clientId,
     this.limit = 5,
   });
 
   @override
-  List<Object> get props => [limit];
+  List<Object> get props => [clientId, limit];
 }
 
 class LoadTeamWfhRequests extends WfhRequestEvent {
@@ -43,16 +55,27 @@ class LoadTeamWfhRequests extends WfhRequestEvent {
   final int page;
   final int limit;
   final RequestAudienceScope scope;
+  final WfhStatus? status;
+  final bool forceRefresh;
 
   const LoadTeamWfhRequests({
     required this.clientId,
     this.page = 1,
     this.limit = 50,
     this.scope = RequestAudienceScope.allUsers,
+    this.status,
+    this.forceRefresh = false,
   });
 
   @override
-  List<Object> get props => [clientId, page, limit, scope];
+  List<Object> get props => [
+    clientId,
+    page,
+    limit,
+    scope,
+    status ?? '',
+    forceRefresh,
+  ];
 }
 
 class LoadMoreTeamWfhRequests extends WfhRequestEvent {

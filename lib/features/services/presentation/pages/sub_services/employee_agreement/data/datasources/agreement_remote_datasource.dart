@@ -11,7 +11,7 @@ abstract class AgreementRemoteDataSource {
 
   Future<AgreementConsentResponse> submitAgreementConsent(
     AgreementConsentRequest request,
-    String signatureFilePath,
+    String signedPdfFilePath,
   );
 }
 
@@ -64,7 +64,7 @@ class AgreementRemoteDataSourceImpl implements AgreementRemoteDataSource {
   @override
   Future<AgreementConsentResponse> submitAgreementConsent(
     AgreementConsentRequest request,
-    String signatureFilePath,
+    String signedPdfFilePath,
   ) async {
     try {
       // Encode the payload
@@ -72,7 +72,7 @@ class AgreementRemoteDataSourceImpl implements AgreementRemoteDataSource {
 
       // Create FormData for multipart/form-data
       final formData = FormData.fromMap({
-        'signature': await MultipartFile.fromFile(signatureFilePath),
+        'file': await MultipartFile.fromFile(signedPdfFilePath),
         'payload': encodedPayload,
       });
 

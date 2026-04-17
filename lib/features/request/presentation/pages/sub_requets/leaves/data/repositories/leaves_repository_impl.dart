@@ -43,6 +43,7 @@ class LeavesRepositoryImpl implements LeavesRepository {
   Future<Either<Failure, TeamLeaveRequestsPageEntity>> getTeamLeaveRequests({
     required int clientId,
     RequestAudienceScope scope = RequestAudienceScope.allUsers,
+    LeaveStatus? status,
     int page = 1,
     int limit = 50,
   }) async {
@@ -51,6 +52,7 @@ class LeavesRepositoryImpl implements LeavesRepository {
         final remoteLeaves = await remoteDataSource.getTeamLeaveRequests(
           clientId: clientId,
           scope: scope,
+          status: status,
           page: page,
           limit: limit,
         );

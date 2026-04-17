@@ -45,7 +45,8 @@ class LeaveRequestCard extends StatelessWidget {
             children: [
               // Colored left border
               Container(
-                width: screenWidth * 0.032,
+                width: screenWidth * 0.018,
+
                 // 3.2% of screen width - increased for better visibility
                 decoration: BoxDecoration(
                   color: statusColor,

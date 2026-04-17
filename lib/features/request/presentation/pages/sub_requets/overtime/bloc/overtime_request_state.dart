@@ -25,7 +25,9 @@ class OvertimeRequestLoaded extends OvertimeRequestState {
   final List<OvertimeRequestModel> filteredRequests;
   final String? searchQuery;
   final OvertimeStatus? statusFilter;
+  final bool isTeamRequestMode;
   final bool isLoadingMore;
+  final bool isRefreshing;
   final bool hasMore;
   final int currentPage;
   final int totalCount;
@@ -34,13 +36,16 @@ class OvertimeRequestLoaded extends OvertimeRequestState {
   final int rejectedCount;
   final int withdrawnCount;
   final RequestAudienceScope selectedScope;
+  final String? contentErrorMessage;
 
   const OvertimeRequestLoaded({
     required this.requests,
     required this.filteredRequests,
     this.searchQuery,
     this.statusFilter,
+    this.isTeamRequestMode = false,
     this.isLoadingMore = false,
+    this.isRefreshing = false,
     this.hasMore = false,
     this.currentPage = 1,
     this.totalCount = 0,
@@ -49,6 +54,7 @@ class OvertimeRequestLoaded extends OvertimeRequestState {
     this.rejectedCount = 0,
     this.withdrawnCount = 0,
     this.selectedScope = RequestAudienceScope.allUsers,
+    this.contentErrorMessage,
   });
 
   OvertimeRequestLoaded copyWith({
@@ -56,7 +62,9 @@ class OvertimeRequestLoaded extends OvertimeRequestState {
     List<OvertimeRequestModel>? filteredRequests,
     Object? searchQuery = _unset,
     Object? statusFilter = _unset,
+    bool? isTeamRequestMode,
     bool? isLoadingMore,
+    bool? isRefreshing,
     bool? hasMore,
     int? currentPage,
     int? totalCount,
@@ -65,6 +73,7 @@ class OvertimeRequestLoaded extends OvertimeRequestState {
     int? rejectedCount,
     int? withdrawnCount,
     RequestAudienceScope? selectedScope,
+    Object? contentErrorMessage = _unset,
   }) {
     return OvertimeRequestLoaded(
       requests: requests ?? this.requests,
@@ -77,7 +86,9 @@ class OvertimeRequestLoaded extends OvertimeRequestState {
           identical(statusFilter, _unset)
               ? this.statusFilter
               : statusFilter as OvertimeStatus?,
+      isTeamRequestMode: isTeamRequestMode ?? this.isTeamRequestMode,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
       hasMore: hasMore ?? this.hasMore,
       currentPage: currentPage ?? this.currentPage,
       totalCount: totalCount ?? this.totalCount,
@@ -86,6 +97,10 @@ class OvertimeRequestLoaded extends OvertimeRequestState {
       rejectedCount: rejectedCount ?? this.rejectedCount,
       withdrawnCount: withdrawnCount ?? this.withdrawnCount,
       selectedScope: selectedScope ?? this.selectedScope,
+      contentErrorMessage:
+          identical(contentErrorMessage, _unset)
+              ? this.contentErrorMessage
+              : contentErrorMessage as String?,
     );
   }
 
@@ -95,7 +110,9 @@ class OvertimeRequestLoaded extends OvertimeRequestState {
     filteredRequests,
     searchQuery,
     statusFilter,
+    isTeamRequestMode,
     isLoadingMore,
+    isRefreshing,
     hasMore,
     currentPage,
     totalCount,
@@ -104,6 +121,7 @@ class OvertimeRequestLoaded extends OvertimeRequestState {
     rejectedCount,
     withdrawnCount,
     selectedScope,
+    contentErrorMessage,
   ];
 }
 

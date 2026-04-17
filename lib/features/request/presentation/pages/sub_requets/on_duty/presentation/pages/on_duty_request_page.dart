@@ -213,6 +213,7 @@ class _OnDutyRequestPageState extends State<OnDutyRequestPage> {
                     : 0;
 
             return ResponsiveScaffold(
+              backgroundColor: AppColors.backgroundLight,
               appBar: AppBar(
                 forceMaterialTransparency: true,
                 elevation: 0,

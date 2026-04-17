@@ -4,9 +4,11 @@ class EmployeeAgreementModel {
   final String agreementName;
   final String employeeName;
   final String employeeAvatar;
+  final String? employeeProfileColor;
   final String agreementType;
   final String assignedBy;
   final String assignedByAvatar;
+  final String? assignedByProfileColor;
   final String expiryDate;
   final String status;
   final String? content; // Agreement content text
@@ -18,9 +20,11 @@ class EmployeeAgreementModel {
     required this.agreementName,
     required this.employeeName,
     required this.employeeAvatar,
+    this.employeeProfileColor,
     required this.agreementType,
     required this.assignedBy,
     required this.assignedByAvatar,
+    this.assignedByProfileColor,
     required this.expiryDate,
     required this.status,
     this.content,
@@ -28,4 +32,3 @@ class EmployeeAgreementModel {
     this.documentUrl,
   });
 }
-

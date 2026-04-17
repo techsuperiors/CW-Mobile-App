@@ -65,6 +65,23 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
   String _totalHours = '--';
   bool _isSubmitting = false;
 
+  List<({String label, RegularizeRequestType value})> get _requestTypeOptions {
+    return <({String label, RegularizeRequestType value})>[
+      (label: 'Punch-in', value: RegularizeRequestType.punchIn),
+      (label: 'Punch-out', value: RegularizeRequestType.punchOut),
+      (label: 'Both', value: RegularizeRequestType.both),
+    ];
+  }
+
+  List<String> get _modeTypeOptions {
+    final options = <String>{'Remote', 'Web'};
+    final currentMode = _captureMode?.trim();
+    if (currentMode != null && currentMode.isNotEmpty) {
+      options.add(currentMode);
+    }
+    return options.toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -148,9 +165,9 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
   String _convertRequestType(RegularizeRequestType requestType) {
     switch (requestType) {
       case RegularizeRequestType.punchIn:
-        return 'Punch-In';
+        return 'checkIn';
       case RegularizeRequestType.punchOut:
-        return 'Punch-Out';
+        return 'checkOut';
       case RegularizeRequestType.both:
         return 'both';
     }
@@ -276,43 +293,38 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
     final statusUpdatedBy =
         _requestToId ?? userProfileState.profile.reportingManager;
 
-    if (statusUpdatedBy == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Reporting manager not available'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
     // Format check-in and check-out times
     // Use default times if not provided based on request type
     final checkIn =
-        _punchInTime != null
+        (_requestType == RegularizeRequestType.punchIn ||
+                _requestType == RegularizeRequestType.both)
             ? _formatDateTime(_attendanceDate!, _punchInTime!)
-            : _formatDateTime(
-              _attendanceDate!,
-              const TimeOfDay(hour: 9, minute: 0),
-            );
+            : null;
 
     final checkOut =
-        _punchOutTime != null
+        (_requestType == RegularizeRequestType.punchOut ||
+                _requestType == RegularizeRequestType.both)
             ? _formatDateTime(_attendanceDate!, _punchOutTime!)
-            : _formatDateTime(
-              _attendanceDate!,
-              const TimeOfDay(hour: 18, minute: 0),
-            );
+            : null;
 
     // Dispatch apply regularize event
     if (widget.regularizeRequest != null) {
+      final updateCheckIn =
+          checkIn ??
+          _formatDateTime(_attendanceDate!, const TimeOfDay(hour: 9, minute: 0));
+      final updateCheckOut =
+          checkOut ??
+          _formatDateTime(
+            _attendanceDate!,
+            const TimeOfDay(hour: 18, minute: 0),
+          );
       _applyRegularizeBloc.add(
         UpdateRegularize(
           id: int.tryParse(widget.regularizeRequest!.id) ?? 0,
           requestDate: _formatDate(_attendanceDate!),
           requestFor: _convertRequestTypeForUpdate(_requestType),
-          checkIn: checkIn,
-          checkOut: checkOut,
+          checkIn: updateCheckIn,
+          checkOut: updateCheckOut,
           statusUpdatedBy: statusUpdatedBy,
           description: _descriptionController.text.trim(),
         ),
@@ -335,7 +347,6 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
         description: _descriptionController.text.trim(),
         userId: userId,
         isOther: _selectedReason == 'Other',
-        statusUpdatedBy: statusUpdatedBy,
       ),
     );
   }
@@ -462,6 +473,16 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
     return '$hour:$minute $period';
   }
 
+  bool get _showsPunchInField =>
+      _requestType == RegularizeRequestType.punchIn ||
+      _requestType == RegularizeRequestType.both;
+
+  bool get _showsPunchOutField =>
+      _requestType == RegularizeRequestType.punchOut ||
+      _requestType == RegularizeRequestType.both;
+
+  bool get _showsTotalHours => _requestType == RegularizeRequestType.both;
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -514,6 +535,8 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
             }
           },
           child: ResponsiveScaffold(
+            backgroundColor: AppColors.backgroundMedium,
+
             appBar: AppBar(
               elevation: 0,
               forceMaterialTransparency: true,
@@ -593,49 +616,32 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
                     ),
                     SizedBox(height: screenHeight * 0.01),
                     Row(
-                      children: [
-                        Expanded(
-                          child: _buildRadioOption(
-                            context,
-                            label: 'Punch-in',
-                            value: RegularizeRequestType.punchIn,
-                            groupValue: _requestType,
-                            onChanged: (value) {
-                              setState(() {
-                                _requestType = value!;
-                              });
-                            },
+                      children: List.generate(_requestTypeOptions.length, (
+                        index,
+                      ) {
+                        final option = _requestTypeOptions[index];
+                        return Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              right:
+                                  index == _requestTypeOptions.length - 1
+                                      ? 0
+                                      : screenWidth * 0.02,
+                            ),
+                            child: _buildRadioOption(
+                              context,
+                              label: option.label,
+                              value: option.value,
+                              groupValue: _requestType,
+                              onChanged: (value) {
+                                setState(() {
+                                  _requestType = value!;
+                                });
+                              },
+                            ),
                           ),
-                        ),
-                        SizedBox(width: screenWidth * 0.02),
-                        Expanded(
-                          child: _buildRadioOption(
-                            context,
-                            label: 'Punch-out',
-                            value: RegularizeRequestType.punchOut,
-                            groupValue: _requestType,
-                            onChanged: (value) {
-                              setState(() {
-                                _requestType = value!;
-                              });
-                            },
-                          ),
-                        ),
-                        SizedBox(width: screenWidth * 0.02),
-                        Expanded(
-                          child: _buildRadioOption(
-                            context,
-                            label: 'Both',
-                            value: RegularizeRequestType.both,
-                            groupValue: _requestType,
-                            onChanged: (value) {
-                              setState(() {
-                                _requestType = value!;
-                              });
-                            },
-                          ),
-                        ),
-                      ],
+                        );
+                      }),
                     ),
                     SizedBox(height: screenHeight * 0.02),
                     // Capture Mode (Mode Type)
@@ -643,7 +649,7 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
                       context,
                       label: 'Mode Type',
                       value: _captureMode,
-                      items: ['Remote', 'Office', 'Hybrid'],
+                      items: _modeTypeOptions,
                       hint: 'Select Mode Type',
                       onChanged: (value) {
                         setState(() {
@@ -653,48 +659,55 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
                     ),
                     SizedBox(height: screenHeight * 0.02),
                     // Punch In
-                    Text('Punch In', style: AppTextStyles.labelLarge(context)),
-                    SizedBox(height: screenHeight * 0.01),
-                    _buildTimeField(
-                      context,
-                      value:
-                          _punchInTime != null
-                              ? _formatTimeOfDay(_punchInTime!)
-                              : null,
-                      hint: 'Enter Punch-in time',
-                      onTap: () => _selectTime(context, true),
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    // Punch Out
-                    Text('Punch Out', style: AppTextStyles.labelLarge(context)),
-                    SizedBox(height: screenHeight * 0.01),
-                    _buildTimeField(
-                      context,
-                      value:
-                          _punchOutTime != null
-                              ? _formatTimeOfDay(_punchOutTime!)
-                              : null,
-                      hint: 'Enter Punch-out time',
-                      onTap: () => _selectTime(context, false),
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    // Total Hours
-                    Row(
-                      children: [
-                        Text(
-                          'Total Hours: ',
-                          style: AppTextStyles.labelLarge(context),
-                        ),
-                        Text(
-                          _totalHours,
-                          style: AppTextStyles.labelLarge(context).copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.attendanceTeal,
+                    if (_showsPunchInField) ...[
+                      Text('Punch In', style: AppTextStyles.labelLarge(context)),
+                      SizedBox(height: screenHeight * 0.01),
+                      _buildTimeField(
+                        context,
+                        value:
+                            _punchInTime != null
+                                ? _formatTimeOfDay(_punchInTime!)
+                                : null,
+                        hint: 'Enter Punch-in time',
+                        onTap: () => _selectTime(context, true),
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                    ],
+                    if (_showsPunchOutField) ...[
+                      Text(
+                        'Punch Out',
+                        style: AppTextStyles.labelLarge(context),
+                      ),
+                      SizedBox(height: screenHeight * 0.01),
+                      _buildTimeField(
+                        context,
+                        value:
+                            _punchOutTime != null
+                                ? _formatTimeOfDay(_punchOutTime!)
+                                : null,
+                        hint: 'Enter Punch-out time',
+                        onTap: () => _selectTime(context, false),
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                    ],
+                    if (_showsTotalHours) ...[
+                      Row(
+                        children: [
+                          Text(
+                            'Total Hours: ',
+                            style: AppTextStyles.labelLarge(context),
                           ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
+                          Text(
+                            _totalHours,
+                            style: AppTextStyles.labelLarge(context).copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.attendanceTeal,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                    ],
                     if (widget.regularizeRequest == null) ...[
                       _buildDropdownField(
                         context,
@@ -841,7 +854,7 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
           padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
 
           child: DropdownButtonFormField<String>(
-            value: value,
+            initialValue: value,
             isExpanded: true,
             borderRadius: BorderRadius.circular(12),
 

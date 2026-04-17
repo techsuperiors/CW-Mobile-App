@@ -35,7 +35,8 @@ class AppColors {
   // Background Colors
   static const Color background = Color(0xFFFFFFFF);
   static const Color backgroundMediumLight = Color(0xFFf3f8fd);
-  static const Color backgroundMedium = Color(0xFFF2F2F7);
+  // static const Color backgroundMedium = Color(0xFFF2F2F7);
+  static const Color backgroundMedium = Color(0xFFF5F5F5);
   static const Color backgroundLight = Color(0xFFF5F5F5);
   static const Color backgroundDark = Color(0xFF121212);
   static const Color splashbackgroundLight = Color(0xFFb7d9d9);

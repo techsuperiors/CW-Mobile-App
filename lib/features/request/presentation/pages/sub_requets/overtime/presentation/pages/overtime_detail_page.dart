@@ -220,7 +220,7 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
               ),
               if (isBusy)
                 Container(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   child: const Center(child: CircularProgressIndicator()),
                 ),
             ],
@@ -262,6 +262,7 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
     final requestDate = detail?.requestDate ?? currentRequest.requestDate;
     final checkIn = detail?.checkIn;
     final checkOut = detail?.checkOut;
+    final totalHours = detail?.totalHours;
     final requestId = int.tryParse(widget.overtimeRequest.id) ?? 0;
     final isPending = currentRequest.status == OvertimeStatus.pending;
     final menuActions = <Map<String, String>>[
@@ -440,6 +441,15 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
               context,
               'Check Out:',
               DateFormat('dd MMM yyyy, hh:mm a').format(checkOut),
+              screenWidth,
+            ),
+          ],
+          if (totalHours != null && totalHours.trim().isNotEmpty) ...[
+            Divider(height: screenHeight * 0.03, color: AppColors.border),
+            _buildDetailRow(
+              context,
+              'Total Overtime hours:',
+              _formatTotalOvertimeHours(totalHours),
               screenWidth,
             ),
           ],
@@ -785,6 +795,38 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
     return parts.map((part) => part[0].toUpperCase()).join();
   }
 
+  String _formatTotalOvertimeHours(String rawValue) {
+    final trimmedValue = rawValue.trim();
+    if (trimmedValue.isEmpty) {
+      return '—';
+    }
+
+    final timePattern = RegExp(r'^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$');
+    final timeMatch = timePattern.firstMatch(trimmedValue);
+    if (timeMatch != null) {
+      final hours = int.tryParse(timeMatch.group(1) ?? '') ?? 0;
+      final minutes = int.tryParse(timeMatch.group(2) ?? '') ?? 0;
+      final seconds = int.tryParse(timeMatch.group(3) ?? '') ?? 0;
+      final roundedMinutes = minutes + (seconds >= 30 ? 1 : 0);
+      final normalizedHours = hours + (roundedMinutes ~/ 60);
+      final normalizedMinutes = roundedMinutes % 60;
+      return '${normalizedHours.toString().padLeft(2, '0')}h ${normalizedMinutes.toString().padLeft(2, '0')}m';
+    }
+
+    final numericValue = double.tryParse(trimmedValue);
+    if (numericValue != null) {
+      final totalMinutes =
+          trimmedValue.contains('.')
+              ? (numericValue * 60).round()
+              : (numericValue / 60).round();
+      final hours = totalMinutes ~/ 60;
+      final minutes = totalMinutes % 60;
+      return '${hours.toString().padLeft(2, '0')}h ${minutes.toString().padLeft(2, '0')}m';
+    }
+
+    return trimmedValue;
+  }
+
   Widget _buildDetailRow(
     BuildContext context,
     String label,
@@ -1128,7 +1170,6 @@ class _OvertimeApproverAvatarStack extends StatelessWidget {
             : avatarSize +
                 ((visibleUsers.length - 1) * (avatarSize - overlap)) +
                 (edgePadding * 2);
-    ;
 
     return SizedBox(
       width: width,

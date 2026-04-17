@@ -53,7 +53,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
           message:
               synced
                   ? 'Punch-in successful.'
-                  : 'Punch-in saved. It will sync after location details are resolved.',
+                  : '',
           data: {'queued': !synced},
         ),
       );

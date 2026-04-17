@@ -10,14 +10,14 @@ abstract class AttendanceRegularizeRepository {
     required String requestDate,
     required String requestFor,
     required String modeType,
-    required String checkIn,
-    required String checkOut,
+    String? checkIn,
+    String? checkOut,
     required String reason,
     String? otherReason,
     required String description,
     required int userId,
     required bool isOther,
-    required int statusUpdatedBy,
+    int? statusUpdatedBy,
   });
 
   Future<Either<Failure, AttendanceRegularizeDetail>> getRegularizeRequestDetail(

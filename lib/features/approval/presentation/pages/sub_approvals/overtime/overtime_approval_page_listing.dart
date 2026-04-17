@@ -49,8 +49,10 @@ class _OvertimeApprovalPageListingState
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
+  late final OvertimeRequestBloc _overtimeRequestBloc;
   RequestAudienceScope _selectedScope = RequestAudienceScope.allUsers;
-  static const int _pageSize = 50;
+  static const int _pageSize = 5;
+  late int _lastHandledTabIndex;
 
   static const List<StatusTabDefinition<OvertimeStatus>> _tabs = [
     StatusTabDefinition(label: 'All', status: null),
@@ -62,14 +64,211 @@ class _OvertimeApprovalPageListingState
   @override
   void initState() {
     super.initState();
+    final networkInfo = NetworkInfoImpl(Connectivity());
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final remoteDataSource = OvertimeRemoteDataSourceImpl(apiClient: apiClient);
+    final repository = OvertimeRepositoryImpl(remoteDataSource: remoteDataSource);
+    _overtimeRequestBloc = OvertimeRequestBloc(
+      getOvertimeRequestsUseCase: GetOvertimeRequestsUseCase(repository),
+      getOvertimeRequestStatsUseCase: GetOvertimeRequestStatsUseCase(
+        repository,
+      ),
+      getTeamOvertimeRequestsUseCase: GetTeamOvertimeRequestsUseCase(
+        repository,
+      ),
+    );
     _tabController = TabController(length: _tabs.length, vsync: this);
+    _lastHandledTabIndex = _tabController.index;
+    _tabController.addListener(_handleTabChange);
   }
+
+  OvertimeStatus? get _selectedTabStatus => _tabs[_tabController.index].status;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
+    _overtimeRequestBloc.close();
     super.dispose();
+  }
+
+  Future<void> _refreshTabData({
+    required int clientId,
+    required RequestAudienceScope scope,
+    required OvertimeStatus? status,
+  }) async {
+    _overtimeRequestBloc.add(
+      LoadTeamOvertimeRequests(
+        clientId: clientId,
+        scope: scope,
+        status: status,
+        limit: _pageSize,
+        forceRefresh: true,
+      ),
+    );
+
+    await _overtimeRequestBloc.stream.firstWhere((state) {
+      if (state is OvertimeRequestLoaded) {
+        return !state.isRefreshing &&
+            state.selectedScope == scope &&
+            state.statusFilter == status;
+      }
+
+      return state is OvertimeRequestError;
+    });
+  }
+
+  void _handleTabChange() {
+    if (!mounted || _lastHandledTabIndex == _tabController.index) {
+      return;
+    }
+
+    _lastHandledTabIndex = _tabController.index;
+    setState(() {});
+
+    final currentState = _overtimeRequestBloc.state;
+    final scope =
+        currentState is OvertimeRequestLoaded
+            ? currentState.selectedScope
+            : _selectedScope;
+
+    _overtimeRequestBloc.add(
+      LoadTeamOvertimeRequests(
+        clientId: _resolveClientId(context),
+        scope: scope,
+        status: _selectedTabStatus,
+        limit: _pageSize,
+      ),
+    );
+  }
+
+  Widget _buildOvertimeTabContent(
+    BuildContext context, {
+    required int clientId,
+    required double screenHeight,
+    required OvertimeRequestLoaded viewState,
+    required bool isCurrentTab,
+  }) {
+    if (isCurrentTab && viewState.isRefreshing) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (isCurrentTab && viewState.contentErrorMessage != null) {
+      return ApiErrorState(
+        rawMessage: viewState.contentErrorMessage!,
+        onRetry:
+            () => context.read<OvertimeRequestBloc>().add(
+              LoadTeamOvertimeRequests(
+                clientId: clientId,
+                scope: viewState.selectedScope,
+                status: viewState.statusFilter,
+                limit: _pageSize,
+                forceRefresh: true,
+              ),
+            ),
+      );
+    }
+
+    final visibleRequests =
+        viewState.filteredRequests
+            .where((request) => request.status != OvertimeStatus.withdrawn)
+            .toList();
+
+    if (visibleRequests.isEmpty) {
+      return const RequestEmptyState();
+    }
+
+    final grouped = RequestGroupingUtils.groupByMonth(
+      items: visibleRequests,
+      dateSelector: (item) => item.appliedDate,
+    );
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (isCurrentTab &&
+            notification.metrics.pixels >=
+                notification.metrics.maxScrollExtent - 200 &&
+            viewState.hasMore &&
+            !viewState.isLoadingMore) {
+          context.read<OvertimeRequestBloc>().add(
+            LoadMoreTeamOvertimeRequests(
+              clientId: clientId,
+              limit: _pageSize,
+            ),
+          );
+        }
+        return false;
+      },
+      child: RefreshIndicator(
+        onRefresh:
+            () => _refreshTabData(
+              clientId: clientId,
+              scope: viewState.selectedScope,
+              status: viewState.statusFilter,
+            ),
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(vertical: screenHeight * 0.012),
+          itemCount: grouped.length + (viewState.isLoadingMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index >= grouped.length) {
+              return Padding(
+                padding: EdgeInsets.symmetric(vertical: screenHeight * 0.02),
+                child: const Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final entry = grouped[index];
+            if (entry is String) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  top: index == 0 ? 0 : screenHeight * 0.014,
+                  bottom: screenHeight * 0.010,
+                ),
+                child: Text(
+                  entry,
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              );
+            }
+
+            final req = entry as OvertimeRequestModel;
+            return OvertimeRequestCard(
+              request: req,
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (_) => OvertimeDetailPage(
+                          overtimeRequest: req,
+                          isApprovalMode: true,
+                        ),
+                  ),
+                );
+                if (result == true && context.mounted) {
+                  context.read<OvertimeRequestBloc>().add(
+                    LoadTeamOvertimeRequests(
+                      clientId: clientId,
+                      scope: viewState.selectedScope,
+                      status: viewState.statusFilter,
+                      limit: _pageSize,
+                      forceRefresh: true,
+                    ),
+                  );
+                }
+              },
+            );
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -110,10 +309,6 @@ class _OvertimeApprovalPageListingState
       );
     }
 
-    final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
-    final remoteDataSource = OvertimeRemoteDataSourceImpl(apiClient: apiClient);
-    final repository = OvertimeRepositoryImpl(remoteDataSource: remoteDataSource);
     final clientId = _resolveClientId(context);
     final allowAllUsers = _allowAllUsers(context);
     final availableScopes =
@@ -129,23 +324,19 @@ class _OvertimeApprovalPageListingState
       _selectedScope = RequestAudienceScope.myReportees;
     }
 
-    return BlocProvider(
-      create:
-          (_) => OvertimeRequestBloc(
-            getOvertimeRequestsUseCase: GetOvertimeRequestsUseCase(repository),
-            getOvertimeRequestStatsUseCase: GetOvertimeRequestStatsUseCase(
-              repository,
-            ),
-            getTeamOvertimeRequestsUseCase: GetTeamOvertimeRequestsUseCase(
-              repository,
-            ),
-          )..add(
-            LoadTeamOvertimeRequests(
-              clientId: clientId,
-              scope: _selectedScope,
-              limit: _pageSize,
-            ),
-          ),
+    if (_overtimeRequestBloc.state is OvertimeRequestInitial) {
+      _overtimeRequestBloc.add(
+        LoadTeamOvertimeRequests(
+          clientId: clientId,
+          scope: _selectedScope,
+          status: _selectedTabStatus,
+          limit: _pageSize,
+        ),
+      );
+    }
+
+    return BlocProvider.value(
+      value: _overtimeRequestBloc,
       child: ResponsiveScaffold(
         backgroundColor: AppColors.backgroundLight,
         appBar: AppBar(
@@ -217,20 +408,15 @@ class _OvertimeApprovalPageListingState
                                       LoadTeamOvertimeRequests(
                                         clientId: clientId,
                                         scope: _selectedScope,
+                                        status: _selectedTabStatus,
                                         limit: _pageSize,
+                                        forceRefresh: true,
                                       ),
                                     ),
                           );
                         }
 
                         final loaded = state as OvertimeRequestLoaded;
-                        final items =
-                            loaded.requests
-                                .where(
-                                  (request) =>
-                                      request.status != OvertimeStatus.withdrawn,
-                                )
-                                .toList();
 
                         return StatusTabbedSection<
                           OvertimeStatus,
@@ -238,7 +424,7 @@ class _OvertimeApprovalPageListingState
                         >(
                           controller: _tabController,
                           tabs: _tabs,
-                          items: items,
+                          items: loaded.requests,
                           searchQuery: loaded.searchQuery?.toLowerCase() ?? '',
                           countOverrides: {
                             null: loaded.totalCount,
@@ -252,96 +438,39 @@ class _OvertimeApprovalPageListingState
                             return item.subject.toLowerCase().contains(query);
                           },
                           tabColorBuilder: RequestTabTheme.colorForIndex,
-                          emptyBuilder: (context) => const RequestEmptyState(),
-                          listBuilder: (context, list) {
-                            final grouped = RequestGroupingUtils.groupByMonth(
-                              items: list,
-                              dateSelector: (item) => item.appliedDate,
-                            );
-                            return NotificationListener<ScrollNotification>(
-                              onNotification: (notification) {
-                                if (notification.metrics.pixels >=
-                                    notification.metrics.maxScrollExtent -
-                                        200) {
-                                  context.read<OvertimeRequestBloc>().add(
-                                    LoadMoreTeamOvertimeRequests(
-                                      clientId: clientId,
-                                      limit: _pageSize,
-                                    ),
-                                  );
-                                }
-                                return false;
-                              },
-                              child: ListView.builder(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: screenHeight * 0.012,
-                                ),
-                                itemCount:
-                                    grouped.length +
-                                    (loaded.isLoadingMore ? 1 : 0),
-                                itemBuilder: (context, index) {
-                                  if (index >= grouped.length) {
-                                    return Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: screenHeight * 0.02,
-                                      ),
-                                      child: const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    );
-                                  }
-
-                                  final entry = grouped[index];
-                                  if (entry is String) {
-                                    return Padding(
-                                      padding: EdgeInsets.only(
-                                        top:
-                                            index == 0
-                                                ? 0
-                                                : screenHeight * 0.014,
-                                        bottom: screenHeight * 0.010,
-                                      ),
-                                      child: Text(
-                                        entry,
-                                        style: AppTextStyles.bodySmall(
-                                          context,
-                                        ).copyWith(
-                                          fontWeight: FontWeight.w500,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    );
-                                  }
-
-                                  final req = entry as OvertimeRequestModel;
-                                  return OvertimeRequestCard(
-                                    request: req,
-                                    onTap: () async {
-                                      final result = await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (_) => OvertimeDetailPage(
-                                                overtimeRequest: req,
-                                                isApprovalMode: true,
-                                              ),
-                                        ),
-                                      );
-                                      if (result == true && context.mounted) {
-                                        context.read<OvertimeRequestBloc>().add(
-                                          LoadTeamOvertimeRequests(
-                                            clientId: clientId,
-                                            scope: _selectedScope,
-                                            limit: _pageSize,
-                                          ),
+                          tabContentBuilder: (context, tab) {
+                            final rawTabState =
+                                tab.status == loaded.statusFilter
+                                    ? loaded
+                                    : _overtimeRequestBloc
+                                        .getCachedTeamOvertimeRequests(
+                                          scope: _selectedScope,
+                                          status: tab.status,
                                         );
-                                      }
-                                    },
-                                  );
-                                },
-                              ),
+
+                            if (rawTabState == null) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+
+                            final tabState =
+                                _overtimeRequestBloc.buildTeamOvertimeViewState(
+                                  baseState: rawTabState,
+                                  searchQuery: loaded.searchQuery,
+                                );
+
+                            return _buildOvertimeTabContent(
+                              context,
+                              clientId: clientId,
+                              screenHeight: screenHeight,
+                              viewState: tabState,
+                              isCurrentTab: tab.status == loaded.statusFilter,
                             );
                           },
+                          emptyBuilder: (context) => const RequestEmptyState(),
+                          listBuilder: (context, list) =>
+                              const SizedBox.shrink(),
                         );
                       },
                     ),
@@ -388,7 +517,7 @@ class _OvertimeApprovalPageListingState
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -443,6 +572,7 @@ class _OvertimeApprovalPageListingState
           selectedScope: _selectedScope,
           availableScopes: availableScopes,
           onSelected: (scope) {
+            if (scope == _selectedScope) return;
             setState(() {
               _selectedScope = scope;
             });
@@ -450,6 +580,7 @@ class _OvertimeApprovalPageListingState
               LoadTeamOvertimeRequests(
                 clientId: _resolveClientId(context),
                 scope: scope,
+                status: _selectedTabStatus,
                 limit: _pageSize,
               ),
             );

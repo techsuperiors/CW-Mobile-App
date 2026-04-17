@@ -31,6 +31,7 @@ class PunchInRequest {
         'longitude': longitude,
       },
       'punch_type': punchType,
+      'device_type': 'app',
     };
     if (punchIn != null && punchIn!.trim().isNotEmpty) {
       data['punch_in_time'] = punchIn;
@@ -81,6 +82,7 @@ class PunchOutRequest {
         'latitude': latitude,
         'longitude': longitude,
       },
+      'device_type': 'app',
     };
     if (punchOut != null && punchOut!.trim().isNotEmpty) {
       data['punch_out_time'] = punchOut;

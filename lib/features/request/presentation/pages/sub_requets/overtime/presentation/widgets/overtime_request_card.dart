@@ -39,7 +39,7 @@ class OvertimeRequestCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Container(
-                width: screenWidth * 0.032,
+                width: screenWidth * 0.018,
                 decoration: BoxDecoration(
                   color: statusColor,
                   borderRadius: const BorderRadius.only(

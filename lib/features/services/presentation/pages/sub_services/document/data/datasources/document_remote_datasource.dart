@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../../../../../../core/constants/app_urls.dart';
 import '../../../../../../../../core/error/exceptions.dart';
@@ -9,9 +10,18 @@ import '../models/document_remote_models.dart';
 
 abstract class DocumentRemoteDataSource {
   Future<List<DocumentDirectoryRemoteModel>> getUserDirectories();
+  Future<String> createDirectory({
+    required String name,
+    required List<String> tags,
+    String description = '',
+  });
   Future<DocumentDirectoryDetailsRemoteModel> getDirectoryDetails(
     int directoryId,
   );
+  Future<String> uploadDocument({
+    required int directoryId,
+    required String filePath,
+  });
   Future<List<AgreementDocumentRemoteModel>> getEmployeeAgreementDocuments();
   Future<void> deleteDocument({
     required int directoryId,
@@ -53,6 +63,43 @@ class DocumentRemoteDataSourceImpl implements DocumentRemoteDataSource {
   }
 
   @override
+  Future<String> createDirectory({
+    required String name,
+    required List<String> tags,
+    String description = '',
+  }) async {
+    try {
+      final payload = encodeData({
+        'parent_id': '',
+        'directory_name': name,
+        'description': description,
+        'request_type': 'My Drive',
+        'directory_tags': tags,
+      });
+
+      final response = await apiClient.post(
+        AppUrls.documentDirectoryCreate,
+        data: {'payload': payload},
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      final json = response.data as Map<String, dynamic>;
+      if (json['success'] != true) {
+        throw ServerException(
+          (json['message'] as String?) ?? 'Failed to create folder',
+        );
+      }
+
+      return (json['message'] as String?) ?? 'Folder created successfully.';
+    } catch (e) {
+      if (e is ServerException) {
+        rethrow;
+      }
+      throw ServerException('Failed to create folder: $e');
+    }
+  }
+
+  @override
   Future<DocumentDirectoryDetailsRemoteModel> getDirectoryDetails(
     int directoryId,
   ) async {
@@ -76,6 +123,49 @@ class DocumentRemoteDataSourceImpl implements DocumentRemoteDataSource {
         rethrow;
       }
       throw ServerException('Failed to load directory details: $e');
+    }
+  }
+
+  @override
+  Future<String> uploadDocument({
+    required int directoryId,
+    required String filePath,
+  }) async {
+    try {
+      final payload = encodeData({
+        'directory_id': directoryId,
+        'client_id': _resolveClientId(),
+        'document_name': p.basename(filePath),
+        'user_id': _resolveUserId(),
+      });
+
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          filePath,
+          filename: p.basename(filePath),
+        ),
+        'payload': payload,
+      });
+
+      final response = await apiClient.post(
+        AppUrls.documentUpload,
+        data: formData,
+        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      );
+
+      final json = response.data as Map<String, dynamic>;
+      if (json['success'] != true) {
+        throw ServerException(
+          (json['message'] as String?) ?? 'Failed to upload file',
+        );
+      }
+
+      return (json['message'] as String?) ?? 'File uploaded successfully.';
+    } catch (e) {
+      if (e is ServerException) {
+        rethrow;
+      }
+      throw ServerException('Failed to upload file: $e');
     }
   }
 
@@ -158,5 +248,24 @@ class DocumentRemoteDataSourceImpl implements DocumentRemoteDataSource {
       }
     }
     throw const ServerException('Unable to resolve user id');
+  }
+
+  int _resolveClientId() {
+    final token = TokenStorage.getToken();
+    if (token == null || token.isEmpty) {
+      throw const ServerException('User token missing');
+    }
+    final decoded = decodeData<Map<String, dynamic>>(token);
+    final clientId = decoded?['client_id'];
+    if (clientId is int) {
+      return clientId;
+    }
+    if (clientId is String) {
+      final parsed = int.tryParse(clientId);
+      if (parsed != null) {
+        return parsed;
+      }
+    }
+    throw const ServerException('Unable to resolve client id');
   }
 }

@@ -502,7 +502,8 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
     String? hint,
     required List<String> items,
     required Function(String?) onChanged,
-  }) {
+  })
+  {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
@@ -524,22 +525,24 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.border),
           ),
-          padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
+          padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02),
 
           child: DropdownButtonFormField<String>(
             value: value,
             isExpanded: true,
-            borderRadius: BorderRadius.circular(12),
+            menuMaxHeight: screenHeight * 0.35,
 
+            borderRadius: BorderRadius.circular(12),
             decoration: InputDecoration(
               hintText: hint,
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(
-                horizontal: screenWidth * 0.01,
+                horizontal: screenWidth * 0.04,
                 vertical: screenHeight * 0.018,
               ),
+
             ),
             items:
                 items.map((String item) {

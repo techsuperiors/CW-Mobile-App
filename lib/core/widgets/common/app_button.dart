@@ -13,6 +13,7 @@ class AppButton extends StatelessWidget {
   final double? width;
   final double? height;
   final Color? backgroundColor;
+  final Color? textColor;
 
   const AppButton({
     super.key,
@@ -25,6 +26,7 @@ class AppButton extends StatelessWidget {
     this.width,
     this.height,
     this.backgroundColor,
+    this.textColor,
   });
 
   @override
@@ -71,7 +73,7 @@ class AppButton extends StatelessWidget {
                   ],
                   Text(
                     label,
-                    style: AppTextStyles.buttonMedium(context),
+                    style: AppTextStyles.buttonMedium(context).copyWith(color: textColor??(isPrimary ? AppColors.textWhite : AppColors.textPrimary)),
                   ),
                 ],
               ),

@@ -29,7 +29,9 @@ class RegularizeRequestLoaded extends RegularizeRequestState {
   final String? searchQuery;
   final RegularizeStatus? statusFilter;
   final RequestAudienceScope selectedScope;
+  final bool isTeamRequestMode;
   final bool isLoadingMore;
+  final bool isRefreshing;
   final bool hasMore;
   final int currentPage;
   final int totalCount;
@@ -37,6 +39,7 @@ class RegularizeRequestLoaded extends RegularizeRequestState {
   final int approvedCount;
   final int rejectedCount;
   final int withdrawnCount;
+  final String? contentErrorMessage;
 
   const RegularizeRequestLoaded({
     required this.regularizeRequests,
@@ -44,7 +47,9 @@ class RegularizeRequestLoaded extends RegularizeRequestState {
     this.searchQuery,
     this.statusFilter,
     this.selectedScope = RequestAudienceScope.allUsers,
+    this.isTeamRequestMode = false,
     this.isLoadingMore = false,
+    this.isRefreshing = false,
     this.hasMore = false,
     this.currentPage = 1,
     this.totalCount = 0,
@@ -52,6 +57,7 @@ class RegularizeRequestLoaded extends RegularizeRequestState {
     this.approvedCount = 0,
     this.rejectedCount = 0,
     this.withdrawnCount = 0,
+    this.contentErrorMessage,
   });
 
   @override
@@ -61,7 +67,9 @@ class RegularizeRequestLoaded extends RegularizeRequestState {
         searchQuery ?? '',
         statusFilter ?? '',
         selectedScope,
+        isTeamRequestMode,
         isLoadingMore,
+        isRefreshing,
         hasMore,
         currentPage,
         totalCount,
@@ -69,6 +77,7 @@ class RegularizeRequestLoaded extends RegularizeRequestState {
         approvedCount,
         rejectedCount,
         withdrawnCount,
+        contentErrorMessage ?? '',
       ];
 
   RegularizeRequestLoaded copyWith({
@@ -77,7 +86,9 @@ class RegularizeRequestLoaded extends RegularizeRequestState {
     Object? searchQuery = _unset,
     Object? statusFilter = _unset,
     RequestAudienceScope? selectedScope,
+    bool? isTeamRequestMode,
     bool? isLoadingMore,
+    bool? isRefreshing,
     bool? hasMore,
     int? currentPage,
     int? totalCount,
@@ -85,6 +96,7 @@ class RegularizeRequestLoaded extends RegularizeRequestState {
     int? approvedCount,
     int? rejectedCount,
     int? withdrawnCount,
+    Object? contentErrorMessage = _unset,
   }) {
     return RegularizeRequestLoaded(
       regularizeRequests: regularizeRequests ?? this.regularizeRequests,
@@ -96,7 +108,9 @@ class RegularizeRequestLoaded extends RegularizeRequestState {
           ? this.statusFilter
           : statusFilter as RegularizeStatus?,
       selectedScope: selectedScope ?? this.selectedScope,
+      isTeamRequestMode: isTeamRequestMode ?? this.isTeamRequestMode,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
       hasMore: hasMore ?? this.hasMore,
       currentPage: currentPage ?? this.currentPage,
       totalCount: totalCount ?? this.totalCount,
@@ -104,6 +118,10 @@ class RegularizeRequestLoaded extends RegularizeRequestState {
       approvedCount: approvedCount ?? this.approvedCount,
       rejectedCount: rejectedCount ?? this.rejectedCount,
       withdrawnCount: withdrawnCount ?? this.withdrawnCount,
+      contentErrorMessage:
+          identical(contentErrorMessage, _unset)
+              ? this.contentErrorMessage
+              : contentErrorMessage as String?,
     );
   }
 }

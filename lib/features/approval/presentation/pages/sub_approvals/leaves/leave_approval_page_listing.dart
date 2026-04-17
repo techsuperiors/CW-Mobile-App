@@ -50,8 +50,10 @@ class _LeaveApprovalPageListingState extends State<LeaveApprovalPageListing>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
+  late final LeaveRequestBloc _leaveRequestBloc;
   static const int _pageSize = 5;
   RequestAudienceScope _selectedScope = RequestAudienceScope.allUsers;
+  late int _lastHandledTabIndex;
 
   static const List<StatusTabDefinition<LeaveStatus>> _tabs = [
     StatusTabDefinition(label: 'All', status: null),
@@ -63,13 +65,206 @@ class _LeaveApprovalPageListingState extends State<LeaveApprovalPageListing>
   @override
   void initState() {
     super.initState();
+    final networkInfo = NetworkInfoImpl(Connectivity());
+    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
+    final remoteDataSource = LeavesRemoteDataSourceImpl(apiClient: apiClient);
+    final repository = LeavesRepositoryImpl(
+      remoteDataSource: remoteDataSource,
+      networkInfo: networkInfo,
+    );
+    _leaveRequestBloc = LeaveRequestBloc(
+      getLeavesUseCase: GetLeavesUseCase(repository),
+      getTeamLeaveRequestsUseCase: GetTeamLeaveRequestsUseCase(repository),
+      applyLeaveUseCase: ApplyLeaveUseCase(repository),
+    );
     _tabController = TabController(length: _tabs.length, vsync: this);
+    _lastHandledTabIndex = _tabController.index;
+    _tabController.addListener(_handleTabChange);
+  }
+
+  LeaveStatus? get _selectedTabStatus => _tabs[_tabController.index].status;
+
+  Widget _buildLeaveTabContent(
+    BuildContext context, {
+    required int clientId,
+    required double screenHeight,
+    required LeaveRequestLoaded viewState,
+    required bool isCurrentTab,
+  }) {
+    if (isCurrentTab && viewState.isRefreshing) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (isCurrentTab && viewState.contentErrorMessage != null) {
+      return ApiErrorState(
+        rawMessage: viewState.contentErrorMessage!,
+        onRetry:
+            () => context.read<LeaveRequestBloc>().add(
+              LoadTeamLeaveRequests(
+                clientId: clientId,
+                scope: viewState.selectedScope,
+                status: viewState.statusFilter,
+                limit: _pageSize,
+                forceRefresh: true,
+              ),
+            ),
+      );
+    }
+
+    final visibleRequests = viewState.filteredLeaveRequests;
+
+    if (visibleRequests.isEmpty) {
+      return const RequestEmptyState();
+    }
+
+    final grouped = RequestGroupingUtils.groupByMonth(
+      items: visibleRequests,
+      dateSelector: (item) => item.appliedDate,
+    );
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (isCurrentTab &&
+            notification.metrics.pixels >=
+                notification.metrics.maxScrollExtent - 200 &&
+            viewState.hasMore &&
+            !viewState.isLoadingMore) {
+          context.read<LeaveRequestBloc>().add(
+            LoadMoreTeamLeaveRequests(
+              clientId: clientId,
+              limit: _pageSize,
+            ),
+          );
+        }
+        return false;
+      },
+      child: RefreshIndicator(
+        onRefresh:
+            () => _refreshTabData(
+              clientId: clientId,
+              scope: viewState.selectedScope,
+              status: viewState.statusFilter,
+            ),
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(vertical: screenHeight * 0.012),
+          itemCount: grouped.length + (viewState.isLoadingMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index >= grouped.length) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final entry = grouped[index];
+            if (entry is String) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  top: index == 0 ? 0 : screenHeight * 0.014,
+                  bottom: screenHeight * 0.010,
+                ),
+                child: Text(
+                  entry,
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              );
+            }
+
+            final req = entry as LeaveEntity;
+            return LeaveRequestCard(
+              leaveRequest: req,
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => LeaveDetailPage(
+                          leaveRequest: req,
+                          isApprovalMode: true,
+                        ),
+                  ),
+                );
+                if (result == true && context.mounted) {
+                  context.read<LeaveRequestBloc>().add(
+                    LoadTeamLeaveRequests(
+                      clientId: clientId,
+                      scope: viewState.selectedScope,
+                      status: viewState.statusFilter,
+                      limit: _pageSize,
+                      forceRefresh: true,
+                    ),
+                  );
+                }
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _refreshTabData({
+    required int clientId,
+    required RequestAudienceScope scope,
+    required LeaveStatus? status,
+  }) async {
+    _leaveRequestBloc.add(
+      LoadTeamLeaveRequests(
+        clientId: clientId,
+        scope: scope,
+        status: status,
+        limit: _pageSize,
+        forceRefresh: true,
+      ),
+    );
+
+    await _leaveRequestBloc.stream.firstWhere((state) {
+      if (state is LeaveRequestLoaded) {
+        return !state.isRefreshing &&
+            state.selectedScope == scope &&
+            state.statusFilter == status;
+      }
+
+      return state is LeaveRequestError;
+    });
+  }
+
+  void _handleTabChange() {
+    if (!mounted || _lastHandledTabIndex == _tabController.index) {
+      return;
+    }
+
+    _lastHandledTabIndex = _tabController.index;
+    setState(() {});
+
+    final currentState = _leaveRequestBloc.state;
+    final scope =
+        currentState is LeaveRequestLoaded
+            ? currentState.selectedScope
+            : _selectedScope;
+
+    _leaveRequestBloc.add(
+      LoadTeamLeaveRequests(
+        clientId: _resolveClientId(),
+        scope: scope,
+        status: _selectedTabStatus,
+        limit: _pageSize,
+      ),
+    );
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChange);
     _searchController.dispose();
     _tabController.dispose();
+    _leaveRequestBloc.close();
     super.dispose();
   }
 
@@ -93,6 +288,17 @@ class _LeaveApprovalPageListingState extends State<LeaveApprovalPageListing>
       context,
       anyOf: ModulePermissions.leaveApproval,
     );
+
+    if (_leaveRequestBloc.state is LeaveRequestInitial) {
+      _leaveRequestBloc.add(
+        LoadTeamLeaveRequests(
+          clientId: clientId,
+          scope: _selectedScope,
+          status: _selectedTabStatus,
+          limit: _pageSize,
+        ),
+      );
+    }
 
     if (!hasAccess) {
       return ResponsiveScaffold(
@@ -118,29 +324,8 @@ class _LeaveApprovalPageListingState extends State<LeaveApprovalPageListing>
       );
     }
 
-    return BlocProvider(
-      create: (_) {
-        final networkInfo = NetworkInfoImpl(Connectivity());
-        final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo);
-        final remoteDataSource = LeavesRemoteDataSourceImpl(
-          apiClient: apiClient,
-        );
-        final repository = LeavesRepositoryImpl(
-          remoteDataSource: remoteDataSource,
-          networkInfo: networkInfo,
-        );
-        return LeaveRequestBloc(
-          getLeavesUseCase: GetLeavesUseCase(repository),
-          getTeamLeaveRequestsUseCase: GetTeamLeaveRequestsUseCase(repository),
-          applyLeaveUseCase: ApplyLeaveUseCase(repository),
-        )..add(
-          LoadTeamLeaveRequests(
-            clientId: clientId,
-            scope: _selectedScope,
-            limit: _pageSize,
-          ),
-        );
-      },
+    return BlocProvider.value(
+      value: _leaveRequestBloc,
       child: ResponsiveScaffold(
         backgroundColor: AppColors.backgroundLight,
         appBar: AppBar(
@@ -214,7 +399,9 @@ class _LeaveApprovalPageListingState extends State<LeaveApprovalPageListing>
                                   LoadTeamLeaveRequests(
                                     clientId: clientId,
                                     scope: _selectedScope,
+                                    status: _selectedTabStatus,
                                     limit: _pageSize,
+                                    forceRefresh: true,
                                   ),
                                 ),
                           );
@@ -237,104 +424,46 @@ class _LeaveApprovalPageListingState extends State<LeaveApprovalPageListing>
                                 item.reason.toLowerCase().contains(query);
                           },
                           tabColorBuilder: RequestTabTheme.colorForIndex,
-                          countOverrides:
-                          {
+                          countOverrides: {
                             null: loaded.totalLeaveRequest,
                             LeaveStatus.pending: loaded.pendingListCount,
                             LeaveStatus.approved: loaded.approvedListCount,
                             LeaveStatus.rejected: loaded.rejectListCount,
                           },
-                          emptyBuilder: (context) => const RequestEmptyState(),
-                          listBuilder: (context, list) {
-                            final grouped = RequestGroupingUtils.groupByMonth(
-                              items: list,
-                              dateSelector: (item) => item.appliedDate,
-                            );
-                            return NotificationListener<ScrollNotification>(
-                              onNotification: (notification) {
-                                if (notification.metrics.pixels >=
-                                        notification.metrics.maxScrollExtent -
-                                            200 &&
-                                    loaded.hasMore &&
-                                    !loaded.isLoadingMore) {
-                                  context.read<LeaveRequestBloc>().add(
-                                    LoadMoreTeamLeaveRequests(
-                                      clientId: clientId,
-                                      limit: _pageSize,
-                                    ),
-                                  );
-                                }
-                                return false;
-                              },
-                              child: ListView.builder(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: screenHeight * 0.012,
-                                ),
-                                itemCount:
-                                    grouped.length +
-                                    (loaded.isLoadingMore ? 1 : 0),
-                                itemBuilder: (context, index) {
-                                  if (index >= grouped.length) {
-                                    return const Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 16,
-                                      ),
-                                      child: Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    );
-                                  }
-
-                                  final entry = grouped[index];
-                                  if (entry is String) {
-                                    return Padding(
-                                      padding: EdgeInsets.only(
-                                        top:
-                                            index == 0
-                                                ? 0
-                                                : screenHeight * 0.014,
-                                        bottom: screenHeight * 0.010,
-                                      ),
-                                      child: Text(
-                                        entry,
-                                        style: AppTextStyles.bodySmall(
-                                          context,
-                                        ).copyWith(
-                                          fontWeight: FontWeight.w500,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  final req = entry as LeaveEntity;
-                                  return LeaveRequestCard(
-                                    leaveRequest: req,
-                                    onTap: () async {
-                                      final result = await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) => LeaveDetailPage(
-                                                leaveRequest: req,
-                                                isApprovalMode: true,
-                                              ),
-                                        ),
-                                      );
-                                      if (result == true && context.mounted) {
-                                        context.read<LeaveRequestBloc>().add(
-                                          LoadTeamLeaveRequests(
-                                            clientId: clientId,
-                                            scope: loaded.selectedScope,
-                                            limit: _pageSize,
-                                          ),
+                          tabContentBuilder: (context, tab) {
+                            final rawTabState =
+                                tab.status == loaded.statusFilter
+                                    ? loaded
+                                    : _leaveRequestBloc
+                                        .getCachedTeamLeaveRequests(
+                                          scope: _selectedScope,
+                                          status: tab.status,
                                         );
-                                      }
-                                    },
-                                  );
-                                },
-                              ),
+
+                            if (rawTabState == null) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+
+                            final tabState =
+                                _leaveRequestBloc.buildTeamLeaveViewState(
+                                  baseState: rawTabState,
+                                  searchQuery: loaded.searchQuery,
+                                  typeFilter: loaded.typeFilter,
+                                );
+
+                            return _buildLeaveTabContent(
+                              context,
+                              clientId: clientId,
+                              screenHeight: screenHeight,
+                              viewState: tabState,
+                              isCurrentTab: tab.status == loaded.statusFilter,
                             );
                           },
+                          emptyBuilder: (context) => const RequestEmptyState(),
+                          listBuilder: (context, list) =>
+                              const SizedBox.shrink(),
                         );
                       },
                     ),
@@ -364,7 +493,7 @@ class _LeaveApprovalPageListingState extends State<LeaveApprovalPageListing>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -427,6 +556,7 @@ class _LeaveApprovalPageListingState extends State<LeaveApprovalPageListing>
               LoadTeamLeaveRequests(
                 clientId: clientId,
                 scope: scope,
+                status: _selectedTabStatus,
                 limit: _pageSize,
               ),
             );

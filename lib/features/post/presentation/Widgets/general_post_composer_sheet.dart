@@ -1,10 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/app_spacing.dart';
 import '../../domain/usecases/create_announcement_usecase.dart';
@@ -101,6 +102,16 @@ class _GeneralPostComposerSheetState extends State<GeneralPostComposerSheet> {
   bool _isPickingVideo = false;
   DateTime? _scheduledAt;
   final List<_SelectedComposerAttachment> _selectedAttachments = [];
+
+  List<_SelectedComposerAttachment> get _selectedImageAttachments =>
+      _selectedAttachments
+          .where((attachment) => attachment.type == _ComposerAttachmentType.image)
+          .toList(growable: false);
+
+  List<_SelectedComposerAttachment> get _selectedMetaAttachments =>
+      _selectedAttachments
+          .where((attachment) => attachment.type != _ComposerAttachmentType.image)
+          .toList(growable: false);
 
   @override
   void dispose() {
@@ -676,43 +687,77 @@ class _GeneralPostComposerSheetState extends State<GeneralPostComposerSheet> {
                               if (_scheduledAt != null ||
                                   _selectedAttachments.isNotEmpty) ...[
                                 AppSpacing.vMd,
-                                Wrap(
-                                  spacing: AppSpacing.sm,
-                                  runSpacing: AppSpacing.sm,
-                                  children: [
-                                    if (_scheduledAt != null)
-                                      _ComposerMetaChip(
-                                        icon: Icons.schedule_rounded,
-                                        label: DateFormat(
-                                          'dd MMM yyyy, hh:mm a',
-                                        ).format(_scheduledAt!),
-                                        onRemove:
-                                            isSubmitting
-                                                ? null
-                                                : () => setState(
-                                                  () => _scheduledAt = null,
+                                if (_selectedImageAttachments.isNotEmpty) ...[
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: Wrap(
+                                      spacing: AppSpacing.sm,
+                                      runSpacing: AppSpacing.sm,
+                                      children: _selectedImageAttachments
+                                          .map(
+                                            (attachment) =>
+                                                _ComposerImagePreviewTile(
+                                                  filePath: attachment.path,
+                                                  fileName: attachment.name,
+                                                  onRemove: isSubmitting
+                                                      ? null
+                                                      : () => setState(
+                                                            () => _selectedAttachments
+                                                                .removeWhere(
+                                                                  (item) =>
+                                                                      item.path ==
+                                                                      attachment
+                                                                          .path,
+                                                                ),
+                                                          ),
                                                 ),
-                                      ),
-                                    ..._selectedAttachments.map(
-                                      (attachment) => _ComposerMetaChip(
-                                        icon: attachment.type.icon,
-                                        label:
-                                            '${attachment.type.label}: ${attachment.name}',
-                                        onRemove:
-                                            isSubmitting
-                                                ? null
-                                                : () => setState(
-                                                  () => _selectedAttachments
-                                                      .removeWhere(
-                                                        (item) =>
-                                                            item.path ==
-                                                            attachment.path,
-                                                      ),
-                                                ),
-                                      ),
+                                          )
+                                          .toList(growable: false),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  if (_scheduledAt != null ||
+                                      _selectedMetaAttachments.isNotEmpty)
+                                    AppSpacing.vMd,
+                                ],
+                                if (_scheduledAt != null ||
+                                    _selectedMetaAttachments.isNotEmpty)
+                                  Wrap(
+                                    spacing: AppSpacing.sm,
+                                    runSpacing: AppSpacing.sm,
+                                    children: [
+                                      if (_scheduledAt != null)
+                                        _ComposerMetaChip(
+                                          icon: Icons.schedule_rounded,
+                                          label: DateFormat(
+                                            'dd MMM yyyy, hh:mm a',
+                                          ).format(_scheduledAt!),
+                                          onRemove:
+                                              isSubmitting
+                                                  ? null
+                                                  : () => setState(
+                                                        () => _scheduledAt = null,
+                                                      ),
+                                        ),
+                                      ..._selectedMetaAttachments.map(
+                                        (attachment) => _ComposerMetaChip(
+                                          icon: attachment.type.icon,
+                                          label:
+                                              '${attachment.type.label}: ${attachment.name}',
+                                          onRemove:
+                                              isSubmitting
+                                                  ? null
+                                                  : () => setState(
+                                                        () => _selectedAttachments
+                                                            .removeWhere(
+                                                              (item) =>
+                                                                  item.path ==
+                                                                  attachment.path,
+                                                            ),
+                                                      ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                               ],
                               AppSpacing.vLg,
                               const Divider(color: AppColors.border),
@@ -915,6 +960,89 @@ class _ComposerMetaChip extends StatelessWidget {
               size: AppSpacing.lg,
               color: AppColors.textSecondary,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ComposerImagePreviewTile extends StatelessWidget {
+  static const double _previewSize = AppSpacing.sectionLarge + AppSpacing.xl;
+
+  final String filePath;
+  final String fileName;
+  final VoidCallback? onRemove;
+
+  const _ComposerImagePreviewTile({
+    required this.filePath,
+    required this.fileName,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _previewSize,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            children: [
+              Container(
+                width: _previewSize,
+                height: _previewSize,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppSpacing.md),
+                  border: Border.all(color: AppColors.border),
+                  color: AppColors.backgroundMediumLight,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Image.file(
+                  File(filePath),
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Center(
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: AppColors.textSecondary,
+                        size: AppSpacing.xxl,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Positioned(
+                top: AppSpacing.xs,
+                right: AppSpacing.xs,
+                child: Material(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    onTap: onRemove,
+                    customBorder: const CircleBorder(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(AppSpacing.xs),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: AppSpacing.lg,
+                        color: AppColors.textWhite,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.vXs,
+          Text(
+            fileName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.bodySmall(
+              context,
+            ).copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),

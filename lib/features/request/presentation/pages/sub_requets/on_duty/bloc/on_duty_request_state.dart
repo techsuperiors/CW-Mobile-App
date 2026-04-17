@@ -28,7 +28,9 @@ class OnDutyRequestLoaded extends OnDutyRequestState {
   final List<OnDutyRequestModel> filteredOnDutyRequests;
   final String? searchQuery;
   final OnDutyStatus? statusFilter;
+  final bool isTeamRequestMode;
   final bool isLoadingMore;
+  final bool isRefreshing;
   final bool hasMore;
   final int currentPage;
   final int totalCount;
@@ -37,13 +39,16 @@ class OnDutyRequestLoaded extends OnDutyRequestState {
   final int rejectedCount;
   final int withdrawnCount;
   final RequestAudienceScope selectedScope;
+  final String? contentErrorMessage;
 
   const OnDutyRequestLoaded({
     required this.onDutyRequests,
     required this.filteredOnDutyRequests,
     this.searchQuery,
     this.statusFilter,
+    this.isTeamRequestMode = false,
     this.isLoadingMore = false,
+    this.isRefreshing = false,
     this.hasMore = false,
     this.currentPage = 1,
     this.totalCount = 0,
@@ -52,6 +57,7 @@ class OnDutyRequestLoaded extends OnDutyRequestState {
     this.rejectedCount = 0,
     this.withdrawnCount = 0,
     this.selectedScope = RequestAudienceScope.allUsers,
+    this.contentErrorMessage,
   });
 
   @override
@@ -60,7 +66,9 @@ class OnDutyRequestLoaded extends OnDutyRequestState {
     filteredOnDutyRequests,
     searchQuery ?? '',
     statusFilter ?? '',
+    isTeamRequestMode,
     isLoadingMore,
+    isRefreshing,
     hasMore,
     currentPage,
     totalCount,
@@ -69,6 +77,7 @@ class OnDutyRequestLoaded extends OnDutyRequestState {
     rejectedCount,
     withdrawnCount,
     selectedScope,
+    contentErrorMessage ?? '',
   ];
 
   OnDutyRequestLoaded copyWith({
@@ -76,7 +85,9 @@ class OnDutyRequestLoaded extends OnDutyRequestState {
     List<OnDutyRequestModel>? filteredOnDutyRequests,
     Object? searchQuery = _unset,
     Object? statusFilter = _unset,
+    bool? isTeamRequestMode,
     bool? isLoadingMore,
+    bool? isRefreshing,
     bool? hasMore,
     int? currentPage,
     int? totalCount,
@@ -85,6 +96,7 @@ class OnDutyRequestLoaded extends OnDutyRequestState {
     int? rejectedCount,
     int? withdrawnCount,
     RequestAudienceScope? selectedScope,
+    Object? contentErrorMessage = _unset,
   }) {
     return OnDutyRequestLoaded(
       onDutyRequests: onDutyRequests ?? this.onDutyRequests,
@@ -96,7 +108,9 @@ class OnDutyRequestLoaded extends OnDutyRequestState {
       identical(statusFilter, _unset)
           ? this.statusFilter
           : statusFilter as OnDutyStatus?,
+      isTeamRequestMode: isTeamRequestMode ?? this.isTeamRequestMode,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
       hasMore: hasMore ?? this.hasMore,
       currentPage: currentPage ?? this.currentPage,
       totalCount: totalCount ?? this.totalCount,
@@ -105,6 +119,10 @@ class OnDutyRequestLoaded extends OnDutyRequestState {
       rejectedCount: rejectedCount ?? this.rejectedCount,
       withdrawnCount: withdrawnCount ?? this.withdrawnCount,
       selectedScope: selectedScope ?? this.selectedScope,
+      contentErrorMessage:
+          identical(contentErrorMessage, _unset)
+              ? this.contentErrorMessage
+              : contentErrorMessage as String?,
     );
   }
 }

@@ -11,12 +11,12 @@ class SubmitAgreementConsentUseCase {
   Future<Either<Failure, AgreementConsentResult>> call(
     int agreementId,
     bool agreementAcknowledged,
-    String signatureFilePath,
+    String signedPdfFilePath,
   ) {
     return repository.submitAgreementConsent(
       agreementId,
       agreementAcknowledged,
-      signatureFilePath,
+      signedPdfFilePath,
     );
   }
 }

@@ -190,8 +190,8 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                   // Separate LOP from other leave types
                   final lopLeaves =
                       leaveTypes.where((lt) {
-                        final name = (lt.leaveType ?? "").trim().toUpperCase();
-                        final code = (lt.leaveCode ?? "").trim().toUpperCase();
+                        final name = lt.leaveType.trim().toUpperCase();
+                        final code = lt.leaveCode.trim().toUpperCase();
                         return name == "LOP" || code == "LOP";
                       }).toList();
 
@@ -215,6 +215,7 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                             children: [
                               LeaveTypeCard(
                                 title: leaveType.leaveType,
+                                shortForm: leaveType.leaveCode,
                                 totalLeaves:
                                     (leaveType.remainingLeaves ??
                                             leaveType.count)
@@ -247,6 +248,7 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                         if (lopLeaves.isNotEmpty)
                           LeaveTypeCard(
                             title: 'Loss of Pay (LOP)',
+                            shortForm: null,
                             totalLeaves:
                                 (lopLeaves.first.currentMonthLop ??
                                         lopLeaves.first.totalLeaves ??

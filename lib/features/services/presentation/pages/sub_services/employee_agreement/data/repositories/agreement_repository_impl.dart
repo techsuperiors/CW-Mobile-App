@@ -82,7 +82,7 @@ class AgreementRepositoryImpl implements AgreementRepository {
   Future<Either<Failure, AgreementConsentResult>> submitAgreementConsent(
     int agreementId,
     bool agreementAcknowledged,
-    String signatureFilePath,
+    String signedPdfFilePath,
   ) async {
     if (await networkInfo.isConnected) {
       try {
@@ -93,7 +93,7 @@ class AgreementRepositoryImpl implements AgreementRepository {
 
         final response = await remoteDataSource.submitAgreementConsent(
           request,
-          signatureFilePath,
+          signedPdfFilePath,
         );
 
         return Right(

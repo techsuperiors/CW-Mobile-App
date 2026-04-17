@@ -16,9 +16,19 @@ class OnDutyRepositoryImpl implements OnDutyRepository {
   OnDutyRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<Either<Failure, List<OnDutyRequestModel>>> getOnDutyRequests() async {
+  Future<Either<Failure, List<OnDutyRequestModel>>> getOnDutyRequests({
+    required int clientId,
+    int page = 1,
+    int limit = 5,
+    OnDutyStatus? status,
+  }) async {
     try {
-      final requests = await remoteDataSource.getOnDutyRequests();
+      final requests = await remoteDataSource.getOnDutyRequests(
+        clientId: clientId,
+        page: page,
+        limit: limit,
+        status: status,
+      );
       return Right(requests);
     } on AppException catch (e) {
       return Left(ErrorHandler.handleException(e));
@@ -33,6 +43,7 @@ class OnDutyRepositoryImpl implements OnDutyRepository {
     int page = 1,
     int limit = 50,
     String requestType = 'All',
+    OnDutyStatus? status,
   }) async {
     try {
       final requests = await remoteDataSource.getTeamOnDutyRequests(
@@ -40,6 +51,7 @@ class OnDutyRepositoryImpl implements OnDutyRepository {
         page: page,
         limit: limit,
         requestType: requestType,
+        status: status,
       );
       return Right(requests);
     } on AppException catch (e) {

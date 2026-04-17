@@ -419,7 +419,10 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
           _fieldRow(
             context,
             'Duration',
-            detail?.duration ?? widget.request.duration,
+            _formatDurationDisplay(
+              type: detail?.type ?? widget.request.type,
+              duration: detail?.duration ?? widget.request.duration,
+            ),
           ),
           _divider(),
           _approversRow(
@@ -558,16 +561,60 @@ class _CompOffDetailPageState extends State<CompOffDetailPage> {
               context,
             ).copyWith(fontWeight: FontWeight.w500),
           ),
-          Text(
-            value,
-            style: AppTextStyles.bodySmall(context).copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w400,
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: AppTextStyles.bodySmall(context).copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w400,
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _formatDurationDisplay({
+    required String type,
+    required String duration,
+  }) {
+    final normalizedType = type.trim().toLowerCase();
+    final normalizedDuration = duration.trim();
+
+    if (normalizedDuration.isEmpty) {
+      return '—';
+    }
+
+    if (normalizedType == 'day' || normalizedType == 'days') {
+      final legacyDayValue =
+          normalizedDuration.toLowerCase().replaceAll(RegExp(r'[\s_\-]'), '');
+      if (legacyDayValue == 'fullday') {
+        return '1 Day';
+      }
+      return _appendUnit(normalizedDuration, 'Day');
+    }
+
+    if (normalizedType == 'hours' || normalizedType == 'hour') {
+      return _appendUnit(normalizedDuration, 'Hour');
+    }
+
+    return normalizedDuration;
+  }
+
+  String _appendUnit(String rawValue, String singularUnit) {
+    final numericValue = double.tryParse(rawValue);
+    if (numericValue == null) {
+      return rawValue;
+    }
+
+    final displayValue =
+        numericValue % 1 == 0
+            ? numericValue.toInt().toString()
+            : numericValue.toString();
+    final unit = numericValue == 1 ? singularUnit : '${singularUnit}s';
+    return '$displayValue $unit';
   }
 
   Widget _approversRow(

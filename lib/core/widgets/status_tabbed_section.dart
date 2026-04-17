@@ -23,6 +23,15 @@ class StatusTabbedSection<TStatus, TItem> extends StatelessWidget {
   final Widget Function(BuildContext context)? emptyBuilder;
   final EdgeInsetsGeometry? margin;
   final Map<TStatus?, int>? countOverrides;
+  final ValueChanged<int>? onTabTap;
+  final ScrollPhysics? tabBarViewPhysics;
+  final Widget? contentOverride;
+  final Widget Function(BuildContext context)? sharedTabContentBuilder;
+  final Widget Function(
+    BuildContext context,
+    StatusTabDefinition<TStatus> tab,
+  )?
+  tabContentBuilder;
 
   const StatusTabbedSection({
     super.key,
@@ -37,6 +46,11 @@ class StatusTabbedSection<TStatus, TItem> extends StatelessWidget {
     this.emptyBuilder,
     this.margin,
     this.countOverrides,
+    this.onTabTap,
+    this.tabBarViewPhysics,
+    this.contentOverride,
+    this.sharedTabContentBuilder,
+    this.tabContentBuilder,
   });
 
   Color _getAnimatedColor() {
@@ -118,6 +132,7 @@ class StatusTabbedSection<TStatus, TItem> extends StatelessWidget {
                 unselectedLabelStyle: AppTextStyles.bodySmall(
                   context,
                 ).copyWith(fontWeight: FontWeight.w400),
+                onTap: onTabTap,
                 tabs: List.generate(tabs.length, (index) {
                   final count = counts[tabs[index].status] ?? 0;
                   final isSelected = (animationValue - index).abs() < 0.5;
@@ -143,24 +158,43 @@ class StatusTabbedSection<TStatus, TItem> extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: TabBarView(
-            controller: controller,
-            children: tabs.map((tab) {
-              final filteredItems = items.where((item) {
-                final searchMatches = matchesSearch(item, searchQuery);
-                final tabMatches =
-                    tab.status == null || statusSelector(item) == tab.status;
-                return searchMatches && tabMatches;
-              }).toList();
+          child:
+              contentOverride ??
+              TabBarView(
+                controller: controller,
+                physics: tabBarViewPhysics,
+                children:
+                    sharedTabContentBuilder != null
+                        ? List.generate(
+                          tabs.length,
+                          (_) => sharedTabContentBuilder!(context),
+                        )
+                        : tabContentBuilder != null
+                        ? tabs
+                            .map(
+                              (tab) => tabContentBuilder!(
+                                context,
+                                tab,
+                              ),
+                            )
+                            .toList()
+                        : tabs.map((tab) {
+                          final filteredItems = items.where((item) {
+                            final searchMatches = matchesSearch(item, searchQuery);
+                            final tabMatches =
+                                tab.status == null ||
+                                statusSelector(item) == tab.status;
+                            return searchMatches && tabMatches;
+                          }).toList();
 
-              if (filteredItems.isEmpty) {
-                return emptyBuilder?.call(context) ??
-                    const SizedBox.shrink();
-              }
+                          if (filteredItems.isEmpty) {
+                            return emptyBuilder?.call(context) ??
+                                const SizedBox.shrink();
+                          }
 
-              return listBuilder(context, filteredItems);
-            }).toList(),
-          ),
+                          return listBuilder(context, filteredItems);
+                        }).toList(),
+              ),
         ),
       ],
     );

@@ -1,3 +1,4 @@
+import 'package:collectivWork/core/utils/app_spacing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/credentials_storage.dart';
@@ -206,7 +207,16 @@ class _LoginPageState extends State<LoginPage> {
                       Container(
                         height: headerHeight,
                         decoration: BoxDecoration(
-                          color: AppColors.loginHeaderTeal,
+                          gradient: const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              AppColors.attendanceTeal, // 0xFF0B7F7F
+                              Color(0xFF073F3F), // mid blend
+                              AppColors.attendancedarkbottom, // 0xFF031e1e
+                            ],
+                            stops: [0.0, 0.85, 1.0],
+                          ),
                           borderRadius: const BorderRadius.only(
                             bottomLeft: Radius.circular(30),
                             bottomRight: Radius.circular(30),
@@ -311,20 +321,25 @@ class _LoginPageState extends State<LoginPage> {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Checkbox(
-                                          value: _rememberMe,
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _rememberMe = value ?? false;
-                                            });
-                                          },
-                                          activeColor:
-                                              AppColors.loginHeaderTeal,
+                                        SizedBox(
+                                          height: AppSpacing.iconSmallHeight,
+                                          width:  AppSpacing.iconSmallHeight,
+                                          child: Checkbox(
+                                            value: _rememberMe,
+                                            onChanged: (value) {
+                                              setState(() {
+                                                _rememberMe = value ?? false;
+                                              });
+                                            },
+                                            activeColor:
+                                                AppColors.loginHeaderTeal,
+                                          ),
                                         ),
+                                        AppSpacing.hXs,
                                         Flexible(
                                           child: Text(
                                             AppStrings.rememberMe,
-                                            style: AppTextStyles.bodyMedium(
+                                            style: AppTextStyles.bodyMediumHeading(
                                               context,
                                             ),
                                             overflow: TextOverflow.ellipsis,
@@ -334,6 +349,7 @@ class _LoginPageState extends State<LoginPage> {
                                     ),
                                   ),
                                   // Forgot password link
+
                                   Flexible(
                                     child: TextButton(
                                       onPressed: () {
@@ -364,7 +380,7 @@ class _LoginPageState extends State<LoginPage> {
                                       ),
                                       child: Text(
                                         AppStrings.forgotPassword,
-                                        style: AppTextStyles.bodyMedium(
+                                        style: AppTextStyles.bodyMediumHeading(
                                           context,
                                         ).copyWith(
                                           color: AppColors.loginHeaderTeal,
@@ -412,7 +428,7 @@ class _LoginPageState extends State<LoginPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppTextField(
-          label: AppStrings.emailOrMobile,
+          label: AppStrings.registeredemail,
           controller: _usernameController,
           hint: AppStrings.enterEmailOrMobile,
           keyboardType: TextInputType.text,

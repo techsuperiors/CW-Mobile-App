@@ -1,4 +1,3 @@
-import 'package:collectivWork/core/constants/app_assets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -13,10 +12,37 @@ class LeaveHistoryPage extends StatelessWidget {
 
   const LeaveHistoryPage({super.key, required this.leaveType});
 
+  bool get _isLopHistory {
+    final normalizedLeaveType = leaveType.trim().toLowerCase();
+    return normalizedLeaveType == 'lop' ||
+        normalizedLeaveType.contains('loss of pay');
+  }
+
+  bool _isPositiveChange(dynamic record) {
+    final normalizedAction = record.action.trim().toLowerCase();
+    if (!_isLopHistory) {
+      return normalizedAction == 'addition';
+    }
+
+    final normalizedRemarks = record.remarks.trim().toLowerCase();
+    if (normalizedRemarks.contains('penalty applied')) {
+      return false;
+    }
+    if (normalizedRemarks.contains('penalty restored')) {
+      return true;
+    }
+
+    return normalizedAction == 'addition';
+  }
+
+  String _changeLabel(dynamic record, bool isPositive) {
+    final amount = record.leaveCount.abs();
+    return isPositive ? '+ $amount' : '- $amount';
+  }
+
   @override
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
-    final sh = MediaQuery.of(context).size.height;
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.background,
@@ -85,79 +111,88 @@ class LeaveHistoryPage extends StatelessWidget {
                       ),
                     );
                   }
-                  return SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minWidth: MediaQuery.of(context).size.width,
-                      ),
-                      child: DataTable(
-                        headingRowColor: WidgetStateProperty.all(
-                          AppColors.borderLight.withOpacity(0.3),
-                        ),
-                        headingTextStyle: AppTextStyles.bodyMedium(
-                          context,
-                        ).copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        dataTextStyle: AppTextStyles.bodyMedium(context),
-                        columns: const [
-                          DataColumn(label: Text('Date')),
-                          DataColumn(label: Text('Leave Date')),
-                          DataColumn(label: Text('Change')),
-                          DataColumn(label: Text('Available')),
-                          DataColumn(label: Text('Details')),
-                        ],
-                        rows:
-                            history.map((record) {
-                              final dateFormat = DateFormat('dd-MMM-yyyy');
-                              final dateStr = dateFormat.format(record.date);
-                              // Determine if this is a positive (addition) or negative (deduction/subtraction)
-                              final isPositive =
-                                  record.action.toLowerCase() == 'addition';
+                  return Scrollbar(
+                    thumbVisibility: history.length > 6,
+                    child: SingleChildScrollView(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minWidth: MediaQuery.of(context).size.width,
+                          ),
+                          child: DataTable(
+                            headingRowColor: WidgetStateProperty.all(
+                              AppColors.borderLight.withValues(alpha: 0.3),
+                            ),
+                            headingTextStyle: AppTextStyles.bodyMedium(
+                              context,
+                            ).copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            dataTextStyle: AppTextStyles.bodyMedium(context),
+                            columns: [
+                              const DataColumn(label: Text('Date')),
+                              if (!_isLopHistory)
+                                const DataColumn(label: Text('Leave Date')),
+                              const DataColumn(label: Text('Change')),
+                              const DataColumn(label: Text('Available')),
+                              const DataColumn(label: Text('Details')),
+                            ],
+                            rows:
+                                history.map((record) {
+                                  final dateFormat = DateFormat('dd-MMM-yyyy');
+                                  final dateStr = dateFormat.format(record.date);
+                                  final isPositive = _isPositiveChange(record);
+                                  final changeLabel = _changeLabel(
+                                    record,
+                                    isPositive,
+                                  );
+                                  final changeColor =
+                                      isPositive
+                                          ? Colors.green
+                                          : AppColors.error;
 
-                              final changeLabel =
-                                  isPositive
-                                      ? '+ ${record.leaveCount}'
-                                      : '- ${record.leaveCount.abs()}';
-
-                              final changeColor =
-                                  isPositive ? Colors.green : AppColors.error;
-
-                              return DataRow(
-                                cells: [
-                                  DataCell(Center(child: Text(dateStr))),
-                                  DataCell(Center(child: const Text('-'))),
-                                  // API doesn't provide explicit Leave Date out of box natively yet
-                                  DataCell(
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: changeColor.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        changeLabel,
-                                        style: TextStyle(
-                                          color: changeColor,
-                                          fontWeight: FontWeight.w600,
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(Center(child: Text(dateStr))),
+                                      if (!_isLopHistory)
+                                        DataCell(Center(child: const Text('-'))),
+                                      DataCell(
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: changeColor.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            changeLabel,
+                                            style: TextStyle(
+                                              color: changeColor,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Text(
-                                      record.remainingLeaves.toStringAsFixed(2),
-                                    ),
-                                  ),
-                                  DataCell(Text(record.remarks)),
-                                ],
-                              );
-                            }).toList(),
+                                      DataCell(
+                                        Text(
+                                          record.remainingLeaves
+                                              .toStringAsFixed(2),
+                                        ),
+                                      ),
+                                      DataCell(Text(record.remarks)),
+                                    ],
+                                  );
+                                }).toList(),
+                          ),
+                        ),
                       ),
                     ),
                   );

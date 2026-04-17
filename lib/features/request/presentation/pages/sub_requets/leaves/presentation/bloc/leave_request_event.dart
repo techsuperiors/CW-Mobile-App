@@ -18,18 +18,29 @@ class LoadLeaveRequests extends LeaveRequestEvent {
 class LoadTeamLeaveRequests extends LeaveRequestEvent {
   final int clientId;
   final RequestAudienceScope scope;
+  final LeaveStatus? status;
   final int page;
   final int limit;
+  final bool forceRefresh;
 
   const LoadTeamLeaveRequests({
     required this.clientId,
     this.scope = RequestAudienceScope.allUsers,
+    this.status,
     this.page = 1,
     this.limit = 50,
+    this.forceRefresh = false,
   });
 
   @override
-  List<Object> get props => [clientId, scope, page, limit];
+  List<Object> get props => [
+    clientId,
+    scope,
+    status ?? '',
+    page,
+    limit,
+    forceRefresh,
+  ];
 }
 
 class LoadMoreTeamLeaveRequests extends LeaveRequestEvent {

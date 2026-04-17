@@ -6,14 +6,18 @@ import '../../models/overtime_request_model.dart';
 import '../repositories/overtime_repository.dart';
 
 class GetTeamOvertimeRequestsParams {
+  final int clientId;
   final int page;
   final int limit;
   final RequestAudienceScope scope;
+  final OvertimeStatus? status;
 
   const GetTeamOvertimeRequestsParams({
+    required this.clientId,
     this.page = 1,
     this.limit = 20,
     this.scope = RequestAudienceScope.allUsers,
+    this.status,
   });
 }
 
@@ -26,9 +30,11 @@ class GetTeamOvertimeRequestsUseCase {
     GetTeamOvertimeRequestsParams params,
   ) {
     return repository.getTeamOvertimeRequests(
+      clientId: params.clientId,
       page: params.page,
       limit: params.limit,
       requestType: params.scope.attendanceRequestType,
+      status: params.status,
     );
   }
 }

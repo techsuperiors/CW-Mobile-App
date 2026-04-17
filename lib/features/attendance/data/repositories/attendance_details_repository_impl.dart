@@ -44,10 +44,21 @@ class AttendanceDetailsRepositoryImpl implements AttendanceDetailsRepository {
   }) async {
     if (await networkInfo.isConnected) {
       try {
-        final model = await remoteDataSource.getAttendanceDayDetail(
+        var model = await remoteDataSource.getAttendanceDayDetail(
           userId: userId,
           date: date,
         );
+        try {
+          final activityLogs = await remoteDataSource.getAttendanceActivity(
+            userId: userId,
+            date: date,
+          );
+          if (activityLogs.isNotEmpty) {
+            model = model.copyWith(dayLogs: activityLogs);
+          }
+        } on ServerException {
+          // Fall back to attendance user detail logs if the activity API fails.
+        }
         return Right(_mapDayDetailModelToEntity(model));
       } on ServerException catch (e) {
         return Left(ServerFailure(e.message));

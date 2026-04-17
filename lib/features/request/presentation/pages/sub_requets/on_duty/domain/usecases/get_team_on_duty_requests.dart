@@ -10,12 +10,14 @@ class GetTeamOnDutyRequestsParams {
   final int page;
   final int limit;
   final RequestAudienceScope scope;
+  final OnDutyStatus? status;
 
   const GetTeamOnDutyRequestsParams({
     required this.clientId,
     this.page = 1,
     this.limit = 50,
     this.scope = RequestAudienceScope.allUsers,
+    this.status,
   });
 }
 
@@ -32,6 +34,7 @@ class GetTeamOnDutyRequestsUseCase {
       page: params.page,
       limit: params.limit,
       requestType: params.scope.attendanceRequestType,
+      status: params.status,
     );
   }
 }

@@ -49,7 +49,7 @@ class RegularizeRequestCard extends StatelessWidget {
             children: [
               // Colored left border
               Container(
-                width: screenWidth * 0.032, // 3.2% of screen width
+                width: screenWidth * 0.018,
                 decoration: BoxDecoration(
                   color: statusColor,
                   // Use status color (blue for pending, green for approved, red for rejected)

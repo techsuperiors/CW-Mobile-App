@@ -7,8 +7,10 @@ import '../../models/wfh_requests_page_model.dart';
 
 abstract class WfhRepository {
   Future<Either<Failure, WfhRequestsPageModel>> getWfhRequests({
+    required int clientId,
     int page = 1,
     int limit = 5,
+    WfhStatus? status,
   });
   Future<Either<Failure, WfhRequestStatsModel>> getWfhRequestStats({
     required int clientId,
@@ -16,9 +18,11 @@ abstract class WfhRepository {
   });
 
   Future<Either<Failure, List<WfhRequestModel>>> getTeamWfhRequests({
+    required int clientId,
     int page = 1,
     int limit = 50,
     RequestAudienceScope scope = RequestAudienceScope.allUsers,
+    WfhStatus? status,
   });
 
   Future<Either<Failure, void>> updateWfhStatus({

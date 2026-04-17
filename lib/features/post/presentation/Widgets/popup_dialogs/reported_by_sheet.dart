@@ -5,8 +5,7 @@ import '../../../../../core/constants/app_text_styles.dart';
 import '../../../../../core/utils/app_spacing.dart';
 import '../../../domain/entities/announcement_entity.dart';
 
-Future<void> showReportedBySheet(
-  BuildContext context, {
+Future<void> showReportedBySheet(BuildContext context, {
   required List<ReportedByEntity> reporters,
 }) {
   return showModalBottomSheet<void>(
@@ -37,9 +36,7 @@ class ReportedBySheet extends StatelessWidget {
               top: Radius.circular(AppSpacing.xl),
             ),
           ),
-          padding: EdgeInsets.symmetric(
-            vertical: AppSpacing.md,
-          ),
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
           child: Column(
             children: [
               AppSpacing.vSm,
@@ -71,33 +68,14 @@ class ReportedBySheet extends StatelessWidget {
                       )
                     else
                       ...reporters.map(
-                        (reporter) => Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-                          child: _ReportedByTile(reporter: reporter),
-                        ),
+                            (reporter) =>
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                  bottom: AppSpacing.sm),
+                              child: _ReportedByTile(reporter: reporter),
+                            ),
                       ),
-                    AppSpacing.vMd,
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.xl,
-                            vertical: AppSpacing.md,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppSpacing.md),
-                          ),
-                        ),
-                        child: Text(
-                          'Cancel',
-                          style: AppTextStyles.buttonMedium(
-                            context,
-                          ).copyWith(color: AppColors.textPrimary),
-                        ),
-                      ),
-                    ),
+                    AppSpacing.vMd
                   ],
                 ),
               ),
@@ -117,11 +95,11 @@ class _ReportedByHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subtitle =
-        count <= 0
-            ? 'This post has not been reported yet.'
-            : count == 1
-            ? 'This post has been reported by 1 employee for following reason'
-            : 'This post has been reported by $count employees for following reasons';
+    count <= 0
+        ? 'This post has not been reported yet.'
+        : count == 1
+        ? 'This post has been reported by 1 employee for following reason'
+        : 'This post has been reported by $count employees for following reasons';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,17 +155,20 @@ class _ReportedByTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name =
-        reporter.fullName.trim().isEmpty
-            ? 'Unknown User'
-            : reporter.fullName.trim();
+    reporter.fullName
+        .trim()
+        .isEmpty
+        ? 'Unknown User'
+        : reporter.fullName.trim();
 
     return Container(
       padding: EdgeInsets.symmetric(
         vertical: AppSpacing.md,
-        horizontal: AppSpacing.sm,
+        horizontal: AppSpacing.md,
       ),
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.border),
+        color: AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(15),
       ),
       child: Row(
@@ -211,14 +192,14 @@ class _ReportedByTile extends StatelessWidget {
                         children: [
                           Text(
                             name,
-                            style: AppTextStyles.heading4(
+                            style: AppTextStyles.bodyMedium(
                               context,
-                            ).copyWith(fontWeight: FontWeight.w700),
+                            ).copyWith(fontWeight: FontWeight.w600),
                           ),
                           if ((reporter.designation ?? '')
                               .trim()
                               .isNotEmpty) ...[
-                            AppSpacing.vXs,
+                            AppSpacing.vXxs,
                             Text(
                               reporter.designation!.trim(),
                               style: AppTextStyles.bodySmall(
@@ -232,20 +213,23 @@ class _ReportedByTile extends StatelessWidget {
                     AppSpacing.hMd,
                     Text(
                       _formatRelativeTime(reporter.reportedAt),
-                      style: AppTextStyles.bodyMedium(
-                        context,
-                      ).copyWith(color: AppColors.textSecondary),
+                      style: AppTextStyles.bodySmall(context).copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w400,
+                      ),
                     ),
                   ],
                 ),
-                AppSpacing.vMd,
+                AppSpacing.vSm,
                 Text(
-                  reporter.reason.trim().isEmpty
+                  reporter.reason
+                      .trim()
+                      .isEmpty
                       ? 'No reason provided'
                       : reporter.reason.trim(),
-                  style: AppTextStyles.bodyMedium(
+                  style: AppTextStyles.bodyMediumHeading(
                     context,
-                  ).copyWith(color: AppColors.textPrimary, height: 1.45),
+                  ).copyWith(color: AppColors.textPrimary, height: 1.2),
                 ),
               ],
             ),
@@ -256,7 +240,9 @@ class _ReportedByTile extends StatelessWidget {
   }
 
   String _formatRelativeTime(String? rawDate) {
-    if (rawDate == null || rawDate.trim().isEmpty) {
+    if (rawDate == null || rawDate
+        .trim()
+        .isEmpty) {
       return '';
     }
 
@@ -292,7 +278,7 @@ class _ReportedByAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CircleAvatar(
-      radius: 28,
+      radius: 20,
       backgroundColor: _parseColor(profileColor),
       child: Text(
         _initials(fullName),
@@ -315,7 +301,9 @@ class _ReportedByAvatar extends StatelessWidget {
   }
 
   Color _parseColor(String? value) {
-    if (value == null || value.trim().isEmpty) {
+    if (value == null || value
+        .trim()
+        .isEmpty) {
       return AppColors.info;
     }
 

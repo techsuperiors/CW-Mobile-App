@@ -17,13 +17,17 @@ class OvertimeRepositoryImpl implements OvertimeRepository {
 
   @override
   Future<Either<Failure, List<OvertimeRequestModel>>> getOvertimeRequests({
+    required int clientId,
     int page = 1,
-    int limit = 20,
+    int limit = 5,
+    OvertimeStatus? status,
   }) async {
     try {
       final requests = await remoteDataSource.getOvertimeRequests(
+        clientId: clientId,
         page: page,
         limit: limit,
+        status: status,
       );
       return Right(requests);
     } on AppException catch (e) {
@@ -35,15 +39,19 @@ class OvertimeRepositoryImpl implements OvertimeRepository {
 
   @override
   Future<Either<Failure, List<OvertimeRequestModel>>> getTeamOvertimeRequests({
+    required int clientId,
     int page = 1,
     int limit = 20,
     String requestType = 'All',
+    OvertimeStatus? status,
   }) async {
     try {
       final requests = await remoteDataSource.getTeamOvertimeRequests(
+        clientId: clientId,
         page: page,
         limit: limit,
         requestType: requestType,
+        status: status,
       );
       return Right(requests);
     } on AppException catch (e) {

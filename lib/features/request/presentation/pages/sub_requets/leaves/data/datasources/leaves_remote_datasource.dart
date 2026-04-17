@@ -1,6 +1,7 @@
 import 'package:collectivWork/core/network/api_client.dart';
 import 'package:collectivWork/core/constants/app_urls.dart';
 import 'package:collectivWork/core/error/exceptions.dart';
+import 'package:collectivWork/features/request/presentation/pages/sub_requets/leaves/domain/entities/leave_entity.dart';
 import 'package:collectivWork/features/request/presentation/widgets/request_listing/request_audience_scope.dart';
 import 'package:dio/dio.dart';
 import '../../../../../../../../core/utils/data_encoder.dart';
@@ -18,6 +19,7 @@ abstract class LeavesRemoteDataSource {
   Future<TeamLeaveRequestsPageModel> getTeamLeaveRequests({
     required int clientId,
     RequestAudienceScope scope = RequestAudienceScope.allUsers,
+    LeaveStatus? status,
     int page = 1,
     int limit = 50,
   });
@@ -35,6 +37,32 @@ class LeavesRemoteDataSourceImpl implements LeavesRemoteDataSource {
   final ApiClient apiClient;
 
   LeavesRemoteDataSourceImpl({required this.apiClient});
+
+  String _teamLeaveStatusFilterValue(LeaveStatus? status) {
+    switch (status) {
+      case null:
+        return 'total';
+      case LeaveStatus.pending:
+        return 'Pending';
+      case LeaveStatus.approved:
+        return 'Approved';
+      case LeaveStatus.rejected:
+        return 'Rejected';
+      case LeaveStatus.withdrawn:
+        return 'Withdrawn';
+    }
+  }
+
+  String _normalizeLeaveHistoryType(String leaveType) {
+    final normalizedType = leaveType.trim();
+    final loweredType = normalizedType.toLowerCase();
+
+    if (loweredType == 'lop' || loweredType.contains('loss of pay')) {
+      return 'lop';
+    }
+
+    return normalizedType;
+  }
 
   @override
   Future<List<LeaveRequestModel>> getLeaves() async {
@@ -72,12 +100,14 @@ class LeavesRemoteDataSourceImpl implements LeavesRemoteDataSource {
   Future<TeamLeaveRequestsPageModel> getTeamLeaveRequests({
     required int clientId,
     RequestAudienceScope scope = RequestAudienceScope.allUsers,
+    LeaveStatus? status,
     int page = 1,
     int limit = 50,
   }) async {
     try {
-      final payload = encodeData({
+      final payloadData = <String, dynamic>{
         'client_id': clientId,
+        'stat_filter': _teamLeaveStatusFilterValue(status),
         'leave_type': <dynamic>[],
         'approved_by': <dynamic>[],
         'leave_between': <dynamic>[],
@@ -85,7 +115,9 @@ class LeavesRemoteDataSourceImpl implements LeavesRemoteDataSource {
         'request_type': scope.leaveRequestType,
         'limit': limit,
         'page': page,
-      });
+      };
+
+      final payload = encodeData(payloadData);
 
       final response = await apiClient.get(
         '${AppUrls.leaveTeamRequestList}?payload=$payload',
@@ -138,7 +170,9 @@ class LeavesRemoteDataSourceImpl implements LeavesRemoteDataSource {
   @override
   Future<List<LeaveHistoryModel>> getLeaveHistory(String leaveType) async {
     try {
-      final payload = {'leave_type': leaveType};
+      final payload = {
+        'leave_type': _normalizeLeaveHistoryType(leaveType),
+      };
       final encodedPayload = encodeData(payload);
 
       final response = await apiClient.get(

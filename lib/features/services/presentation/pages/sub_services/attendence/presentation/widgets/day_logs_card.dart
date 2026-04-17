@@ -140,6 +140,7 @@ class _DayLogsCardState extends State<DayLogsCard>
   }
 
   List<TimelineLogEntry> _mapDayLogToTimelineEntries(AttendanceDayLog log) {
+    final activityText = (log.activityAction ?? '').trim();
     final rawType =
         (log.activityType ?? log.activityAction ?? '').trim().toLowerCase();
     final isPunchIn = rawType.contains('punch in');
@@ -147,14 +148,19 @@ class _DayLogsCardState extends State<DayLogsCard>
 
     if (isPunchIn || isPunchOut) {
       final actor = _toTitleCase(log.activityBy ?? '');
-      final actionText = isPunchIn ? 'Punched In At' : 'Punched Out At';
-      final title = actor.isEmpty ? actionText : '$actor $actionText';
-
+      final fallbackTitle = isPunchIn ? 'Punched In At' : 'Punched Out At';
+      final title =
+          activityText.isNotEmpty
+              ? _toSentenceCase(activityText)
+              : actor.isEmpty
+              ? fallbackTitle
+              : '$actor $fallbackTitle';
+      final location = (log.location ?? '').toString().trim();
       return [
         TimelineLogEntry(
           title: title,
           subtitle: _formatTimelineTime(log.time),
-          location: log.location,
+          location: location.isEmpty ? null : location,
           color: isPunchIn ? AppColors.success : AppColors.error,
         ),
       ];
@@ -193,6 +199,15 @@ class _DayLogsCardState extends State<DayLogsCard>
           return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
         })
         .join(' ');
+  }
+
+  String _toSentenceCase(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return trimmed;
+    }
+
+    return trimmed[0].toUpperCase() + trimmed.substring(1);
   }
 
   String? _formatTimelineTime(String? timeString) {

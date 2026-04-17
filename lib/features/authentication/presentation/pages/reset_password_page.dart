@@ -92,7 +92,16 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     // Normal Teal Header Section with curved bottom (just back button)
                     Container(
                       decoration: BoxDecoration(
-                        color: AppColors.loginHeaderTeal,
+                        gradient: const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            AppColors.attendanceTeal, // 0xFF0B7F7F
+                            Color(0xFF073F3F), // mid blend
+                            AppColors.attendancedarkbottom, // 0xFF031e1e
+                          ],
+                          stops: [0.0, 0.85, 1.0],
+                        ),
                         borderRadius: const BorderRadius.only(
                           bottomLeft: Radius.circular(30),
                           bottomRight: Radius.circular(30),

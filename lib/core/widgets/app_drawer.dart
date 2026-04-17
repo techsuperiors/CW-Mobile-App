@@ -354,13 +354,9 @@ class _DrawerMenuList extends StatelessWidget {
               iconColor: AppColors.attendanceTeal,
               label: AppStrings.actions,
               shortSide: shortSide,
-              trailing:
-                  reportedPostsCount == null || pendingApprovalPostsCount == null
-                      ? null
-                      : _ActionCountsBadge(
-                        reportedCount: reportedPostsCount!,
-                        pendingCount: pendingApprovalPostsCount!,
-                      ),
+              trailing: (reportedPostsCount != null && pendingApprovalPostsCount != null)
+                  ? _MenuCountBadge(count: reportedPostsCount! + pendingApprovalPostsCount!)
+                  : null,
               onTap: onActionsTap,
             ),
           _MenuTile(

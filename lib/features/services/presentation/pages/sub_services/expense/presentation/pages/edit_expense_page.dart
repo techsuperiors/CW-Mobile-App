@@ -10,6 +10,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../../../../core/constants/app_colors.dart';
+import '../../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../../../core/error/exceptions.dart';
 import '../../../../../../../../core/network/api_client.dart';
@@ -366,16 +367,59 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
     return ResponsiveScaffold(
       backgroundColor: AppColors.backgroundMedium,
-      appBar: AppBar(
-        elevation: 0,
+      appBar:
+      // AppBar(
+      //   elevation: 0,
+      //   forceMaterialTransparency: true,
+      //   backgroundColor: AppColors.background,
+      //   foregroundColor: AppColors.textPrimary,
+      //   title: Text(
+      //     _isEdit ? 'Edit Reimbursement' : 'Claim Reimbursement',
+      //     style: AppTextStyles.heading4(
+      //       context,
+      //     ).copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+      //   ),
+      //   centerTitle: true,
+      // ),
+      AppBar(
         forceMaterialTransparency: true,
+        elevation: 0,
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.textPrimary,
-        title: Text(
-          _isEdit ? 'Edit Reimbursement' : 'Claim Reimbursement',
-          style: AppTextStyles.heading4(
+        leading: GestureDetector(
+          onTap:
+              () => Navigator.of(
             context,
-          ).copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          ).pop(),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.arrow_back_ios,
+                color: Theme.of(context).colorScheme.primary,
+                size: sw * 0.048,
+              ),
+              Flexible(
+                child: Text(
+                  AppStrings.back,
+                  style: AppTextStyles.bodyMedium(context).copyWith(
+                    fontWeight: FontWeight.w400,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        leadingWidth: 110,
+        title: Text(
+            _isEdit ? 'Edit Reimbursement' : 'Claim Reimbursement',
+          style: AppTextStyles.heading4(context).copyWith(
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
+          ),
         ),
         centerTitle: true,
       ),
@@ -401,7 +445,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
             _FormCard(
               child: Column(
                 children: [
-
                   AppTextField(
                     controller: _nameController,
                     label: 'Expense Name',
@@ -530,10 +573,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                         }
                       });
                     },
-                    validator: (value) =>
-                        (value == null || value.trim().isEmpty)
-                            ? 'Duration type is required'
-                            : null,
+                    validator:
+                        (value) =>
+                            (value == null || value.trim().isEmpty)
+                                ? 'Duration type is required'
+                                : null,
                   ),
                   SizedBox(height: sw * 0.035),
                   Row(
@@ -580,7 +624,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  SizedBox(height: sh * 0.01),
+                  SizedBox(height: sh * 0.02),
                   if (_existingFiles.isEmpty && _newFiles.isEmpty)
                     Center(
                       child: GestureDetector(
@@ -690,6 +734,31 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                         ),
               ),
             ),
+            SizedBox(height: sh * 0.015),
+            // Cancel Button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: sh * 0.018),
+                  side: BorderSide(color: AppColors.border),
+                  backgroundColor: AppColors.background,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  AppStrings.cancel,
+                  style: AppTextStyles.buttonLarge(
+                    context,
+                  ).copyWith(color: AppColors.textPrimary),
+                ),
+              ),
+            ),
+            SizedBox(height: sh * 0.02),
           ],
         ),
       ),
@@ -806,7 +875,7 @@ class _DateButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.backgroundLight,
+          color: AppColors.backgroundLight.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.borderLight),
         ),
@@ -897,11 +966,7 @@ class _SelectedFileChip extends StatelessWidget {
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                    : Icon(
-                      removeIcon,
-                      size: 18,
-                      color: removeIconColor,
-                    ),
+                    : Icon(removeIcon, size: 18, color: removeIconColor),
           ),
         ],
       ),

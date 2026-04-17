@@ -1,4 +1,5 @@
 import 'package:collectivWork/core/constants/app_assets.dart';
+import 'package:collectivWork/core/utils/app_spacing.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -175,14 +176,11 @@ class _AssignedAssetsPageState extends State<AssignedAssetsPage>
                 _loadAll(_userId!);
               }
             },
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: screenWidth * 0.016,
-                vertical: screenHeight * 0.016,
-              ),
-              child: SvgPicture.asset(AppAssets.addIcon),
-            ),
+            child: SizedBox(
+                height: screenHeight * 0.050, // 5.0% of screen height
+                child: SvgPicture.asset(AppAssets.addIcon)),
           ),
+          AppSpacing.hMd
         ],
         centerTitle: true,
         bottom: TabBar(

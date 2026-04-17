@@ -13,13 +13,19 @@ import '../../domain/entities/on_duty_detail.dart';
 import '../models/on_duty_detail_model.dart';
 
 abstract class OnDutyRemoteDataSource {
-  Future<List<OnDutyRequestModel>> getOnDutyRequests();
+  Future<List<OnDutyRequestModel>> getOnDutyRequests({
+    required int clientId,
+    int page = 1,
+    int limit = 5,
+    OnDutyStatus? status,
+  });
 
   Future<List<OnDutyRequestModel>> getTeamOnDutyRequests({
     required int clientId,
     int page = 1,
     int limit = 50,
     String requestType = 'All',
+    OnDutyStatus? status,
   });
 
   Future<OnDutyRequestStatsModel> getOnDutyRequestStats({
@@ -64,10 +70,21 @@ class OnDutyRemoteDataSourceImpl implements OnDutyRemoteDataSource {
   OnDutyRemoteDataSourceImpl({required this.apiClient});
 
   @override
-  Future<List<OnDutyRequestModel>> getOnDutyRequests() async {
+  Future<List<OnDutyRequestModel>> getOnDutyRequests({
+    required int clientId,
+    int page = 1,
+    int limit = 5,
+    OnDutyStatus? status,
+  }) async {
     final encodedData = encodeData({
-      'page': 1,
-      'limit': 50,
+      'client_id': clientId,
+      'status': status == null ? <dynamic>[] : <String>[status.displayName],
+      'date': <dynamic>[],
+      'approved_by': <dynamic>[],
+      'rejected_by': <dynamic>[],
+      'request_type': 'All',
+      'page': page,
+      'limit': limit,
     });
 
     try {
@@ -107,15 +124,14 @@ class OnDutyRemoteDataSourceImpl implements OnDutyRemoteDataSource {
     int page = 1,
     int limit = 50,
     String requestType = 'All',
+    OnDutyStatus? status,
   }) async {
     final encodedData = encodeData({
       'client_id': clientId,
-      'request_for': [],
-      'users': [],
-      'date': DateTime.now().toIso8601String().split('T').first,
+      'status': status == null ? [] : [status.displayName],
+      'date': [],
       'approved_by': [],
       'rejected_by': [],
-      'status': [],
       'request_type': requestType,
       'page': page,
       'limit': limit,
@@ -158,12 +174,11 @@ class OnDutyRemoteDataSourceImpl implements OnDutyRemoteDataSource {
   }) async {
     final encodedData = encodeData({
       'client_id': clientId,
-      'requested_to': [],
-      'requested_by': [],
-      'approved_by': [],
-      'rejected_by': [],
+      'status': <dynamic>[],
+      'date': <dynamic>[],
+      'approved_by': <dynamic>[],
+      'rejected_by': <dynamic>[],
       'request_type': requestType,
-      'status': [],
     });
 
     try {

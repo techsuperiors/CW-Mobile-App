@@ -32,7 +32,6 @@ import '../Widgets/poll_post_composer_sheet.dart';
 import '../Widgets/praise_post_composer_sheet.dart';
 import 'bookmarked_posts_page.dart';
 import 'post_preview_page.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../../features/user/presentation/bloc/user_profile_bloc.dart';
 import '../../../../features/user/presentation/bloc/user_profile_state.dart';
 
@@ -50,11 +49,15 @@ class _PostPageState extends State<PostPage> {
   static const String _myPostsFilter = 'my';
   static const String _praisePostsFilter = 'praise';
   final TextEditingController _searchController = TextEditingController();
+  final Map<String, ScrollController> _scrollControllers = {};
   String _searchQuery = '';
 
   @override
   void dispose() {
     _searchController.dispose();
+    for (final controller in _scrollControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -86,10 +89,7 @@ class _PostPageState extends State<PostPage> {
     }
 
     context.read<PostBloc>().add(
-      FetchPostsEvent(
-        postName: postName,
-        showLoader: false,
-      ),
+      FetchPostsEvent(postName: postName, showLoader: false),
     );
   }
 
@@ -104,6 +104,10 @@ class _PostPageState extends State<PostPage> {
     });
   }
 
+  ScrollController _scrollControllerFor(String postName) {
+    return _scrollControllers.putIfAbsent(postName, ScrollController.new);
+  }
+
   List<AnnouncementEntity> _filterAnnouncements(
     List<AnnouncementEntity> announcements,
   ) {
@@ -112,14 +116,16 @@ class _PostPageState extends State<PostPage> {
       return announcements;
     }
 
-    return announcements.where((announcement) {
-      final normalizedSubject = announcement.subject.trim().toLowerCase();
-      final normalizedDescription =
-          announcement.description.trim().toLowerCase();
+    return announcements
+        .where((announcement) {
+          final normalizedSubject = announcement.subject.trim().toLowerCase();
+          final normalizedDescription =
+              announcement.description.trim().toLowerCase();
 
-      return normalizedSubject.contains(normalizedQuery) ||
-          normalizedDescription.contains(normalizedQuery);
-    }).toList(growable: false);
+          return normalizedSubject.contains(normalizedQuery) ||
+              normalizedDescription.contains(normalizedQuery);
+        })
+        .toList(growable: false);
   }
 
   PostBloc _createPreviewPostBloc(PostRepository postRepository) {
@@ -270,13 +276,13 @@ class _PostPageState extends State<PostPage> {
               child: SafeArea(
                 bottom: false,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildHeader(horizontalPadding),
                     _buildSearchAndFilter(
                       compact: compact,
                       horizontalPadding: horizontalPadding,
                     ),
-
                     Expanded(
                       child: BlocConsumer<PostBloc, PostState>(
                         listener: (context, state) {
@@ -296,7 +302,7 @@ class _PostPageState extends State<PostPage> {
                           }
                         },
                         builder: (context, state) {
-                          if (state is PostLoading) {
+                          if (state is PostInitial || state is PostLoading) {
                             return const Center(
                               child: CircularProgressIndicator(),
                             );
@@ -316,6 +322,7 @@ class _PostPageState extends State<PostPage> {
                             }
                             return _buildPostList(
                               filteredAnnouncements,
+                              currentPostName: state.currentPostName,
                               processingPostIds: state.processingPostIds,
                               horizontalPadding: horizontalPadding,
                             );
@@ -388,25 +395,20 @@ class _PostPageState extends State<PostPage> {
         right: horizontalPadding,
         bottom: AppSpacing.sm,
       ),
-      child: Flex(
-        direction: compact ? Axis.vertical : Axis.horizontal,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.white,
-            ),
-            child: Column(
-              children: [
-                _buildSearchField(compact),
-                AppSpacing.vSm,
-                _buildPostTypeTabs(),
-              ],
-            ),
-          ),
-        ],
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.white,
+        ),
+        child: Column(
+          children: [
+            _buildSearchField(compact),
+            AppSpacing.vSm,
+            _buildPostTypeTabs(),
+          ],
+        ),
       ),
     );
   }
@@ -414,64 +416,67 @@ class _PostPageState extends State<PostPage> {
   Widget _buildSearchField(bool compact) {
     return Row(
       children: [
-        Expanded(
-          child: SizedBox(
-            height: AppSpacing.section,
-            child: TextField(
-              controller: _searchController,
-              onChanged: _handleSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'Search',
-                fillColor: AppColors.backgroundMedium,
-                prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8), // 👈 curved border
-                  borderSide: BorderSide.none,
-                ),
+        Expanded(child: _buildSearchInput()),
+        AppSpacing.hMd,
+        _buildSearchActions(),
+      ],
+    );
+  }
 
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
+  Widget _buildSearchInput() {
+    return SizedBox(
+      height: AppSpacing.section,
+      child: TextField(
+        controller: _searchController,
+        onChanged: _handleSearchChanged,
+        decoration: InputDecoration(
+          hintText: 'Search',
+          fillColor: AppColors.backgroundMedium,
+          filled: true,
+          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        ),
+      ),
+    );
+  }
 
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: AppSpacing.sm,
-                ),
-              ),
-            ),
+  Widget _buildSearchActions() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        GestureDetector(
+          onTap: _openBookmarkedPosts,
+          child: SvgPicture.asset(
+            AppAssets.bookmarksIcon,
+            width: AppSpacing.iconMediumWidth,
+            height: AppSpacing.iconMediumHeight,
           ),
         ),
-        AppSpacing.hMd,
-        SizedBox(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                onTap: () {
-                  _openBookmarkedPosts();
-                },
-                child: SvgPicture.asset(AppAssets.bookmarksIcon),
-              ),
-              PermissionGuard(
-                anyOf: ModulePermissions.postWrite,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AppSpacing.hMd,
-                    _buildTopActionButton(
-                      icon: Icons.add,
-                      filled: true,
-                      onTap: _openCreatePostSheet,
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        AppSpacing.hSm,
+        PermissionGuard(
+          anyOf: ModulePermissions.postWrite,
+          child: GestureDetector(
+            onTap: () {
+              _openCreatePostSheet();
+            },
+            child: SvgPicture.asset(
+              AppAssets.addIcon,
+              width: AppSpacing.iconMediumWidth,
+              height: AppSpacing.iconMediumHeight,
+            ),
           ),
         ),
       ],
@@ -494,7 +499,7 @@ class _PostPageState extends State<PostPage> {
               child: _PostTypeTab(
                 label: 'All Posts',
                 count: allPostsCount,
-                icon: Icons.dynamic_feed_outlined,
+                postIcons: AppAssets.allPostIcon,
                 color: AppColors.info,
                 isSelected: currentPostName == _allPostsFilter,
                 onTap: () => _selectPostFilter(_allPostsFilter),
@@ -505,7 +510,7 @@ class _PostPageState extends State<PostPage> {
               child: _PostTypeTab(
                 label: 'My Posts',
                 count: myPostsCount,
-                icon: Icons.person_outline_rounded,
+                postIcons: AppAssets.myProfileIcon,
                 color: AppColors.servicePurpleDark,
                 isSelected: currentPostName == _myPostsFilter,
                 onTap: () => _selectPostFilter(_myPostsFilter),
@@ -516,7 +521,7 @@ class _PostPageState extends State<PostPage> {
               child: _PostTypeTab(
                 label: 'Praise',
                 count: praisePostsCount,
-                icon: Icons.workspace_premium_outlined,
+                postIcons: AppAssets.praiseIcon,
                 color: AppColors.error,
                 isSelected: currentPostName == _praisePostsFilter,
                 onTap: () => _selectPostFilter(_praisePostsFilter),
@@ -528,51 +533,9 @@ class _PostPageState extends State<PostPage> {
     );
   }
 
-  Widget _buildTopActionButton({
-    required IconData icon,
-    required bool filled,
-    required VoidCallback onTap,
-  }) {
-    return SizedBox(
-      width: AppSpacing.iconMediumHeight,
-      height: AppSpacing.iconMediumWidth,
-      child: Material(
-        color: filled ? AppTheme.primaryColor : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border:
-                  filled
-                      ? null
-                      : Border.all(
-                        color: AppTheme.primaryColor.withValues(alpha: 0.65),
-                        width: 1.4,
-                      ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF101828).withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Icon(
-              icon,
-              color: filled ? Colors.white : AppTheme.primaryColor,
-              size: 22,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildPostList(
     List<AnnouncementEntity> announcements, {
+    required String currentPostName,
     required List<int> processingPostIds,
     required double horizontalPadding,
   }) {
@@ -596,6 +559,8 @@ class _PostPageState extends State<PostPage> {
             _refreshCurrentPosts();
           },
           child: ListView.builder(
+            key: PageStorageKey<String>('post_list_$currentPostName'),
+            controller: _scrollControllerFor(currentPostName),
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             itemCount: announcements.length,
             itemBuilder: (context, index) {
@@ -618,18 +583,18 @@ class _PostPageState extends State<PostPage> {
 class _PostTypeTab extends StatelessWidget {
   final String label;
   final int count;
-  final IconData icon;
   final Color color;
   final bool isSelected;
   final VoidCallback onTap;
+  final String postIcons;
 
   const _PostTypeTab({
     required this.label,
     required this.count,
-    required this.icon,
     required this.color,
     required this.isSelected,
     required this.onTap,
+    required this.postIcons,
   });
 
   @override
@@ -658,7 +623,10 @@ class _PostTypeTab extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: AppSpacing.xl, color: color),
+              SizedBox(
+                  height: AppSpacing.iconSmallHeight,
+                  width: AppSpacing.iconSmallWidth,
+                  child: SvgPicture.asset(postIcons)),
               AppSpacing.hSm,
               Container(
                 padding: const EdgeInsets.symmetric(

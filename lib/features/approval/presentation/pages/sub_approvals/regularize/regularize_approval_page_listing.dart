@@ -38,7 +38,9 @@ class _RegularizeApprovalPageListingState
     extends State<RegularizeApprovalPageListing> with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
-  static const int _pageSize = 50;
+  late final RegularizeRequestBloc _regularizeRequestBloc;
+  static const int _pageSize = 5;
+  late int _lastHandledTabIndex;
 
   final List<StatusTabDefinition<RegularizeStatus>> _tabs = const [
     StatusTabDefinition(label: 'All', status: null),
@@ -52,14 +54,199 @@ class _RegularizeApprovalPageListingState
   @override
   void initState() {
     super.initState();
+    _regularizeRequestBloc = RegularizeRequestBloc();
     _tabController = TabController(length: _tabs.length, vsync: this);
+    _lastHandledTabIndex = _tabController.index;
+    _tabController.addListener(_handleTabChange);
   }
+
+  RegularizeStatus? get _selectedTabStatus => _tabs[_tabController.index].status;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
+    _regularizeRequestBloc.close();
     super.dispose();
+  }
+
+  Future<void> _refreshTabData({
+    required int clientId,
+    required RequestAudienceScope scope,
+    required RegularizeStatus? status,
+  }) async {
+    _regularizeRequestBloc.add(
+      LoadTeamRegularizeRequests(
+        clientId: clientId,
+        scope: scope,
+        status: status,
+        limit: _pageSize,
+        forceRefresh: true,
+      ),
+    );
+
+    await _regularizeRequestBloc.stream.firstWhere((state) {
+      if (state is RegularizeRequestLoaded) {
+        return !state.isRefreshing &&
+            state.selectedScope == scope &&
+            state.statusFilter == status;
+      }
+
+      return state is RegularizeRequestError;
+    });
+  }
+
+  void _handleTabChange() {
+    if (!mounted || _lastHandledTabIndex == _tabController.index) {
+      return;
+    }
+
+    _lastHandledTabIndex = _tabController.index;
+    setState(() {});
+
+    final currentState = _regularizeRequestBloc.state;
+    final scope =
+        currentState is RegularizeRequestLoaded
+            ? currentState.selectedScope
+            : _selectedScope;
+
+    _regularizeRequestBloc.add(
+      LoadTeamRegularizeRequests(
+        clientId: _resolveClientId(context),
+        scope: scope,
+        status: _selectedTabStatus,
+        limit: _pageSize,
+      ),
+    );
+  }
+
+  Widget _buildRegularizeTabContent(
+    BuildContext context, {
+    required int clientId,
+    required double screenHeight,
+    required RegularizeRequestLoaded viewState,
+    required bool isCurrentTab,
+  }) {
+    if (isCurrentTab && viewState.isRefreshing) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (isCurrentTab && viewState.contentErrorMessage != null) {
+      return ApiErrorState(
+        rawMessage: viewState.contentErrorMessage!,
+        onRetry:
+            () => context.read<RegularizeRequestBloc>().add(
+              LoadTeamRegularizeRequests(
+                clientId: clientId,
+                scope: viewState.selectedScope,
+                status: viewState.statusFilter,
+                limit: _pageSize,
+                forceRefresh: true,
+              ),
+            ),
+      );
+    }
+
+    final visibleRequests =
+        viewState.filteredRegularizeRequests
+            .where((request) => request.status != RegularizeStatus.withdrawn)
+            .toList();
+
+    if (visibleRequests.isEmpty) {
+      return const RequestEmptyState();
+    }
+
+    final grouped = RequestGroupingUtils.groupByMonth(
+      items: visibleRequests,
+      dateSelector: (item) => item.appliedDate,
+    );
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (isCurrentTab &&
+            notification.metrics.pixels >=
+                notification.metrics.maxScrollExtent - 200 &&
+            viewState.hasMore &&
+            !viewState.isLoadingMore) {
+          context.read<RegularizeRequestBloc>().add(
+            LoadMoreTeamRegularizeRequests(
+              clientId: clientId,
+              limit: _pageSize,
+            ),
+          );
+        }
+        return false;
+      },
+      child: RefreshIndicator(
+        onRefresh:
+            () => _refreshTabData(
+              clientId: clientId,
+              scope: viewState.selectedScope,
+              status: viewState.statusFilter,
+            ),
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(vertical: screenHeight * 0.012),
+          itemCount: grouped.length + (viewState.isLoadingMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index >= grouped.length) {
+              return Padding(
+                padding: EdgeInsets.symmetric(vertical: screenHeight * 0.02),
+                child: const Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final entry = grouped[index];
+            if (entry is String) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  top: index == 0 ? 0 : screenHeight * 0.014,
+                  bottom: screenHeight * 0.010,
+                ),
+                child: Text(
+                  entry,
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              );
+            }
+
+            final request = entry as RegularizeRequestModel;
+            return RegularizeRequestCard(
+              regularizeRequest: request,
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => RegularizeDetailPage(
+                          regularizeRequest: request,
+                          isApprovalMode: true,
+                        ),
+                  ),
+                );
+                if (result == true && context.mounted) {
+                  context.read<RegularizeRequestBloc>().add(
+                    LoadTeamRegularizeRequests(
+                      clientId: clientId,
+                      scope: viewState.selectedScope,
+                      status: viewState.statusFilter,
+                      limit: _pageSize,
+                      forceRefresh: true,
+                    ),
+                  );
+                }
+              },
+            );
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -115,16 +302,19 @@ class _RegularizeApprovalPageListingState
       _selectedScope = RequestAudienceScope.myReportees;
     }
 
-    return BlocProvider(
-      create:
-          (_) => RegularizeRequestBloc()
-            ..add(
-              LoadTeamRegularizeRequests(
-                clientId: clientId,
-                scope: _selectedScope,
-                limit: _pageSize,
-              ),
-            ),
+    if (_regularizeRequestBloc.state is RegularizeRequestInitial) {
+      _regularizeRequestBloc.add(
+        LoadTeamRegularizeRequests(
+          clientId: clientId,
+          scope: _selectedScope,
+          status: _selectedTabStatus,
+          limit: _pageSize,
+        ),
+      );
+    }
+
+    return BlocProvider.value(
+      value: _regularizeRequestBloc,
       child: ResponsiveScaffold(
         backgroundColor: AppColors.backgroundLight,
         appBar: AppBar(
@@ -199,21 +389,15 @@ class _RegularizeApprovalPageListingState
                                       LoadTeamRegularizeRequests(
                                         clientId: clientId,
                                         scope: _selectedScope,
+                                        status: _selectedTabStatus,
                                         limit: _pageSize,
+                                        forceRefresh: true,
                                       ),
                                     ),
                           );
                         }
 
                         final loaded = state as RegularizeRequestLoaded;
-                        final items =
-                            loaded.regularizeRequests
-                                .where(
-                                  (request) =>
-                                      request.status !=
-                                      RegularizeStatus.withdrawn,
-                                )
-                                .toList();
 
                         return StatusTabbedSection<
                           RegularizeStatus,
@@ -221,7 +405,7 @@ class _RegularizeApprovalPageListingState
                         >(
                           controller: _tabController,
                           tabs: _tabs,
-                          items: items,
+                          items: loaded.regularizeRequests,
                           searchQuery: loaded.searchQuery?.toLowerCase() ?? '',
                           countOverrides: {
                             null: loaded.totalCount,
@@ -246,97 +430,40 @@ class _RegularizeApprovalPageListingState
                                     false);
                           },
                           tabColorBuilder: RequestTabTheme.colorForIndex,
-                          emptyBuilder: (context) => const RequestEmptyState(),
-                          listBuilder: (context, list) {
-                            final grouped = RequestGroupingUtils.groupByMonth(
-                              items: list,
-                              dateSelector: (item) => item.appliedDate,
-                            );
-
-                            return NotificationListener<ScrollNotification>(
-                              onNotification: (notification) {
-                                if (notification.metrics.pixels >=
-                                    notification.metrics.maxScrollExtent -
-                                        200) {
-                                  context.read<RegularizeRequestBloc>().add(
-                                    const LoadMoreTeamRegularizeRequests(
-                                      limit: _pageSize,
-                                    ),
-                                  );
-                                }
-                                return false;
-                              },
-                              child: ListView.builder(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: screenHeight * 0.012,
-                                ),
-                                itemCount:
-                                    grouped.length +
-                                    (loaded.isLoadingMore ? 1 : 0),
-                                itemBuilder: (context, index) {
-                                  if (index >= grouped.length) {
-                                    return Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: screenHeight * 0.02,
-                                      ),
-                                      child: const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    );
-                                  }
-
-                                  final entry = grouped[index];
-                                  if (entry is String) {
-                                    return Padding(
-                                      padding: EdgeInsets.only(
-                                        top:
-                                            index == 0
-                                                ? 0
-                                                : screenHeight * 0.014,
-                                        bottom: screenHeight * 0.010,
-                                      ),
-                                      child: Text(
-                                        entry,
-                                        style: AppTextStyles.bodySmall(
-                                          context,
-                                        ).copyWith(
-                                          fontWeight: FontWeight.w500,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    );
-                                  }
-
-                                  final request =
-                                      entry as RegularizeRequestModel;
-                                  return RegularizeRequestCard(
-                                    regularizeRequest: request,
-                                    onTap: () async {
-                                      final result = await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) => RegularizeDetailPage(
-                                                regularizeRequest: request,
-                                                isApprovalMode: true,
-                                              ),
-                                        ),
-                                      );
-                                      if (result == true && context.mounted) {
-                                        context.read<RegularizeRequestBloc>().add(
-                                          LoadTeamRegularizeRequests(
-                                            clientId: clientId,
-                                            scope: _selectedScope,
-                                            limit: _pageSize,
-                                          ),
+                          tabContentBuilder: (context, tab) {
+                            final rawTabState =
+                                tab.status == loaded.statusFilter
+                                    ? loaded
+                                    : _regularizeRequestBloc
+                                        .getCachedTeamRegularizeRequests(
+                                          scope: _selectedScope,
+                                          status: tab.status,
                                         );
-                                      }
-                                    },
-                                  );
-                                },
-                              ),
+
+                            if (rawTabState == null) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+
+                            final tabState =
+                                _regularizeRequestBloc
+                                    .buildTeamRegularizeViewState(
+                                      baseState: rawTabState,
+                                      searchQuery: loaded.searchQuery,
+                                    );
+
+                            return _buildRegularizeTabContent(
+                              context,
+                              clientId: clientId,
+                              screenHeight: screenHeight,
+                              viewState: tabState,
+                              isCurrentTab: tab.status == loaded.statusFilter,
                             );
                           },
+                          emptyBuilder: (context) => const RequestEmptyState(),
+                          listBuilder: (context, list) =>
+                              const SizedBox.shrink(),
                         );
                       },
                     ),
@@ -383,7 +510,7 @@ class _RegularizeApprovalPageListingState
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -438,6 +565,7 @@ class _RegularizeApprovalPageListingState
           selectedScope: _selectedScope,
           availableScopes: availableScopes,
           onSelected: (scope) {
+            if (scope == _selectedScope) return;
             setState(() {
               _selectedScope = scope;
             });
@@ -445,6 +573,7 @@ class _RegularizeApprovalPageListingState
               LoadTeamRegularizeRequests(
                 clientId: _resolveClientId(context),
                 scope: scope,
+                status: _selectedTabStatus,
                 limit: _pageSize,
               ),
             );

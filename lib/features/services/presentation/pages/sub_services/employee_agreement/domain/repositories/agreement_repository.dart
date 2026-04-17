@@ -19,6 +19,6 @@ abstract class AgreementRepository {
   Future<Either<Failure, AgreementConsentResult>> submitAgreementConsent(
     int agreementId,
     bool agreementAcknowledged,
-    String signatureFilePath,
+    String signedPdfFilePath,
   );
 }

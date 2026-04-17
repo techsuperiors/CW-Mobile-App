@@ -22,6 +22,7 @@ import 'donut_chart_widget.dart';
 /// Card widget for displaying leave type information with donut chart
 class LeaveTypeCard extends StatelessWidget {
   final String title;
+  final String? shortForm;
   final double totalLeaves;
   final double consumed;
   final double allocatedQuota;
@@ -33,6 +34,7 @@ class LeaveTypeCard extends StatelessWidget {
   const LeaveTypeCard({
     super.key,
     required this.title,
+    this.shortForm,
     required this.totalLeaves,
     required this.consumed,
     required this.allocatedQuota,
@@ -48,13 +50,18 @@ class LeaveTypeCard extends StatelessWidget {
     final percentage = base > 0
         ? ((base - consumed) / base).clamp(0.0, 1.0)
         : 0.0;
+    final normalizedShortForm = shortForm?.trim();
+    final shouldShowShortForm =
+        normalizedShortForm != null &&
+        normalizedShortForm.isNotEmpty &&
+        normalizedShortForm.toUpperCase() != title.trim().toUpperCase();
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -71,13 +78,25 @@ class LeaveTypeCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Flexible(
-                child: Text(
-                  title.capitalizeFirst(),
-                  style: AppTextStyles.bodyMedium(context).copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
+                child: RichText(
                   overflow: TextOverflow.ellipsis,
+                  text: TextSpan(
+                    style: AppTextStyles.bodyMedium(context).copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                    children: [
+                      TextSpan(text: title.capitalizeFirst()),
+                      if (shouldShowShortForm)
+                        TextSpan(
+                          text: ' (${normalizedShortForm.toUpperCase()})',
+                          style: AppTextStyles.bodyMedium(context).copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               GestureDetector(
@@ -90,7 +109,7 @@ class LeaveTypeCard extends StatelessWidget {
                       0.072, // ~5.3% of screen width
                   height: MediaQuery.of(context).size.height * 0.032,
                   decoration: BoxDecoration(
-                    color: AppColors.primaryLight.withOpacity(0.2),
+                    color: AppColors.primaryLight.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -171,7 +190,7 @@ class LeaveTypeCard extends StatelessWidget {
 
   Widget _buildLOPTable(context) {
     final currentMonthLop = totalLeaves;
-    String _fmt(double v) => '${v.toStringAsFixed(2)} Day(s)';
+    String formatDays(double v) => '${v.toStringAsFixed(2)} Day(s)';
     return Table(
       border: TableBorder(
         top: const BorderSide(color: AppColors.border, width: 1),
@@ -181,14 +200,14 @@ class LeaveTypeCard extends StatelessWidget {
         horizontalInside: const BorderSide(color: AppColors.border, width: 1),
       ),
       children: [
-        _buildTableRow(context, 'LOP This Month', _fmt(currentMonthLop)),
-        _buildTableRow(context, 'Total LOP Days', _fmt(allocatedQuota)),
+        _buildTableRow(context, 'LOP This Month', formatDays(currentMonthLop)),
+        _buildTableRow(context, 'Total LOP Days', formatDays(allocatedQuota)),
       ],
     );
   }
 
   Widget _buildRegularTable(context) {
-    String _fmt(double? v) =>
+    String formatDays(double? v) =>
         v != null ? '${v.toStringAsFixed(2)} Day(s)' : '-- Day(s)';
     return Table(
       border: TableBorder(
@@ -206,10 +225,10 @@ class LeaveTypeCard extends StatelessWidget {
             _buildTableCell(
               context,
               'Accrued So Far',
-              _fmt(accruedSoFar),
+              formatDays(accruedSoFar),
               showRightBorder: true,
             ),
-            _buildTableCell(context, 'Consumed', _fmt(consumed)),
+            _buildTableCell(context, 'Consumed', formatDays(consumed)),
           ],
         ),
         // Row 2: Allocated Quota | Annual Quota
@@ -218,10 +237,10 @@ class LeaveTypeCard extends StatelessWidget {
             _buildTableCell(
               context,
               'Allocated Quota',
-              _fmt(allocatedQuota),
+              formatDays(allocatedQuota),
               showRightBorder: true,
             ),
-            _buildTableCell(context, 'Annual Quota', _fmt(annualQuota)),
+            _buildTableCell(context, 'Annual Quota', formatDays(annualQuota)),
           ],
         ),
       ],
@@ -257,11 +276,6 @@ class LeaveTypeCard extends StatelessWidget {
           final spacing = availableWidth < 150
               ? (availableWidth * 0.01).clamp(2.0, 4.0)
               : (availableWidth * 0.015).clamp(4.0, 6.0);
-
-          // Calculate available width after padding
-          final contentWidth =
-              availableWidth - (horizontalPadding * 2) - spacing;
-
           return Padding(
             padding: EdgeInsets.symmetric(
               horizontal: horizontalPadding,
