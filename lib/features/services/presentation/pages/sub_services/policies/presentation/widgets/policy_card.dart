@@ -104,16 +104,16 @@ class PolicyCard extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                Container(
-                  decoration: BoxDecoration(
-                    color: _statusColor(policy),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: EdgeInsets.symmetric(
-                    vertical: screenHeight*0.0008,
-                    horizontal: screenWidth*0.02,
-                  ),
-                  child: Flexible(
+                Flexible(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _statusColor(policy),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      vertical: screenHeight*0.0008,
+                      horizontal: screenWidth*0.02,
+                    ),
                     child: Text(
                       policy.status,
                       style: AppTextStyles.bodySmall(context).copyWith(
