@@ -221,6 +221,8 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing>
                                   return LeaveRequestCard(
                                     leaveRequest: req,
                                     onTap: () async {
+                                      print("result: called");
+
                                       final result = await Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -236,7 +238,7 @@ class _ApplyLeavePageListingState extends State<ApplyLeavePageListing>
                                         );
                                       }
                                     },
-                                  );
+                                   );
                                 },
                               );
                             },

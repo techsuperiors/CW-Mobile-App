@@ -21,11 +21,10 @@ class PostPreviewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth=MediaQuery.of(context).size.width;
+    final screenWidth = MediaQuery.of(context).size.width;
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
-      appBar:
-      AppBar(
+      appBar: AppBar(
         forceMaterialTransparency: true,
         elevation: 0,
         backgroundColor: AppColors.background,
@@ -63,18 +62,6 @@ class PostPreviewPage extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      // AppBar(
-      //   backgroundColor: AppColors.background,
-      //   foregroundColor: AppColors.textPrimary,
-      //   elevation: 0,
-      //   forceMaterialTransparency: true,
-      //   title: Text(
-      //     AppStrings.postPreview,
-      //     style: AppTextStyles.heading4(
-      //       context,
-      //     ).copyWith(fontWeight: FontWeight.w600),
-      //   ),
-      // ),
       body: SafeArea(
         bottom: false,
         child: BlocConsumer<PostBloc, PostState>(

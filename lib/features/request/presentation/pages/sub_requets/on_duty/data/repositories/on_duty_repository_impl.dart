@@ -161,6 +161,7 @@ class OnDutyRepositoryImpl implements OnDutyRepository {
     required String startHalf,
     required String endHalf,
     required int userId,
+    int? requestId,
   }) async {
     try {
       final message = await remoteDataSource.raiseOnDutyRequest(
@@ -172,6 +173,7 @@ class OnDutyRepositoryImpl implements OnDutyRepository {
         startHalf: startHalf,
         endHalf: endHalf,
         userId: userId,
+        requestId: requestId,
       );
       return Right(message);
     } on AppException catch (e) {

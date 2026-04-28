@@ -1,3 +1,4 @@
+import 'package:collectivWork/core/utils/app_spacing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -167,7 +168,7 @@ class _EmployeeAgreementPageState extends State<EmployeeAgreementPage> {
                           ).copyWith(color: AppColors.error),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.lg),
                         ElevatedButton(
                           onPressed: () {
                             _hasLoaded = false;

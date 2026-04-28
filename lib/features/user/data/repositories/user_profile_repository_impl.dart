@@ -35,11 +35,13 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
     if (await networkInfo.isConnected) {
       try {
         final profileModel = await remoteDataSource.getUserProfile();
-        final allowAllUsers = await remoteDataSource.getAllowAllUsers(
+        final extendedFlags = await remoteDataSource.getExtendedProfileFlags(
           userId: profileModel.userId,
         );
         final enrichedProfileModel = profileModel.copyWith(
-          allowAllUsers: allowAllUsers,
+          allowAllUsers: extendedFlags.allowAllUsers,
+          enabledWorkFromHome: extendedFlags.enabledWorkFromHome,
+          halfDayWfhEnabled: extendedFlags.halfDayWfhEnabled,
         );
         final token = TokenStorage.getToken();
 
@@ -57,7 +59,7 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
         // Convert model to entity
         final profile = _mapModelToEntity(
           enrichedProfileModel,
-          allowAllUsers: allowAllUsers,
+          allowAllUsers: extendedFlags.allowAllUsers,
         );
 
         return Right(profile);
@@ -121,6 +123,8 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
       clientId: model.clientId,
       userId: model.userId,
       allowAllUsers: allowAllUsers,
+      enabledWorkFromHome: model.enabledWorkFromHome,
+      halfDayWfhEnabled: model.halfDayWfhEnabled,
       departmentId: model.departmentId,
       address: model.address,
       birthday: model.birthday,

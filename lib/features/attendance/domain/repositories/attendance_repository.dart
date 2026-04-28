@@ -22,4 +22,6 @@ abstract class AttendanceRepository {
   Future<bool> syncPendingActions();
 
   Future<bool> hasPendingActions();
+
+  Future<int> pruneExpiredPendingActions();
 }

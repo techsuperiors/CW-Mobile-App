@@ -194,6 +194,15 @@ class AttendancePunchBloc
 
     try {
       final repository = _createAttendanceRepository();
+      final expiredActionCount = await repository.pruneExpiredPendingActions();
+      if (expiredActionCount > 0) {
+        final expiredMessage =
+            expiredActionCount == 1
+                ? 'An offline attendance action expired after midnight and could not be synced. Please regularize if needed.'
+                : '$expiredActionCount offline attendance actions expired after midnight and could not be synced. Please regularize if needed.';
+        emit(AttendancePendingSyncExpired(message: expiredMessage));
+      }
+
       final hadPendingActions = await repository.hasPendingActions();
       if (!hadPendingActions) return;
 

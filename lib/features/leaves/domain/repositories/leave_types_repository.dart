@@ -41,6 +41,8 @@ abstract class LeaveTypesRepository {
     required String dayType,
     required String description,
     required int requestTo,
+    String? leaveStartTime,
+    String? leaveEndTime,
   });
   Future<Either<Failure, List<LeaveUploadedFile>>> uploadLeaveFiles({
     required int leaveId,

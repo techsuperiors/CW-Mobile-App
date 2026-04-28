@@ -126,6 +126,9 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
     // If editing, pre-fill the form
     if (widget.leaveRequest != null) {
       _initializeFormFromLeaveRequest(widget.leaveRequest!);
+      if (_isShortLeave && _fromDate != null) {
+        unawaited(_loadWorkingHoursForDate(_fromDate!));
+      }
     }
 
     final profileState = context.read<UserProfileBloc>().state;
@@ -141,12 +144,47 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
     _fromDate = leaveRequest.fromDate;
     _selectedToDate = leaveRequest.toDate;
 
-    // Determine leave duration
-    _selectedLeaveDuration =
-        leaveRequest.toDate == null ? 'Single Day' : 'Multiple Days';
+    final normalizedDayType = leaveRequest.dayType?.trim().toLowerCase();
+    switch (normalizedDayType) {
+      case 'half':
+        _selectedLeaveDuration = _halfDayOption;
+        _fromHalfDay = _apiHalfToDisplay(leaveRequest.startHalf);
+        _toHalfDay = _fromHalfDay;
+        _leaveStartTime = null;
+        _leaveEndTime = null;
+        _selectedToDate = null;
+        break;
+      case 'short':
+        _selectedLeaveDuration = _shortLeaveOption;
+        _leaveStartTime = _parseApiTimeOfDay(leaveRequest.leaveStartTime);
+        _leaveEndTime = _parseApiTimeOfDay(leaveRequest.leaveEndTime);
+        _fromHalfDay = _halfDayOptions.first;
+        _toHalfDay = _halfDayOptions.last;
+        _selectedToDate = null;
+        break;
+      case 'multiple':
+        _selectedLeaveDuration = _multipleDaysOption;
+        _fromHalfDay = _apiHalfToDisplay(leaveRequest.startHalf);
+        _toHalfDay = _apiHalfToDisplay(
+          leaveRequest.endHalf,
+          fallback: _halfDayOptions.last,
+        );
+        _leaveStartTime = null;
+        _leaveEndTime = null;
+        break;
+      case 'single':
+      default:
+        _selectedLeaveDuration = _singleDayOption;
+        _fromHalfDay = _halfDayOptions.first;
+        _toHalfDay = _halfDayOptions.last;
+        _leaveStartTime = null;
+        _leaveEndTime = null;
+        _selectedToDate = null;
+        break;
+    }
 
     // Pre-fill reason/description
-    _descriptionController.text = leaveRequest.reason;
+    _descriptionController.text = leaveRequest.description ?? "";
     _subjectController.text = leaveRequest.subject ?? leaveRequest.leaveType;
     _existingAttachments = List<LeaveAttachmentRef>.from(
       leaveRequest.fileAttachments,
@@ -157,6 +195,31 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
         _reasonOptions.contains(leaveRequest.reason)
             ? leaveRequest.reason
             : null;
+  }
+
+  String _apiHalfToDisplay(String? apiHalf, {String fallback = 'First Half'}) {
+    switch (apiHalf?.trim().toLowerCase()) {
+      case 'first_half':
+        return 'First Half';
+      case 'second_half':
+        return 'Second Half';
+      default:
+        return fallback;
+    }
+  }
+
+  TimeOfDay? _parseApiTimeOfDay(String? value) {
+    final raw = value?.trim();
+    if (raw == null || raw.isEmpty) return null;
+
+    final parts = raw.split(':');
+    if (parts.length < 2) return null;
+
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+
+    return TimeOfDay(hour: hour, minute: minute);
   }
 
   @override
@@ -248,6 +311,13 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
     }
     if (_supportsShortLeave) {
       options.add(_shortLeaveOption);
+    }
+    final selectedDuration = _selectedLeaveDuration;
+    if (widget.leaveRequest != null &&
+        selectedDuration != null &&
+        !options.contains(selectedDuration)) {
+      // Preserve the existing edited value while policy data is still loading.
+      options.add(selectedDuration);
     }
     return options;
   }
@@ -535,6 +605,8 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
         dayType: dayType,
         description: _descriptionController.text.trim(),
         requestTo: _requestToId!,
+        leaveStartTime: leaveStartTime,
+        leaveEndTime: leaveEndTime,
       );
 
       if (_selectedFiles.isNotEmpty) {
@@ -1275,6 +1347,14 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
   }) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final normalizedItems = <String>[];
+    for (final item in items) {
+      if (!normalizedItems.contains(item)) {
+        normalizedItems.add(item);
+      }
+    }
+    final selectedValue =
+        value != null && normalizedItems.contains(value) ? value : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1297,7 +1377,7 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
           padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02),
 
           child: DropdownButtonFormField<String>(
-            initialValue: value,
+            initialValue: selectedValue,
             isExpanded: true,
             borderRadius: BorderRadius.circular(12),
             hint: Text(
@@ -1317,7 +1397,7 @@ class _ApplyLeavePageState extends State<ApplyLeavePage> {
               ),
             ),
             items:
-                items.map((String item) {
+                normalizedItems.map((String item) {
                   return DropdownMenuItem<String>(
                     value: item,
                     child: Text(

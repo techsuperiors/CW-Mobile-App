@@ -14,9 +14,20 @@ class LeaveHistoryModel extends LeaveHistoryEntity {
     required super.profileUrl,
     required super.profileColor,
     required super.date,
+    required super.leaveStartDate,
+    required super.leaveEndDate,
     required super.remarks,
     required super.performedBy,
   });
+
+  static DateTime? _parseLocalDateTime(dynamic value) {
+    if (value is! String || value.trim().isEmpty) {
+      return null;
+    }
+
+    final parsedDate = DateTime.tryParse(value.trim());
+    return parsedDate?.toLocal();
+  }
 
   /// Factory constructor to create from API JSON response.
   factory LeaveHistoryModel.fromJson(Map<String, dynamic> json) {
@@ -31,7 +42,9 @@ class LeaveHistoryModel extends LeaveHistoryEntity {
       lastName: json['last_name'] as String? ?? '',
       profileUrl: json['profile_url'] as String? ?? '',
       profileColor: json['profile_color'] as String? ?? '#000000',
-      date: DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now(),
+      date: _parseLocalDateTime(json['date']) ?? DateTime.now(),
+      leaveStartDate: _parseLocalDateTime(json['leave_start_date']),
+      leaveEndDate: _parseLocalDateTime(json['leave_end_date']),
       remarks: json['remarks'] as String? ?? '',
       performedBy: json['performed_by'] as String? ?? 'System',
     );

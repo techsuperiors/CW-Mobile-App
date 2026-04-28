@@ -61,6 +61,7 @@ abstract class OnDutyRemoteDataSource {
     required String startHalf, // 'first_half' or 'second_half'
     required String endHalf,
     required int userId,
+    int? requestId,
   });
 }
 
@@ -362,41 +363,60 @@ class OnDutyRemoteDataSourceImpl implements OnDutyRemoteDataSource {
     required String startHalf,
     required String endHalf,
     required int userId,
+    int? requestId,
   }) async {
-    // API expects wfh_request_date to be the previous day at 18:30:00.000Z (Midnight IST)
     final startDateTime = DateTime.parse(startDate);
     final endDateTime = DateTime.parse(endDate);
-    
-    final wfhRequestDate = startDateTime.subtract(const Duration(days: 1));
-    final wfhToRequestDate = endDateTime.subtract(const Duration(days: 1));
-
-    final fromDateIso = '${wfhRequestDate.toString().substring(0, 10)}T18:30:00.000Z';
-    final toDateIso = '${wfhToRequestDate.toString().substring(0, 10)}T18:30:00.000Z';
+    final startBoundaryIso = _startOfDayBoundaryIso(startDateTime);
+    final endBoundaryIso = _endOfDayBoundaryIso(endDateTime);
 
     final payloadMap = <String, dynamic>{
       'subject': subject,
       'request_type': requestType,
       'description': description,
-      'wfh_request_date': fromDateIso,
-      'start_half': startHalf,
-      'end_half': endHalf,
       'user_id': userId,
       'start_date': startDate,
       'end_date': endDate,
     };
 
-    if (requestType != 'single') {
-      payloadMap['wfh_to_request_date'] = toDateIso;
+    if (requestId != null) {
+      payloadMap['request_id'] = requestId;
+      payloadMap['wfh_request_date'] =
+          requestType == 'single'
+              ? startBoundaryIso
+              : <String>[startBoundaryIso, endBoundaryIso];
+      if (requestType != 'single') {
+        payloadMap['start_half'] = startHalf;
+        payloadMap['end_half'] = endHalf;
+      }
+    } else {
+      payloadMap['wfh_request_date'] = startBoundaryIso;
+      payloadMap['start_half'] = startHalf;
+      payloadMap['end_half'] = endHalf;
+      if (requestType != 'single') {
+        payloadMap['wfh_to_request_date'] = _startOfDayBoundaryIso(endDateTime);
+      }
     }
 
     final encodedData = encodeData(payloadMap);
 
     try {
-      final response = await apiClient.post(
-        AppUrls.onDutyRequestRaise,
-        data: {'payload': encodedData},
-        options: Options(headers: const {'Content-Type': 'application/json'}),
-      );
+      final response =
+          requestId != null
+              ? await apiClient.put(
+                AppUrls.onDutyRequestRaise,
+                data: {'payload': encodedData},
+                options: Options(
+                  headers: const {'Content-Type': 'application/json'},
+                ),
+              )
+              : await apiClient.post(
+                AppUrls.onDutyRequestRaise,
+                data: {'payload': encodedData},
+                options: Options(
+                  headers: const {'Content-Type': 'application/json'},
+                ),
+              );
 
       final data = response.data as Map<String, dynamic>?;
       if (data == null) {
@@ -417,6 +437,17 @@ class OnDutyRemoteDataSourceImpl implements OnDutyRemoteDataSource {
       throw const ServerException(AppStrings.unknownError);
     }
   }
+}
+
+String _startOfDayBoundaryIso(DateTime date) {
+  final previousDay = date.subtract(const Duration(days: 1));
+  final yyyyMmDd = previousDay.toIso8601String().substring(0, 10);
+  return '${yyyyMmDd}T18:30:00.000Z';
+}
+
+String _endOfDayBoundaryIso(DateTime date) {
+  final yyyyMmDd = date.toIso8601String().substring(0, 10);
+  return '${yyyyMmDd}T18:29:59.999Z';
 }
 
 Never _throwMappedDioException(DioException e) {

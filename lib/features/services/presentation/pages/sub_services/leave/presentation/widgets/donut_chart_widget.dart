@@ -51,9 +51,9 @@ class DonutChartWidget extends StatelessWidget {
               ),
               SizedBox(height: screenHeight * 0.005), // 0.5% of screen height
               Text(
-                "${totalLeaves.toStringAsFixed(1)} Day(s)",
+                "${totalLeaves.toStringAsFixed(2)} Day(s)",
                 style: AppTextStyles.bodySmall(context).copyWith(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w500,
                   color: AppColors.textSecondary,
                 ),
               ),

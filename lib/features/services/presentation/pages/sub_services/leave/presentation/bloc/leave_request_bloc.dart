@@ -103,6 +103,8 @@ class LeaveRequestBloc extends Bloc<LeaveRequestEvent, LeaveRequestState> {
       dayType: event.dayType,
       description: event.description,
       requestTo: event.requestTo,
+      leaveStartTime: event.leaveStartTime,
+      leaveEndTime: event.leaveEndTime,
     );
 
     result.fold(

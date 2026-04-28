@@ -41,6 +41,7 @@ import '../../../leaves/data/repositories/approvers_repository_impl.dart';
 import '../../../leaves/domain/usecases/get_approvers.dart';
 import '../../../leaves/presentation/widgets/approvers_section.dart';
 import '../widgets/on_duty_activity_bottom_sheet.dart';
+import 'on_duty_request_page.dart';
 
 class OnDutyDetailPage extends StatefulWidget {
   final OnDutyRequestModel onDutyRequest;
@@ -69,11 +70,15 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
   void initState() {
     super.initState();
     final networkInfo = NetworkInfoImpl(Connectivity());
-    final apiClient = ApiClient(dio: Dio(), networkInfo: networkInfo,onTokenExpired: () {
-      AppNavigator.pushAndRemoveAll(
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-      );
-    },);
+    final apiClient = ApiClient(
+      dio: Dio(),
+      networkInfo: networkInfo,
+      onTokenExpired: () {
+        AppNavigator.pushAndRemoveAll(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      },
+    );
     final remoteDataSource = OnDutyRemoteDataSourceImpl(apiClient: apiClient);
     final repository = OnDutyRepositoryImpl(remoteDataSource: remoteDataSource);
 
@@ -148,10 +153,11 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
               state is OnDutyDetailStatusUpdating ||
               state is OnDutyCommentSubmitting;
 
-          return WillPopScope(
-            onWillPop: () async {
+          return PopScope(
+            canPop: false,
+            onPopInvokedWithResult: (didPop, result) {
+              if (didPop) return;
               Navigator.of(context).pop(_shouldRefreshListing);
-              return false;
             },
             child: Stack(
               children: [
@@ -201,12 +207,16 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
                   bottomNavigationBar:
                       widget.isApprovalMode
                           ? BottomNavBar(
-                        currentIndex: 4,
-                        onTap: NavigationHelper.getBottomNavHandler(context),
-                      )
+                            currentIndex: 4,
+                            onTap: NavigationHelper.getBottomNavHandler(
+                              context,
+                            ),
+                          )
                           : BottomNavBar(
                             currentIndex: 3,
-                            onTap: NavigationHelper.getBottomNavHandler(context),
+                            onTap: NavigationHelper.getBottomNavHandler(
+                              context,
+                            ),
                           ),
                   body:
                       state is OnDutyDetailError && state.detail == null
@@ -234,7 +244,7 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
                 ),
                 if (isBusy)
                   Container(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     child: const Center(child: CircularProgressIndicator()),
                   ),
               ],
@@ -268,11 +278,10 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
               currentRequest,
               statusColor,
               detail,
-              comments
-            )
+              comments,
+            ),
 
           // shown while loading
-
         ],
       ),
     );
@@ -285,7 +294,7 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
     OnDutyRequestModel currentRequest,
     Color statusColor,
     OnDutyDetail? onDutyDetail,
-      List<AttendanceRequestComment> comments
+    List<AttendanceRequestComment> comments,
   ) {
     final dateFormat = DateFormat('dd MMM yyyy');
     final dateTimeFormat = DateFormat('dd MMM yyyy, hh:mm a');
@@ -294,7 +303,10 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
         currentRequest.toDate == null;
     final requestId = int.tryParse(widget.onDutyRequest.id) ?? 0;
     final isPending = currentRequest.status == OnDutyStatus.pending;
+
     final menuActions = <Map<String, String>>[
+      if (isPending && !widget.isApprovalMode)
+        {'value': 'Edit', 'icon': AppAssets.editIconwfh},
       if (isPending && !widget.isApprovalMode)
         {'value': 'Withdraw', 'icon': AppAssets.withdrawIcon},
       {'value': 'Activity', 'icon': AppAssets.activityIcon},
@@ -307,7 +319,7 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
         border: Border.all(color: AppColors.border, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -331,8 +343,27 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
               if (menuActions.length >= 2)
                 PopupMenuButton<String>(
                   icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
-                  onSelected: (value) {
-                    if (value == 'Withdraw') {
+                  onSelected: (value) async {
+                    if (value == 'Edit') {
+                      final updated = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder:
+                              (_) => OnDutyRequestPage(
+                                onDutyRequest: currentRequest,
+                              ),
+                        ),
+                      );
+                      if (updated == true && context.mounted) {
+                        _shouldRefreshListing = true;
+                        context.read<OnDutyDetailBloc>().add(
+                          LoadOnDutyDetail(
+                            requestId:
+                                int.tryParse(widget.onDutyRequest.id) ?? 0,
+                            clientId: _clientId,
+                          ),
+                        );
+                      }
+                    } else if (value == 'Withdraw') {
                       context.read<OnDutyDetailBloc>().add(
                         UpdateOnDutyRequestStatus(
                           requestId: requestId,
@@ -386,9 +417,28 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
               else if (menuActions.length == 1)
                 InkWell(
                   borderRadius: BorderRadius.circular(20),
-                  onTap: () {
+                  onTap: () async {
                     final action = menuActions.first['value'];
-                    if (action == 'Withdraw') {
+                    if (action == 'Edit') {
+                      final updated = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder:
+                              (_) => OnDutyRequestPage(
+                                onDutyRequest: currentRequest,
+                              ),
+                        ),
+                      );
+                      if (updated == true && context.mounted) {
+                        _shouldRefreshListing = true;
+                        context.read<OnDutyDetailBloc>().add(
+                          LoadOnDutyDetail(
+                            requestId:
+                                int.tryParse(widget.onDutyRequest.id) ?? 0,
+                            clientId: _clientId,
+                          ),
+                        );
+                      }
+                    } else if (action == 'Withdraw') {
                       context.read<OnDutyDetailBloc>().add(
                         UpdateOnDutyRequestStatus(
                           requestId: requestId,
@@ -591,9 +641,7 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
                   approverUsers.length == 1
                       ? approverUsers.first.fullName
                       : '${approverUsers.length} approvers',
-                  style: AppTextStyles.bodySmall(
-                    context,
-                  ).copyWith(
+                  style: AppTextStyles.bodySmall(context).copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w500,
                   ),
@@ -689,7 +737,7 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
         border: Border.all(color: AppColors.border, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -715,7 +763,7 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
                   vertical: screenHeight * 0.004,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.attendanceTeal.withOpacity(0.08),
+                  color: AppColors.attendanceTeal.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -1001,7 +1049,8 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
                       scrollController: scrollController,
                       endpoint: AppUrls.onDutyRequestDetails,
                       payload: {
-                        'request_id': int.tryParse(widget.onDutyRequest.id) ?? 0,
+                        'request_id':
+                            int.tryParse(widget.onDutyRequest.id) ?? 0,
                       },
                     ),
                   ),
@@ -1080,8 +1129,7 @@ class _OnDutyDetailPageState extends State<OnDutyDetailPage> {
   Color _getStatusColor(OnDutyStatus status) {
     switch (status) {
       case OnDutyStatus.pending:
-        return AppColors
-            .approvalSheetPending; // 0xFF2196F3
+        return AppColors.approvalSheetPending; // 0xFF2196F3
       case OnDutyStatus.approved:
         return AppColors.approvalSheetAccept; // 0xFF12B76A
       case OnDutyStatus.rejected:
@@ -1109,9 +1157,10 @@ class _OnDutyApproverAvatarStack extends StatelessWidget {
 
     final width =
         visibleUsers.length == 1
-            ? avatarSize+ (edgePadding * 2)
-            : avatarSize + ((visibleUsers.length - 1) * (avatarSize - overlap))+
-            (edgePadding * 2);
+            ? avatarSize + (edgePadding * 2)
+            : avatarSize +
+                ((visibleUsers.length - 1) * (avatarSize - overlap)) +
+                (edgePadding * 2);
 
     return SizedBox(
       width: width,
@@ -1130,7 +1179,9 @@ class _OnDutyApproverAvatarStack extends StatelessWidget {
                 ),
                 child: CircleAvatar(
                   radius: avatarSize / 2,
-                  backgroundColor: _parseAvatarColor(visibleUsers[i].profileColor),
+                  backgroundColor: _parseAvatarColor(
+                    visibleUsers[i].profileColor,
+                  ),
                   backgroundImage:
                       visibleUsers[i].imageUrl != null &&
                               visibleUsers[i].imageUrl!.isNotEmpty
@@ -1140,16 +1191,14 @@ class _OnDutyApproverAvatarStack extends StatelessWidget {
                       visibleUsers[i].imageUrl == null ||
                               visibleUsers[i].imageUrl!.isEmpty
                           ? Text(
-                              visibleUsers[i].fullName.isNotEmpty
-                                  ? visibleUsers[i].fullName[0].toUpperCase()
-                                  : '?',
-                              style: AppTextStyles.bodyMedium(
-                                context,
-                              ).copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            )
+                            visibleUsers[i].fullName.isNotEmpty
+                                ? visibleUsers[i].fullName[0].toUpperCase()
+                                : '?',
+                            style: AppTextStyles.bodyMedium(context).copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
                           : null,
                 ),
               ),

@@ -104,18 +104,21 @@ class TimeUtils {
         String? punchIn,
         String? punchOut,
         String? punchInIp,
+        bool? isActiveSessionOverride,
       })
   {
     final hasPunchOut = punchOut != null && punchOut.isNotEmpty && punchOut != '-';
 
     final hasPunchIn = punchIn != null && punchIn.isNotEmpty && punchIn != '-';
-    final isPunchedIn = isActivePunchSession(
-      status: status,
-      entries: entries,
-      punchType: punchType,
-      punchIn: punchIn,
-      punchOut: punchOut,
-    );
+    final isPunchedIn =
+        isActiveSessionOverride ??
+        isActivePunchSession(
+          status: status,
+          entries: entries,
+          punchType: punchType,
+          punchIn: punchIn,
+          punchOut: punchOut,
+        );
 
     if (isPunchedIn && hasPunchIn) {
       // Live calculation from punch in to now

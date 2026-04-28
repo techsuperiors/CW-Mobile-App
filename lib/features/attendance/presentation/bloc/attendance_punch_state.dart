@@ -91,3 +91,14 @@ class AttendancePendingSyncSuccess extends AttendancePunchState {
   @override
   List<Object?> get props => [message, _emittedAt];
 }
+
+class AttendancePendingSyncExpired extends AttendancePunchState {
+  final String message;
+  final DateTime _emittedAt;
+
+  AttendancePendingSyncExpired({required this.message})
+    : _emittedAt = DateTime.now();
+
+  @override
+  List<Object?> get props => [message, _emittedAt];
+}

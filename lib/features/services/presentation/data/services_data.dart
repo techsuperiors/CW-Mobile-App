@@ -50,15 +50,15 @@ class ServicesData {
         backgroundColor: AppColors.serviceOrangeBg,
         requiredPermission: 'Employee Agreements:Employee Agreements:Read',
       ),
-      // ServiceModel(
-      //   id: '5',
-      //   title: AppStrings.visit,
-      //   description: AppStrings.visitDescription,
-      //   iconPath: AppAssets.iconVisit,
-      //   iconColor: AppColors.serviceBlue,
-      //   backgroundColor: AppColors.serviceBlueBg,
-      //   requiredPermission: 'Visit & Geo Tracking:Dashboard:Read',
-      // ),
+      ServiceModel(
+        id: '5',
+        title: AppStrings.visit,
+        description: AppStrings.visitDescription,
+        iconPath: AppAssets.iconVisit,
+        iconColor: AppColors.serviceBlue,
+        backgroundColor: AppColors.serviceBlueBg,
+        requiredPermission: 'Visit & Geo Tracking:Dashboard:Read',
+      ),
       ServiceModel(
         id: '6',
         title: AppStrings.expenses,
@@ -107,6 +107,31 @@ class ServicesData {
           'Ticket Management:My Tickets:Read',
         ],
       ),
+      ServiceModel(
+        id: '11',
+        title: AppStrings.employeeDirectory,
+        description: AppStrings.employeeDirectorySubText,
+        iconPath: AppAssets.iconTickets,
+        iconColor: AppColors.servicePinkDark,
+        backgroundColor: AppColors.servicePinkDarkBg,
+        // anyOfPermissions: [
+        //   'Ticket Management:Ticket Dashboard:Read',
+        //   'Ticket Management:My Tickets:Read',
+        // ],
+      ),
+
+      // ServiceModel(
+      //   id: '12',
+      //   title: AppStrings.account,
+      //   description: AppStrings.accountSubText,
+      //   iconPath: AppAssets.iconTickets,
+      //   iconColor: AppColors.servicePinkDark,
+      //   backgroundColor: AppColors.servicePinkDarkBg,
+      //   // anyOfPermissions: [
+      //   //   'Ticket Management:Ticket Dashboard:Read',
+      //   //   'Ticket Management:My Tickets:Read',
+      //   // ],
+      // ),
     ];
   }
 }

@@ -52,7 +52,7 @@ class _ApplyOvertimePageState extends State<ApplyOvertimePage> {
   // Auto-filled from API (read-only)
   DateTime? _checkInDateTime;
   DateTime? _checkOutDateTime;
-  int? _overtimeTotalMinutes; // over_time.total from API
+  int? _overtimeTotalSeconds; // over_time.total from API
 
   bool _isLoadingAttendance = false;
   String? _attendanceError;
@@ -123,11 +123,12 @@ class _ApplyOvertimePageState extends State<ApplyOvertimePage> {
           ),
     );
     if (picked == null) return;
+    if (!mounted) return;
     setState(() {
       _requestDate = picked;
       _checkInDateTime = null;
       _checkOutDateTime = null;
-      _overtimeTotalMinutes = null;
+      _overtimeTotalSeconds = null;
       _attendanceError = null;
     });
 
@@ -152,19 +153,22 @@ class _ApplyOvertimePageState extends State<ApplyOvertimePage> {
       final AttendanceDayDetailModel model = await _attendanceDataSource
           .getAttendanceDayDetail(userId: userId, date: apiDate);
 
-      DateTime? punchIn;
-      DateTime? punchOut;
-      if (model.punchIn != null) {
-        punchIn = DateTime.tryParse(model.punchIn!)?.toLocal();
-      }
-      if (model.punchOut != null) {
-        punchOut = DateTime.tryParse(model.punchOut!)?.toLocal();
-      }
+      final effectivePunchIn =
+          (model.regularizePunchIn?.trim().isNotEmpty ?? false)
+              ? model.regularizePunchIn
+              : model.punchIn;
+      final effectivePunchOut =
+          (model.regularizePunchOut?.trim().isNotEmpty ?? false)
+              ? model.regularizePunchOut
+              : model.punchOut;
+
+      final punchIn = DateTime.tryParse(effectivePunchIn ?? '')?.toLocal();
+      final punchOut = DateTime.tryParse(effectivePunchOut ?? '')?.toLocal();
 
       setState(() {
         _checkInDateTime = punchIn;
         _checkOutDateTime = punchOut;
-        _overtimeTotalMinutes = model.overTime?.total;
+        _overtimeTotalSeconds = model.overTime?.total;
         _isLoadingAttendance = false;
         _attendanceError = null;
       });
@@ -174,7 +178,7 @@ class _ApplyOvertimePageState extends State<ApplyOvertimePage> {
         _attendanceError = 'Could not load attendance data for this date';
         _checkInDateTime = null;
         _checkOutDateTime = null;
-        _overtimeTotalMinutes = null;
+        _overtimeTotalSeconds = null;
       });
     }
   }
@@ -182,11 +186,11 @@ class _ApplyOvertimePageState extends State<ApplyOvertimePage> {
   /// Format DateTime to display time (e.g. "10:26 AM")
   String _formatTime(DateTime dt) => DateFormat('hh:mm a').format(dt);
 
-  /// Format total overtime minutes to "Xh Ym"
-  String _formatOvertimeMinutes(int? totalMinutes) {
-    if (totalMinutes == null) return '-- h -- m';
-    final h = totalMinutes ~/ 60;
-    final m = totalMinutes % 60;
+  /// Format total overtime seconds to "Xh Ym"
+  String _formatOvertimeDuration(int? totalSeconds) {
+    if (totalSeconds == null) return '-- h -- m';
+    final h = totalSeconds ~/ 3600;
+    final m = (totalSeconds % 3600) ~/ 60;
     return '${h}h ${m}m';
   }
 
@@ -429,7 +433,7 @@ class _ApplyOvertimePageState extends State<ApplyOvertimePage> {
                                   ),
                                 ),
                                 Text(
-                                  _formatOvertimeMinutes(_overtimeTotalMinutes),
+                                  _formatOvertimeDuration(_overtimeTotalSeconds),
                                   style: AppTextStyles.bodyMedium(
                                     context,
                                   ).copyWith(
@@ -561,7 +565,7 @@ class _ApplyOvertimePageState extends State<ApplyOvertimePage> {
                 ),
                 if (isSubmitting)
                   Container(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     child: const Center(child: CircularProgressIndicator()),
                   ),
               ],
@@ -593,7 +597,7 @@ class _ApplyOvertimePageState extends State<ApplyOvertimePage> {
             vertical: screenHeight * 0.018,
           ),
           decoration: BoxDecoration(
-            color: AppColors.textSecondary.withOpacity(0.07),
+            color: AppColors.textSecondary.withValues(alpha: 0.07),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.border),
           ),
@@ -642,7 +646,7 @@ class _ApplyOvertimePageState extends State<ApplyOvertimePage> {
             vertical: screenHeight * 0.018,
           ),
           decoration: BoxDecoration(
-            color: AppColors.textSecondary.withOpacity(0.07),
+            color: AppColors.textSecondary.withValues(alpha: 0.07),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.border),
           ),

@@ -51,7 +51,7 @@ class AppStrings {
   static const String enterPassword = 'Enter password';
   static const String pleaseEnterUsername = 'Please enter your username';
   static const String pleaseEnterEmailOrMobile =
-      'Please enter email or mobile number';
+      'Please enter your registered email';
   static const String pleaseEnterPassword = 'Please enter your password';
   static const String forgotPassword = 'Forgot Password?';
   static const String forgetPassword = 'Forget password';
@@ -288,5 +288,15 @@ class AppStrings {
 
   //Posts
   static const String selectAudience = 'Select Audience';
+
+  //Employee Directory
+  static const String employeeDirectory = 'Employee Directory';
+  static const String employeeDirectorySubText = 'Access Employee Information';
+
+  //Visit
+  static const String account = 'Accounts';
+  static const String accountSubText = 'Account Information';
+
+
 
 }

@@ -21,6 +21,8 @@ import '../../../../../../../../core/widgets/responsive_scaffold.dart';
 import '../../../../../../../../core/widgets/status_tabbed_section.dart';
 import '../../../../../../../authentication/presentation/pages/login_page.dart';
 import '../../../../../../../home/presentation/widgets/bottom_nav_bar.dart';
+import '../../../../../../../user/presentation/bloc/user_profile_bloc.dart';
+import '../../../../../../../user/presentation/bloc/user_profile_state.dart';
 import '../../bloc/wfh_request_bloc.dart';
 import '../../bloc/wfh_request_event.dart';
 import '../../bloc/wfh_request_state.dart';
@@ -538,38 +540,48 @@ class _WfhPageListingState extends State<WfhPageListing>
             ),
           ),
           SizedBox(width: screenWidth * 0.042),
-          PermissionGuard(
-            requiredPermission: "Attendance:WFH Request:Write",
-            child: SizedBox(
-              height: screenHeight * 0.050,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ApplyWfhPage(),
-                      ),
-                    );
-                    if (result == true && context.mounted) {
-                      context.read<WfhRequestBloc>().add(
-                        LoadWfhRequests(
-                          clientId: clientId,
-                          status: _selectedTabStatus,
-                          limit: _pageSize,
-                          forceRefresh: true,
+          if (_canRaiseWfhRequest(context))
+            PermissionGuard(
+              requiredPermission: "Attendance:WFH Request:Write",
+              child: SizedBox(
+                height: screenHeight * 0.050,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ApplyWfhPage(),
                         ),
                       );
-                    }
-                  },
-                  child: SvgPicture.asset(AppAssets.addIcon),
+                      if (result == true && context.mounted) {
+                        context.read<WfhRequestBloc>().add(
+                          LoadWfhRequests(
+                            clientId: clientId,
+                            status: _selectedTabStatus,
+                            limit: _pageSize,
+                            forceRefresh: true,
+                          ),
+                        );
+                      }
+                    },
+                    child: SvgPicture.asset(AppAssets.addIcon),
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
+  }
+
+  bool _canRaiseWfhRequest(BuildContext context) {
+    final profileState = context.read<UserProfileBloc>().state;
+    if (profileState is! UserProfileLoaded) {
+      return false;
+    }
+
+    return profileState.profile.enabledWorkFromHome;
   }
 }

@@ -69,6 +69,8 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
   late final PolicyPdfEditorController _pdfEditorController;
   Uint8List? _legacySignatureBytes;
   bool _isDownloading = false;
+  bool _isPreparingConsentSubmission = false;
+  bool _hasSubmittedConsent = false;
   File? _previewPdfFile;
   bool _isPreparingPreview = true;
   String? _previewError;
@@ -79,16 +81,21 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
   bool get _hasHtmlContent =>
       widget.content != null && widget.content!.trim().isNotEmpty;
 
-  bool get _isSigned => widget.status.toLowerCase() == 'signed';
+  bool get _isSigned =>
+      _hasSubmittedConsent || widget.status.toLowerCase() == 'signed';
 
-  bool get _canDownloadSignedDocument =>
-       (_hasPdfDocument || _hasHtmlContent);
+  bool get _canDownloadSignedDocument => (_hasPdfDocument || _hasHtmlContent);
 
   bool get _hasPreviewSource => _hasPdfDocument || _hasHtmlContent;
 
   bool get _isEditableAgreement => !widget.showDocumentsOnly && !_isSigned;
 
   bool get _usesLegacyHtmlPreview => _hasHtmlContent && !_hasPdfDocument;
+
+  bool get _canUseGeneratedLegacyPdfPreview =>
+      _usesLegacyHtmlPreview &&
+      _previewError == null &&
+      (_isPreparingPreview || _previewPdfFile != null);
 
   RegExp get _legacySignaturePlaceholderPattern => RegExp(
     r"""^\s*(?:<p[^>]*>\s*)?<span[^>]*data-lexical-mention=(['"])true\1[^>]*>\s*\[Candidate Signature\]\s*<\/span>(?:\s*<\/p>)?\s*""",
@@ -112,7 +119,7 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
   void initState() {
     super.initState();
     _pdfEditorController = PolicyPdfEditorController();
-    if (!_usesLegacyHtmlPreview) {
+    if (_hasPreviewSource) {
       _preparePreviewPdf();
     } else {
       _isPreparingPreview = false;
@@ -128,6 +135,7 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
   @override
   Widget build(BuildContext context) {
     return ResponsiveScaffold(
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: AppColors.background,
@@ -198,7 +206,9 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
       ),
       body:
           _usesLegacyHtmlPreview
-              ? _buildLegacyHtmlLayout(context)
+              ? _canUseGeneratedLegacyPdfPreview
+                  ? _buildLegacyHtmlPdfPreviewLayout(context)
+                  : _buildLegacyHtmlLayout(context)
               : _hasPreviewSource
               ? _buildPdfLayout(context)
               : Center(
@@ -225,6 +235,7 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.05),
@@ -235,6 +246,70 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
             ),
             child: _buildConsentSection(context),
           ),
+      ],
+    );
+  }
+
+  // Widget _buildLegacyHtmlPdfPreviewLayout(BuildContext context) {
+  //   if (_isEditableAgreement) {
+  //     return Column(
+  //       children: [
+  //         Expanded(child: _buildPdfViewer()),
+  //         AppSpacing.vSm,
+  //         Container(
+  //           margin: EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+  //           decoration: BoxDecoration(
+  //             color: Colors.white,
+  //             borderRadius: BorderRadius.circular(12),
+  //             boxShadow: [
+  //               BoxShadow(
+  //                 color: Colors.black.withValues(alpha: 0.05),
+  //                 blurRadius: 8,
+  //                 offset: const Offset(0, -2),
+  //               ),
+  //             ],
+  //           ),
+  //           child: _buildLegacyConsentSection(context),
+  //         ),
+  //       ],
+  //     );
+  //   }
+  //
+  //   return Column(children: [Expanded(child: _buildPdfViewer())]);
+  // }
+
+  Widget _buildLegacyHtmlPdfPreviewLayout(BuildContext context) {
+    if (_isEditableAgreement) {
+      return ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.68,
+            child: _buildPdfViewer(),
+          ),
+          AppSpacing.vSm,
+          Container(
+            margin: EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: _buildLegacyConsentSection(context),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        Expanded(child: _buildPdfViewer()),
       ],
     );
   }
@@ -401,9 +476,12 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
         padding: EdgeInsets.zero,
         children: [
           _buildEditablePdfContent(),
+          AppSpacing.vSm,
           Container(
+            margin: EdgeInsets.symmetric(horizontal: AppSpacing.xs),
             decoration: BoxDecoration(
               color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.05),
@@ -418,9 +496,7 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
       );
     }
 
-    return Column(
-      children: [Expanded(child: _buildPdfViewer())],
-    );
+    return Column(children: [Expanded(child: _buildPdfViewer())]);
   }
 
   Future<void> _preparePreviewPdf() async {
@@ -467,7 +543,7 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppSpacing.vLg,
+            AppSpacing.vXs,
             Padding(
               padding: AppSpacing.pagePadding,
               child: Column(
@@ -515,31 +591,31 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
                         ),
                     ],
                   ),
-                  if (_pdfEditorController.placementMessage != null) ...[
-                    AppSpacing.vMd,
-                    Container(
-                      width: double.infinity,
-                      padding: AppSpacing.cardPaddingSmall,
-                      decoration: BoxDecoration(
-                        color: AppColors.info.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: AppColors.info.withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: Text(
-                        _pdfEditorController.placementMessage!,
-                        style: AppTextStyles.bodySmall(context).copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
+                  // if (_pdfEditorController.placementMessage != null) ...[
+                  //   AppSpacing.vMd,
+                  //   Container(
+                  //     width: double.infinity,
+                  //     padding: AppSpacing.cardPaddingSmall,
+                  //     decoration: BoxDecoration(
+                  //       color: AppColors.info.withValues(alpha: 0.10),
+                  //       borderRadius: BorderRadius.circular(10),
+                  //       border: Border.all(
+                  //         color: AppColors.info.withValues(alpha: 0.25),
+                  //       ),
+                  //     ),
+                  //     child: Text(
+                  //       _pdfEditorController.placementMessage!,
+                  //       style: AppTextStyles.bodySmall(context).copyWith(
+                  //         color: AppColors.textPrimary,
+                  //         fontWeight: FontWeight.w500,
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ],
                 ],
               ),
             ),
-            AppSpacing.vLg,
+            // AppSpacing.vSm,
             Row(
               children: [
                 Checkbox(
@@ -568,7 +644,12 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
               child: BlocConsumer<AgreementBloc, AgreementState>(
                 listener: (context, state) {
                   if (state is AgreementConsentSubmitted) {
-                    final navigator = Navigator.of(context);
+                    if (mounted) {
+                      setState(() {
+                        _isPreparingConsentSubmission = false;
+                        _hasSubmittedConsent = true;
+                      });
+                    }
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -586,13 +667,12 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
                         RefreshAgreementList(userId),
                       );
                     }
-
-                    Future.delayed(const Duration(milliseconds: 500), () {
-                      if (mounted) {
-                        navigator.pop(true);
-                      }
-                    });
                   } else if (state is AgreementConsentError) {
+                    if (mounted) {
+                      setState(() {
+                        _isPreparingConsentSubmission = false;
+                      });
+                    }
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(state.message),
@@ -602,15 +682,15 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
                   }
                 },
                 builder: (context, state) {
-                  final isSubmitting = state is AgreementConsentSubmitting;
+                  final isSubmitting =
+                      _isPreparingConsentSubmission ||
+                      state is AgreementConsentSubmitting;
 
                   return SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed:
-                          (_isAgreed &&
-                                  hasRequiredSignature &&
-                                  !isSubmitting)
+                          (_isAgreed && hasRequiredSignature && !isSubmitting)
                               ? () => _submitAgreementConsent(context)
                               : null,
                       style: OutlinedButton.styleFrom(
@@ -620,8 +700,7 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
                           width: 1.5,
                         ),
                         padding: EdgeInsets.symmetric(
-                          vertical:
-                              MediaQuery.of(context).size.height * 0.0175,
+                          vertical: MediaQuery.of(context).size.height * 0.0175,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -684,30 +763,27 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
               ).copyWith(color: AppColors.textSecondary),
             ),
           ),
-        Padding(
-          padding: AppSpacing.pagePadding,
-          child: Row(
-            children: [
-              Checkbox(
-                value: _isAgreed,
-                onChanged: (value) {
-                  setState(() {
-                    _isAgreed = value ?? false;
-                  });
-                },
-                activeColor: Theme.of(context).colorScheme.primary,
-              ),
-              Expanded(
-                child: Text(
-                  'I have read and agree to the company policy',
-                  style: AppTextStyles.bodySmall(context).copyWith(
-                    fontWeight: FontWeight.w400,
-                    color: AppColors.textPrimary,
-                  ),
+        Row(
+          children: [
+            Checkbox(
+              value: _isAgreed,
+              onChanged: (value) {
+                setState(() {
+                  _isAgreed = value ?? false;
+                });
+              },
+              activeColor: Theme.of(context).colorScheme.primary,
+            ),
+            Expanded(
+              child: Text(
+                'I have read and agree to the company policy',
+                style: AppTextStyles.bodySmall(context).copyWith(
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.textPrimary,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         AppSpacing.vXxs,
         Padding(
@@ -715,7 +791,12 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
           child: BlocConsumer<AgreementBloc, AgreementState>(
             listener: (context, state) {
               if (state is AgreementConsentSubmitted) {
-                final navigator = Navigator.of(context);
+                if (mounted) {
+                  setState(() {
+                    _isPreparingConsentSubmission = false;
+                    _hasSubmittedConsent = true;
+                  });
+                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
@@ -728,15 +809,17 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
                 final userProfileState = context.read<UserProfileBloc>().state;
                 if (userProfileState is UserProfileLoaded) {
                   final userId = userProfileState.profile.userId;
-                  context.read<AgreementBloc>().add(RefreshAgreementList(userId));
+                  context.read<AgreementBloc>().add(
+                    RefreshAgreementList(userId),
+                  );
                 }
 
-                Future.delayed(const Duration(milliseconds: 500), () {
-                  if (mounted) {
-                    navigator.pop(true);
-                  }
-                });
               } else if (state is AgreementConsentError) {
+                if (mounted) {
+                  setState(() {
+                    _isPreparingConsentSubmission = false;
+                  });
+                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(state.message),
@@ -746,7 +829,9 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
               }
             },
             builder: (context, state) {
-              final isSubmitting = state is AgreementConsentSubmitting;
+              final isSubmitting =
+                  _isPreparingConsentSubmission ||
+                  state is AgreementConsentSubmitting;
               final canSubmit =
                   _isAgreed &&
                   (_legacyCanSubmitWithoutSignature || _hasLegacySignature) &&
@@ -800,7 +885,15 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
 
   Widget _buildEditablePdfContent() {
     if (_isPreparingPreview) {
-      return const Center(child: CircularProgressIndicator());
+      return Container(
+        height: MediaQuery.sizeOf(context).height * 0.5,
+        margin: EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     if (_previewError != null) {
@@ -1133,7 +1226,8 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
                     child: pw.Container(
                       width: annotation.widthRatio * page.width.toDouble(),
                       constraints: pw.BoxConstraints(
-                        minHeight: annotation.heightRatio * page.height.toDouble(),
+                        minHeight:
+                            annotation.heightRatio * page.height.toDouble(),
                       ),
                       child: pw.Text(
                         annotation.text!.trim(),
@@ -1297,13 +1391,13 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
     final contentWithSignature =
         _usesLegacyHtmlPreview
             ? _showsLegacySignaturePlaceholder
-            ? htmlContent.replaceFirst(
-              _legacySignaturePlaceholderPattern,
-              effectiveSignatureTag.isEmpty
-                  ? ''
-                  : '<div style="margin-bottom:16px;">$effectiveSignatureTag</div>',
-            )
-            : htmlContent
+                ? htmlContent.replaceFirst(
+                  _legacySignaturePlaceholderPattern,
+                  effectiveSignatureTag.isEmpty
+                      ? ''
+                      : '<div style="margin-bottom:16px;">$effectiveSignatureTag</div>',
+                )
+                : htmlContent
             : _showsLegacySignaturePlaceholder
             ? htmlContent.replaceFirst(
               _legacySignaturePlaceholderPattern,
@@ -1312,7 +1406,10 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
                   : '<div style="margin-bottom:16px;">$effectiveSignatureTag</div>',
             )
             : htmlContent.contains('[Candidate Signature]')
-            ? htmlContent.replaceAll('[Candidate Signature]', effectiveSignatureTag)
+            ? htmlContent.replaceAll(
+              '[Candidate Signature]',
+              effectiveSignatureTag,
+            )
             : '$htmlContent${effectiveSignatureTag.isEmpty ? '' : '<div style="margin-top:16px;">$effectiveSignatureTag</div>'}';
 
     final normalized = _wrapHtmlDocument(contentWithSignature);
@@ -1539,6 +1636,11 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
+      if (mounted) {
+        setState(() {
+          _isPreparingConsentSubmission = true;
+        });
+      }
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final signedPdfFile = File(
@@ -1568,6 +1670,9 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
       });
     } catch (e) {
       if (!mounted) return;
+      setState(() {
+        _isPreparingConsentSubmission = false;
+      });
       messenger.showSnackBar(
         SnackBar(
           content: Text('Failed to submit agreement: ${e.toString()}'),
@@ -1592,6 +1697,11 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
+      if (mounted) {
+        setState(() {
+          _isPreparingConsentSubmission = true;
+        });
+      }
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final signedPdfFile = await _generateAgreementPdfFile(
@@ -1618,6 +1728,9 @@ class _CommonAgreementDetailPageState extends State<CommonAgreementDetailPage> {
       });
     } catch (e) {
       if (!mounted) return;
+      setState(() {
+        _isPreparingConsentSubmission = false;
+      });
       messenger.showSnackBar(
         SnackBar(
           content: Text('Failed to submit agreement: ${e.toString()}'),

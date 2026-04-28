@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:collectivWork/core/constants/app_strings.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
@@ -191,33 +193,68 @@ class _CreatePostTypeSheetState extends State<CreatePostTypeSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final maxHeight = MediaQuery.of(context).size.height * 0.92;
+    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
     return SafeArea(
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: AppSpacing.sectionLarge * 16,
-            maxHeight: maxHeight,
-          ),
-          child: Material(
-            color: AppColors.background,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(15),
-              topRight: Radius.circular(15),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                child:
-                    _currentStep == _CreatePostSheetStep.typeSelection
-                        ? _buildTypeSelectionStep(context)
-                        : _buildAudienceStep(context),
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.82,
+          minChildSize: 0.58,
+          maxChildSize: 0.95,
+          expand: false,
+          builder:
+              (context, scrollController) => Align(
+                alignment: Alignment.bottomCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppSpacing.sectionLarge * 16,
+                  ),
+                  child: Material(
+                    color: AppColors.background,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(15),
+                      topRight: Radius.circular(15),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: SingleChildScrollView(
+                      controller: scrollController,
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: EdgeInsets.fromLTRB(
+                        AppSpacing.lg,
+                        AppSpacing.lg,
+                        AppSpacing.lg,
+                        AppSpacing.lg + keyboardInset,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Center(
+                            child: Container(
+                              width: AppSpacing.sectionLarge,
+                              height: AppSpacing.xs,
+                              decoration: BoxDecoration(
+                                color: AppColors.borderDark,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                          ),
+                          AppSpacing.vMd,
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            child:
+                                _currentStep == _CreatePostSheetStep.typeSelection
+                                    ? _buildTypeSelectionStep(context)
+                                    : _buildAudienceStep(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
         ),
       ),
     );
@@ -330,7 +367,7 @@ class _CreatePostTypeSheetState extends State<CreatePostTypeSheet> {
                 ),
                 _AudienceScopeToggle(
                   label: 'Departments',
-                  value: state.departmentsSelected,
+                  value: state.departmentsSelected ||state.allUsersSelected,
                   onChanged: (value) {
                     setState(() {
                       _showDepartmentSuggestions = value;
@@ -347,7 +384,7 @@ class _CreatePostTypeSheetState extends State<CreatePostTypeSheet> {
                 ),
                 _AudienceScopeToggle(
                   label: 'Individuals',
-                  value: state.individualsSelected,
+                  value: state.individualsSelected ||state.allUsersSelected,
                   onChanged: (value) {
                     setState(() {
                       _showIndividualSuggestions = value;
@@ -367,7 +404,7 @@ class _CreatePostTypeSheetState extends State<CreatePostTypeSheet> {
             AppSpacing.vSm,
             Container(
               width: double.infinity,
-              height: AppSpacing.sectionLarge * 5,
+              height: AppSpacing.sectionLarge * 4,
               padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(AppSpacing.lg),
@@ -466,121 +503,187 @@ class _CreatePostTypeSheetState extends State<CreatePostTypeSheet> {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (state.departmentsSelected) ...[
-          _SelectionSearchField(
-            controller: _departmentSearchController,
-            hintText: 'Select Departments',
-            showSuggestions: _showDepartmentSuggestions,
-            onToggleSuggestions:
-                () => setState(
-                  () =>
-                      _showDepartmentSuggestions = !_showDepartmentSuggestions,
-                ),
-            onChanged: (_) => setState(() => _showDepartmentSuggestions = true),
-          ),
-          if (_selectedDepartments(state).isNotEmpty) ...[
-            AppSpacing.vSm,
-            _SelectionChipsWrap(
-              labels: _selectedDepartments(state)
-                  .map(
-                    (department) => _SelectionChipData(
-                      label: department.name,
-                      onRemove:
-                          () => context
-                              .read<CreatePostAudienceCubit>()
-                              .removeDepartment(department.id),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final suggestionMaxHeight =
+            constraints.maxHeight.isFinite
+                ? constraints.maxHeight * 0.42
+                : AppSpacing.sectionLarge * 2;
+        final suggestionMinHeight =
+            constraints.maxHeight.isFinite
+                ? math.min(
+                  AppSpacing.sectionLarge * 1.25,
+                  constraints.maxHeight * 0.24,
+                )
+                : AppSpacing.sectionLarge * 1.25;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (state.departmentsSelected) ...[
+              _SelectionSearchField(
+                controller: _departmentSearchController,
+                hintText: 'Select Departments',
+                showSuggestions: _showDepartmentSuggestions,
+                onToggleSuggestions:
+                    () => setState(
+                      () =>
+                          _showDepartmentSuggestions =
+                              !_showDepartmentSuggestions,
                     ),
-                  )
-                  .toList(growable: false),
-            ),
-          ],
-          if (_showDepartmentSuggestions) ...[
-            AppSpacing.vSm,
-            _SuggestionsList<CreatePostAudienceDepartmentEntity>(
-              items: departmentSuggestions,
-              itemLabel: (department) => department.name,
-              onSelected: (department) {
-                context.read<CreatePostAudienceCubit>().addDepartment(
-                  department,
-                );
-                setState(() {
-                  _departmentSearchController.clear();
-                  _showDepartmentSuggestions = false;
-                });
-              },
-              emptyText: 'No departments found',
-            ),
-          ],
-          AppSpacing.vMd,
-        ],
-        if (state.individualsSelected) ...[
-          _SelectionSearchField(
-            controller: _individualSearchController,
-            hintText: 'Select Individuals',
-            showSuggestions: _showIndividualSuggestions,
-            onToggleSuggestions:
-                () => setState(
-                  () =>
-                      _showIndividualSuggestions = !_showIndividualSuggestions,
-                ),
-            onChanged: (_) => setState(() => _showIndividualSuggestions = true),
-          ),
-          if (_selectedIndividualUsers(state).isNotEmpty) ...[
-            AppSpacing.vSm,
-            _SelectionChipsWrap(
-              labels: _selectedIndividualUsers(state)
-                  .map(
-                    (user) => _SelectionChipData(
-                      label: user.fullName,
-                      onRemove:
-                          () => context
-                              .read<CreatePostAudienceCubit>()
-                              .removeSelectedUser(user.id),
+                onChanged:
+                    (_) => setState(() => _showDepartmentSuggestions = true),
+              ),
+              if (_showDepartmentSuggestions) ...[
+                Flexible(
+                  fit: FlexFit.loose,
+                  flex: 6,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: _SuggestionsList<CreatePostAudienceDepartmentEntity>(
+                      items: departmentSuggestions,
+                      itemLabel: (department) => department.name,
+                      minHeight: suggestionMinHeight,
+                      maxHeight: suggestionMaxHeight,
+                      onSelected: (department) {
+                        context.read<CreatePostAudienceCubit>().addDepartment(
+                          department,
+                        );
+                        setState(() {
+                          _departmentSearchController.clear();
+                          _showDepartmentSuggestions = false;
+                        });
+                      },
+                      emptyText: 'No departments found',
                     ),
-                  )
-                  .toList(growable: false),
-            ),
-          ],
-          if (_showIndividualSuggestions) ...[
-            AppSpacing.vSm,
-            _SuggestionsList<CreatePostAudienceUserEntity>(
-              items: userSuggestions,
-              itemLabel: (user) => '${user.fullName} • ${user.email}',
-              onSelected: (user) {
-                context.read<CreatePostAudienceCubit>().addIndividualUser(user);
-                setState(() {
-                  _individualSearchController.clear();
-                  _showIndividualSuggestions = false;
-                });
-              },
-              emptyText: 'No individuals found',
-            ),
-          ],
-          AppSpacing.vMd,
-        ],
-        Expanded(
-          child:
-              selectedUsers.isEmpty
-                  ? Center(
-                    child: Text(
-                      'Select Audience',
-                      style: AppTextStyles.bodyLarge(
-                        context,
-                      ).copyWith(color: AppColors.textTertiary),
-                    ),
-                  )
-                  : _SelectedAudienceUsersList(
-                    users: selectedUsers,
-                    onRemove:
-                        (userId) => context
-                            .read<CreatePostAudienceCubit>()
-                            .removeSelectedUser(userId),
                   ),
-        ),
-      ],
+                ),
+              ],
+
+              if (_selectedDepartments(state).isNotEmpty) ...[
+                AppSpacing.vSm,
+                _SelectionChipsWrap(
+                  labels: _selectedDepartments(state)
+                      .map(
+                        (department) => _SelectionChipData(
+                          label: department.name,
+                          onRemove:
+                              () => context
+                                  .read<CreatePostAudienceCubit>()
+                                  .removeDepartment(department.id),
+                        ),
+                      )
+                      .toList(growable: false),
+                ),
+              ],
+              AppSpacing.vMd,
+            ],
+            if (state.individualsSelected) ...[
+              _SelectionSearchField(
+                controller: _individualSearchController,
+                hintText: 'Select Individuals',
+                showSuggestions: _showIndividualSuggestions,
+                onToggleSuggestions:
+                    () => setState(
+                      () =>
+                          _showIndividualSuggestions =
+                              !_showIndividualSuggestions,
+                    ),
+                onChanged:
+                    (_) => setState(() => _showIndividualSuggestions = true),
+              ),
+              if (_selectedIndividualUsers(state).isNotEmpty) ...[
+                AppSpacing.vSm,
+                _SelectionChipsWrap(
+                  labels: _selectedIndividualUsers(state)
+                      .map(
+                        (user) => _SelectionChipData(
+                          label: user.fullName,
+                          onRemove:
+                              () => context
+                                  .read<CreatePostAudienceCubit>()
+                                  .removeSelectedUser(user.id),
+                        ),
+                      )
+                      .toList(growable: false),
+                ),
+              ],
+              if (_showIndividualSuggestions) ...[
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: _SuggestionsList<CreatePostAudienceUserEntity>(
+                      items: userSuggestions,
+                      itemLabel: (user) => user.fullName,
+                      minHeight: suggestionMinHeight,
+                      maxHeight: suggestionMaxHeight,
+                      itemBuilder:
+                          (context, user) => Row(
+                            children: [
+                              AppAvatar(
+                                imageUrl: user.imageUrl,
+                                firstName: user.firstName,
+                                lastName: user.lastName,
+                                name: user.fullName,
+                                radius: AppSpacing.lg,
+                                backgroundColor: _profileBackgroundColor(
+                                  user.profileColor,
+                                ),
+                              ),
+                              AppSpacing.hMd,
+                              Expanded(
+                                child: Text(
+                                  user.fullName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.bodyMedium(
+                                    context,
+                                  ).copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                      onSelected: (user) {
+                        context
+                            .read<CreatePostAudienceCubit>()
+                            .addIndividualUser(user);
+                        setState(() {
+                          _individualSearchController.clear();
+                          _showIndividualSuggestions = false;
+                        });
+                      },
+                      emptyText: 'No individuals found',
+                    ),
+                  ),
+                ),
+              ],
+              AppSpacing.vMd,
+            ],
+            Expanded(
+              child:
+                  selectedUsers.isEmpty
+                      ? Center(
+                        child: Text(
+                          'Select Audience',
+                          style: AppTextStyles.bodyLarge(
+                            context,
+                          ).copyWith(color: AppColors.textTertiary),
+                        ),
+                      )
+                      : _SelectedAudienceUsersList(
+                        users: selectedUsers,
+                        onRemove:
+                            (userId) => context
+                                .read<CreatePostAudienceCubit>()
+                                .removeSelectedUser(userId),
+                      ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1069,14 +1172,20 @@ class _SelectionChipsWrap extends StatelessWidget {
 class _SuggestionsList<T> extends StatelessWidget {
   final List<T> items;
   final String Function(T item) itemLabel;
+  final Widget Function(BuildContext context, T item)? itemBuilder;
   final ValueChanged<T> onSelected;
   final String emptyText;
+  final double minHeight;
+  final double maxHeight;
 
   const _SuggestionsList({
     required this.items,
     required this.itemLabel,
+    this.itemBuilder,
     required this.onSelected,
     required this.emptyText,
+    this.minHeight = 0,
+    this.maxHeight = AppSpacing.sectionLarge * 2,
   });
 
   @override
@@ -1099,7 +1208,10 @@ class _SuggestionsList<T> extends StatelessWidget {
     }
 
     return Container(
-      constraints: BoxConstraints(maxHeight: AppSpacing.sectionLarge * 2),
+      constraints: BoxConstraints(
+        minHeight: minHeight,
+        maxHeight: maxHeight,
+      ),
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(AppSpacing.md),
@@ -1119,12 +1231,15 @@ class _SuggestionsList<T> extends StatelessWidget {
                 horizontal: AppSpacing.md,
                 vertical: AppSpacing.md,
               ),
-              child: Text(
-                itemLabel(item),
-                style: AppTextStyles.bodyMedium(
-                  context,
-                ).copyWith(color: AppColors.textPrimary),
-              ),
+              child:
+                  itemBuilder != null
+                      ? itemBuilder!(context, item)
+                      : Text(
+                        itemLabel(item),
+                        style: AppTextStyles.bodyMedium(
+                          context,
+                        ).copyWith(color: AppColors.textPrimary),
+                      ),
             ),
           );
         },

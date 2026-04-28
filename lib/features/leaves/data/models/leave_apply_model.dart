@@ -76,6 +76,8 @@ class UpdateLeaveRequest {
   final bool isClubbing;
   final String? endDate;
   final List<String?> clubing;
+  final String? leaveStartTime;
+  final String? leaveEndTime;
 
   UpdateLeaveRequest({
     required this.leaveId,
@@ -91,6 +93,8 @@ class UpdateLeaveRequest {
     required this.isClubbing,
     required this.endDate,
     required this.clubing,
+    this.leaveStartTime,
+    this.leaveEndTime,
   });
 
   Map<String, dynamic> toJson() {
@@ -108,6 +112,8 @@ class UpdateLeaveRequest {
       'is_clubing': isClubbing,
       'end_date': endDate,
       'clubing': clubing,
+      'leave_start_time': leaveStartTime,
+      'leave_end_time': leaveEndTime,
     };
   }
 }

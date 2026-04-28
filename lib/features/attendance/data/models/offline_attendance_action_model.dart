@@ -117,6 +117,14 @@ class OfflineAttendanceActionModel {
     );
   }
 
+  bool isForSameLocalDay(DateTime referenceTime) {
+    final localCreatedAt = createdAt.toLocal();
+    final localReferenceTime = referenceTime.toLocal();
+    return localCreatedAt.year == localReferenceTime.year &&
+        localCreatedAt.month == localReferenceTime.month &&
+        localCreatedAt.day == localReferenceTime.day;
+  }
+
   static String encodeList(List<OfflineAttendanceActionModel> items) {
     return jsonEncode(items.map((item) => item.toJson()).toList());
   }

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../../core/constants/app_text_styles.dart';
 import 'package:collectivWork/core/widgets/loading_widget.dart';
+import '../../domain/entities/leave_history_entity.dart';
 import '../bloc/leave_history/leave_history_bloc.dart';
 import '../bloc/leave_history/leave_history_state.dart';
 
@@ -18,7 +19,7 @@ class LeaveHistoryPage extends StatelessWidget {
         normalizedLeaveType.contains('loss of pay');
   }
 
-  bool _isPositiveChange(dynamic record) {
+  bool _isPositiveChange(LeaveHistoryEntity record) {
     final normalizedAction = record.action.trim().toLowerCase();
     if (!_isLopHistory) {
       return normalizedAction == 'addition';
@@ -35,9 +36,46 @@ class LeaveHistoryPage extends StatelessWidget {
     return normalizedAction == 'addition';
   }
 
-  String _changeLabel(dynamic record, bool isPositive) {
+  String _changeLabel(LeaveHistoryEntity record, bool isPositive) {
     final amount = record.leaveCount.abs();
     return isPositive ? '+ $amount' : '- $amount';
+  }
+
+  String _formatLeaveDate(LeaveHistoryEntity record) {
+    final startDate = record.leaveStartDate;
+    final endDate = record.leaveEndDate;
+
+    if (startDate == null && endDate == null) {
+      return '-';
+    }
+
+    final dateFormat = DateFormat('dd-MMM-yyyy');
+
+    if (startDate == null) {
+      return dateFormat.format(endDate!);
+    }
+
+    if (endDate == null) {
+      return dateFormat.format(startDate);
+    }
+
+    final normalizedStart = DateTime(
+      startDate.year,
+      startDate.month,
+      startDate.day,
+    );
+    final normalizedEnd = DateTime(endDate.year, endDate.month, endDate.day);
+
+    if (normalizedStart == normalizedEnd) {
+      return dateFormat.format(startDate);
+    }
+
+    final rangeStart =
+        normalizedStart.isBefore(normalizedEnd) ? startDate : endDate;
+    final rangeEnd =
+        normalizedStart.isBefore(normalizedEnd) ? endDate : startDate;
+
+    return '${dateFormat.format(rangeStart)} - ${dateFormat.format(rangeEnd)}';
   }
 
   @override
@@ -133,16 +171,19 @@ class LeaveHistoryPage extends StatelessWidget {
                             dataTextStyle: AppTextStyles.bodyMedium(context),
                             columns: [
                               const DataColumn(label: Text('Date')),
-                              if (!_isLopHistory)
+                              if (_isLopHistory)
+                                const DataColumn(label: Text('LOP Date'))
+                              else
                                 const DataColumn(label: Text('Leave Date')),
-                              const DataColumn(label: Text('Change')),
-                              const DataColumn(label: Text('Available')),
+                              const DataColumn(label: Text('Balance Change')),
+                              const DataColumn(label: Text('Available Balance')),
                               const DataColumn(label: Text('Details')),
                             ],
                             rows:
                                 history.map((record) {
                                   final dateFormat = DateFormat('dd-MMM-yyyy');
                                   final dateStr = dateFormat.format(record.date);
+                                  final leaveDateStr = _formatLeaveDate(record);
                                   final isPositive = _isPositiveChange(record);
                                   final changeLabel = _changeLabel(
                                     record,
@@ -156,8 +197,9 @@ class LeaveHistoryPage extends StatelessWidget {
                                   return DataRow(
                                     cells: [
                                       DataCell(Center(child: Text(dateStr))),
-                                      if (!_isLopHistory)
-                                        DataCell(Center(child: const Text('-'))),
+                                      DataCell(
+                                        Center(child: Text(leaveDateStr)),
+                                      ),
                                       DataCell(
                                         Container(
                                           padding: const EdgeInsets.symmetric(
@@ -174,7 +216,9 @@ class LeaveHistoryPage extends StatelessWidget {
                                           ),
                                           child: Text(
                                             changeLabel,
-                                            style: TextStyle(
+                                            style: AppTextStyles.bodyMedium(
+                                              context,
+                                            ).copyWith(
                                               color: changeColor,
                                               fontWeight: FontWeight.w600,
                                             ),

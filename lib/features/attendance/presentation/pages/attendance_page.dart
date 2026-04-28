@@ -389,7 +389,7 @@ class _AttendancePageState extends State<AttendancePage> {
         },
       );
     } catch (e) {
-      if(context.mounted){
+      if(mounted){
         setState(() {
           _attendanceError = 'Error loading attendance: ${e.toString()}';
           _isLoadingAttendance = false;

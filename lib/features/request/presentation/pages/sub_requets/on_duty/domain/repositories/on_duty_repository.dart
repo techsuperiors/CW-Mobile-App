@@ -55,5 +55,6 @@ abstract class OnDutyRepository {
     required String startHalf,
     required String endHalf,
     required int userId,
+    int? requestId,
   });
 }

@@ -103,7 +103,16 @@ class AppAssets {
   static const String praiseIcon="assets/icons/praise_icon.svg";
   static const String myProfileIcon="assets/icons/my_profile.svg";
 
+  //VISIT
+  static const String checkcircleone="assets/icons/check_circle_one.svg";
+  static const String inProgressIcon="assets/icons/in_progess_icon.svg";
+  static const String pendingIconVisit="assets/icons/pending_icon_visit.svg";
 
+  static const String department_Icon="assets/icons/department_icon.svg";
+  static const String email_Icon="assets/icons/email_icon.svg";
+  static const String gender_Icon="assets/icons/gender_icon.svg";
+  static const String location_Icon="assets/icons/location_icon.svg";
+  static const String visit_planned_Icon="assets/icons/visit_planned_icon.svg";
 
 
 }

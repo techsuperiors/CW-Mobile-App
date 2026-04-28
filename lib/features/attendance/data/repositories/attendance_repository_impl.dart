@@ -33,6 +33,8 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     required String punchType,
     bool needsAddressResolution = false,
   }) async {
+    await _removeExpiredPendingActions();
+
     final action = OfflineAttendanceActionModel(
       id: _buildActionId(OfflineAttendanceActionType.punchIn),
       type: OfflineAttendanceActionType.punchIn,
@@ -134,6 +136,8 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     double? longitude,
     bool needsAddressResolution = false,
   }) async {
+    await _removeExpiredPendingActions();
+
     final action = OfflineAttendanceActionModel(
       id: _buildActionId(OfflineAttendanceActionType.punchOut),
       type: OfflineAttendanceActionType.punchOut,
@@ -228,6 +232,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
 
   @override
   Future<bool> syncPendingActions() async {
+    await _removeExpiredPendingActions();
     if (!await networkInfo.isConnected) return false;
 
     final actions = await offlineLocalDataSource.getPendingActions();
@@ -299,11 +304,38 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
 
   @override
   Future<bool> hasPendingActions() {
-    return offlineLocalDataSource.hasPendingActions();
+    return _hasActivePendingActions();
+  }
+
+  @override
+  Future<int> pruneExpiredPendingActions() {
+    return _removeExpiredPendingActions();
   }
 
   String _buildActionId(OfflineAttendanceActionType type) {
     return '${type.value}_${DateTime.now().microsecondsSinceEpoch}';
+  }
+
+  Future<bool> _hasActivePendingActions() async {
+    await _removeExpiredPendingActions();
+    return offlineLocalDataSource.hasPendingActions();
+  }
+
+  Future<int> _removeExpiredPendingActions() async {
+    final actions = await offlineLocalDataSource.getPendingActions();
+    if (actions.isEmpty) return 0;
+
+    final referenceTime = DateTime.now();
+    final expiredActions =
+        actions
+            .where((action) => !action.isForSameLocalDay(referenceTime))
+            .toList();
+
+    for (final action in expiredActions) {
+      await offlineLocalDataSource.removePendingAction(action.id);
+    }
+
+    return expiredActions.length;
   }
 
   Future<OfflineAttendanceActionModel?> _prepareActionForSync(

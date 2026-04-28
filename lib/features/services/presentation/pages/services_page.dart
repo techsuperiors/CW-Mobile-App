@@ -1,3 +1,5 @@
+import 'package:collectivWork/features/services/presentation/pages/sub_services/visit/subservices/sub_visits/presentation/pages/visit_management_page.dart';
+import 'package:collectivWork/features/services/presentation/pages/sub_services/visit/subservices/sub_visits/presentation/widgets/start_visit_activity_card.dart';
 import 'package:flutter/material.dart';
 import 'package:collectivWork/features/services/presentation/pages/sub_services/assets/presentation/pages/assigned_assets_page.dart';
 import 'package:collectivWork/features/services/presentation/pages/sub_services/employee_agreement/presentation/pages/employee_agreement_page.dart';
@@ -6,9 +8,10 @@ import 'package:collectivWork/features/services/presentation/pages/sub_services/
 import 'package:collectivWork/features/services/presentation/pages/sub_services/attendence/presentation/pages/attendance_detail_page.dart';
 import 'package:collectivWork/features/services/presentation/pages/sub_services/tickets/presentation/pages/tickets_page.dart';
 import 'package:collectivWork/features/services/presentation/pages/sub_services/payslip/presentation/pages/payslip_page.dart';
+import 'package:collectivWork/features/services/presentation/pages/sub_services/employee_directory/presentation/pages/employee_directory_page.dart';
 import 'package:collectivWork/features/services/presentation/pages/sub_services/document/presentation/pages/document_page.dart';
 import 'package:collectivWork/features/services/presentation/pages/sub_services/expense/presentation/pages/expense_page.dart';
-import 'package:collectivWork/features/services/presentation/pages/sub_services/visit/presentation/pages/visit_management_page.dart';
+import 'package:collectivWork/features/services/presentation/pages/sub_services/visit/subservices/accounts/presentation/pages/account_management_page.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -128,6 +131,36 @@ class _ServicesPageState extends State<ServicesPage> {
           MaterialPageRoute(builder: (context) => const TicketsPage()),
         );
         break;
+      case 11: // Employee Directory
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => EmployeeDirectoryPage.withDependencies(
+                  apiClient: ApiClient(
+                    dio: Dio(),
+                    networkInfo: NetworkInfoImpl(Connectivity()),
+                  ),
+                  networkInfo: NetworkInfoImpl(Connectivity()),
+                ),
+          ),
+        );
+        break;
+      case 12: // Accounts
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => AccountManagementPage.withDependencies(
+                  apiClient: ApiClient(
+                    dio: Dio(),
+                    networkInfo: NetworkInfoImpl(Connectivity()),
+                  ),
+                  networkInfo: NetworkInfoImpl(Connectivity()),
+                ),
+          ),
+        );
+        break;
       // Add more cases for other services as needed
       default:
         // Handle other services or do nothing
@@ -175,7 +208,7 @@ class _ServicesPageState extends State<ServicesPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // Filter services based on user permissions dynamically using BlocBuilder
-              SizedBox(height: screenHeight*0.01),
+              SizedBox(height: screenHeight * 0.01),
               BlocBuilder<UserProfileBloc, UserProfileState>(
                 builder: (context, state) {
                   return ServicesGrid(

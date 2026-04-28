@@ -3,6 +3,8 @@ class UserProfile {
   final int clientId;
   final int userId;
   final bool allowAllUsers;
+  final bool enabledWorkFromHome;
+  final bool halfDayWfhEnabled;
   final int? departmentId;
   final String? address;
   final String? birthday;
@@ -34,6 +36,8 @@ class UserProfile {
     required this.clientId,
     required this.userId,
     this.allowAllUsers = false,
+    this.enabledWorkFromHome = false,
+    this.halfDayWfhEnabled = false,
     this.departmentId,
     this.address,
     this.birthday,

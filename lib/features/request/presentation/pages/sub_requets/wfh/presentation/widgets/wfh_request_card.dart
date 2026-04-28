@@ -31,7 +31,7 @@ class WfhRequestCard extends StatelessWidget {
                 : Border.all(color: AppColors.border, width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -108,7 +108,7 @@ class WfhRequestCard extends StatelessWidget {
                               SizedBox(height: screenHeight * 0.005),
                               // Duration
                               Text(
-                                'Duration : ${wfhRequest.numberOfDays} ${wfhRequest.numberOfDays == 1 ? 'day' : 'days'}',
+                                'Duration : ${_formatDuration(wfhRequest.numberOfDays)}',
                                 style: AppTextStyles.bodySmall(context).copyWith(
                                   fontWeight: FontWeight.w400,
                                   color: AppColors.textSecondary,
@@ -180,6 +180,14 @@ class WfhRequestCard extends StatelessWidget {
     return monthNames[month];
   }
 
+  String _formatDuration(num value) {
+    final isWholeNumber = value % 1 == 0;
+    final displayValue =
+        isWholeNumber ? value.toInt().toString() : value.toString();
+    final label = value == 1 ? 'day' : 'days';
+    return '$displayValue $label';
+  }
+
   Color _getStatusColor(WfhStatus status) {
     switch (status) {
       case WfhStatus.pending:
@@ -193,4 +201,3 @@ class WfhRequestCard extends StatelessWidget {
     }
   }
 }
-

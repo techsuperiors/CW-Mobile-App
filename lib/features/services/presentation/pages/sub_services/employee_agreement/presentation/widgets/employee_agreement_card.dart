@@ -20,7 +20,9 @@ class EmployeeAgreementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint("Check:- ${agreement.documentUrl}");
+    final hasExpiryDate =
+        agreement.expiryDate.trim().isNotEmpty &&
+        agreement.expiryDate.trim().toLowerCase() != 'null';
     return InkWell(
       onTap: () async {
         // Navigate to agreement detail page when tapped
@@ -47,7 +49,7 @@ class EmployeeAgreementCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: MediaQuery.of(context).size.width * 0.02,
+          horizontal: MediaQuery.of(context).size.width * 0.04,
         ),
         child: Container(
           decoration: BoxDecoration(
@@ -122,20 +124,22 @@ class EmployeeAgreementCard extends StatelessWidget {
                 thickness: 1, // Line ki motai
               ), // 1.5% of screen height
               // Expiry Date
-              _buildDetailRow(
-                context,
-                'Expiry Date',
-                agreement.expiryDate,
-                null,
-                null,
-              ),
-              Divider(
-                color: AppColors.loginInputBorder,
-                height:
-                    MediaQuery.of(context).size.height *
-                    0.03, // 3% total space (1.5% upar, 1.5% niche)
-                thickness: 1, // Line ki motai
-              ), // 1.5% of screen height
+              if (hasExpiryDate) ...[
+                _buildDetailRow(
+                  context,
+                  'Expiry Date',
+                  agreement.expiryDate,
+                  null,
+                  null,
+                ),
+                Divider(
+                  color: AppColors.loginInputBorder,
+                  height:
+                  MediaQuery.of(context).size.height *
+                      0.03, // 3% total space (1.5% upar, 1.5% niche)
+                  thickness: 1, // Line ki motai
+                ), // 1.5% of screen height
+              ],
               // Status
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,8 +189,7 @@ class EmployeeAgreementCard extends StatelessWidget {
     String value,
     String? avatarPath,
     String? profileColor,
-  )
-  {
+  ) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     final smallerDimension =
@@ -260,12 +263,8 @@ class EmployeeAgreementCard extends StatelessWidget {
             height: avatarSize,
             fit: BoxFit.cover,
             errorWidget:
-                (_, __, ___) => _buildAvatarFallback(
-                  context,
-                  name,
-                  radius,
-                  profileColor,
-                ),
+                (_, __, ___) =>
+                    _buildAvatarFallback(context, name, radius, profileColor),
           ),
         ),
       );
@@ -282,12 +281,8 @@ class EmployeeAgreementCard extends StatelessWidget {
             height: avatarSize,
             fit: BoxFit.cover,
             errorBuilder:
-                (_, __, ___) => _buildAvatarFallback(
-                  context,
-                  name,
-                  radius,
-                  profileColor,
-                ),
+                (_, __, ___) =>
+                    _buildAvatarFallback(context, name, radius, profileColor),
           ),
         ),
       );
@@ -317,17 +312,12 @@ class EmployeeAgreementCard extends StatelessWidget {
       backgroundColor: _parseProfileColor(profileColor),
       child:
           initials.isEmpty
-              ? Icon(
-                Icons.person,
-                size: radius,
-                color: Colors.white,
-              )
+              ? Icon(Icons.person, size: radius, color: Colors.white)
               : Text(
                 initials,
-                style: AppTextStyles.bodySmall(context).copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: AppTextStyles.bodySmall(
+                  context,
+                ).copyWith(color: Colors.white, fontWeight: FontWeight.w700),
               ),
     );
   }

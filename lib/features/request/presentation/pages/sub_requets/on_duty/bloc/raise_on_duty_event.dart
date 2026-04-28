@@ -16,6 +16,7 @@ class SubmitOnDutyRequest extends RaiseOnDutyRequestEvent {
   final String startHalf;
   final String endHalf;
   final int userId;
+  final int? requestId;
 
   const SubmitOnDutyRequest({
     required this.subject,
@@ -26,6 +27,7 @@ class SubmitOnDutyRequest extends RaiseOnDutyRequestEvent {
     required this.startHalf,
     required this.endHalf,
     required this.userId,
+    this.requestId,
   });
 
   @override
@@ -38,5 +40,6 @@ class SubmitOnDutyRequest extends RaiseOnDutyRequestEvent {
         startHalf,
         endHalf,
         userId,
+        requestId ?? 0,
       ];
 }

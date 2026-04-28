@@ -37,7 +37,7 @@ class AgreementMapper {
       assignedBy: agreement.agreementAssignedBy.fullName,
       assignedByAvatar: agreement.agreementAssignedBy.imageUrl?? AppAssets.placeholderAvatar,
       assignedByProfileColor: agreement.agreementAssignedBy.profileColor,
-      expiryDate: formattedExpiryDate.isNotEmpty ? formattedExpiryDate : 'N/A',
+      expiryDate: formattedExpiryDate,
       status: agreement.agreementStatus,
       content: agreement.agreementContent,
       signatureUrl: agreement.signatureUrl,

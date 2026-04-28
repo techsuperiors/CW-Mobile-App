@@ -161,31 +161,23 @@ class _AttendanceCardState extends State<AttendanceCard> {
     final actions = await _offlineLocalDataSource.getPendingActions();
     if (!mounted) return;
 
+    final resolvedState = PendingAttendanceSessionHelper.resolve(
+      actions: actions,
+      serverPunchedIn: _getServerPunchedIn(),
+      serverVirtualPunchInTime: _getServerVirtualPunchInTime(),
+      baseWorkedSeconds: _getPreviousWorkedSeconds(),
+    );
+
     setState(() {
-      _localPunchedInOverride = null;
-      _frozenWorkedHoursOverride = null;
-
-      if (actions.isEmpty) {
-        if (!_getServerPunchedIn()) {
-          _virtualPunchInTime = null;
-        }
-        return;
-      }
-
-      // Pending offline actions should not be shown as a completed punch
-      // state. Keep the card aligned with the last confirmed server state.
-      _virtualPunchInTime =
-          _getServerPunchedIn() ? _getServerVirtualPunchInTime() : null;
+      _localPunchedInOverride = resolvedState.localPunchedInOverride;
+      _virtualPunchInTime = resolvedState.virtualPunchInTime;
+      _frozenWorkedHoursOverride = resolvedState.frozenWorkedHoursOverride;
     });
   }
 
   bool _getServerPunchedIn() {
-    return TimeUtils.isActivePunchSession(
-      status: widget.attendanceDetails?.status,
-      entries: widget.attendanceDetails?.entries,
-      punchType: widget.attendanceDetails?.punchType,
-      punchIn: widget.attendanceDetails?.punchIn,
-      punchOut: widget.attendanceDetails?.punchOut,
+    return AttendanceSessionStateHelper.isActiveSession(
+      widget.attendanceDetails,
     );
   }
 
@@ -422,6 +414,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
           punchIn: widget.attendanceDetails?.punchIn,
           punchOut: widget.attendanceDetails?.punchOut,
           punchInIp: widget.attendanceDetails?.punchInIp,
+          isActiveSessionOverride: _getServerPunchedIn(),
         );
       }
     });
@@ -635,6 +628,18 @@ class _AttendanceCardState extends State<AttendanceCard> {
           SnackBar(
             content: Text(state.message),
             backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } else if (state is AttendancePendingSyncExpired) {
+      _cancelSlowNetworkDialogWatcher();
+      _hydratePendingOfflineState();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(state.message),
+            backgroundColor: AppColors.warning,
+            duration: const Duration(seconds: 4),
           ),
         );
       }

@@ -3,6 +3,8 @@ class UserProfileModel {
   final int clientId;
   final int userId;
   final bool allowAllUsers;
+  final bool enabledWorkFromHome;
+  final bool halfDayWfhEnabled;
   final int? departmentId;
   final String? address;
   final List<dynamic>? contactDetails;
@@ -42,6 +44,8 @@ class UserProfileModel {
     required this.clientId,
     required this.userId,
     this.allowAllUsers = false,
+    this.enabledWorkFromHome = false,
+    this.halfDayWfhEnabled = false,
     this.departmentId,
     this.address,
     this.contactDetails,
@@ -83,6 +87,8 @@ class UserProfileModel {
       clientId: _asInt(json['client_id']) ?? 0,
       userId: _asInt(json['user_id']) ?? 0,
       allowAllUsers: json['allow_all_users'] as bool? ?? false,
+      enabledWorkFromHome: json['enabled_work_from_home'] as bool? ?? false,
+      halfDayWfhEnabled: json['half_day_wfh_enabled'] as bool? ?? false,
       departmentId: _asInt(json['department_id']),
       address: _parseAddress(json['address']),
       contactDetails: json['contact_details'] as List<dynamic>?,
@@ -149,11 +155,17 @@ class UserProfileModel {
     );
   }
 
-  UserProfileModel copyWith({bool? allowAllUsers}) {
+  UserProfileModel copyWith({
+    bool? allowAllUsers,
+    bool? enabledWorkFromHome,
+    bool? halfDayWfhEnabled,
+  }) {
     return UserProfileModel(
       clientId: clientId,
       userId: userId,
       allowAllUsers: allowAllUsers ?? this.allowAllUsers,
+      enabledWorkFromHome: enabledWorkFromHome ?? this.enabledWorkFromHome,
+      halfDayWfhEnabled: halfDayWfhEnabled ?? this.halfDayWfhEnabled,
       departmentId: departmentId,
       address: address,
       contactDetails: contactDetails,
@@ -196,6 +208,8 @@ class UserProfileModel {
       'client_id': clientId,
       'user_id': userId,
       'allow_all_users': allowAllUsers,
+      'enabled_work_from_home': enabledWorkFromHome,
+      'half_day_wfh_enabled': halfDayWfhEnabled,
       'department_id': departmentId,
       'address': address,
       'contact_details': contactDetails,
@@ -274,6 +288,18 @@ class UserProfileModel {
     }
     return null;
   }
+}
+
+class UserProfileExtendedFlagsModel {
+  final bool allowAllUsers;
+  final bool enabledWorkFromHome;
+  final bool halfDayWfhEnabled;
+
+  const UserProfileExtendedFlagsModel({
+    required this.allowAllUsers,
+    required this.enabledWorkFromHome,
+    required this.halfDayWfhEnabled,
+  });
 }
 
 /// User basic information

@@ -28,6 +28,7 @@ class AppSpacing {
   static const EdgeInsets screenPaddingLarge = EdgeInsets.symmetric(horizontal: 24.0);
 
   static const EdgeInsets pagePadding = EdgeInsets.all(16.0);
+  static const EdgeInsets smallpagePadding = EdgeInsets.all(8.0);
 
   // Card spacing
   static const EdgeInsets cardPadding = EdgeInsets.all(16.0);

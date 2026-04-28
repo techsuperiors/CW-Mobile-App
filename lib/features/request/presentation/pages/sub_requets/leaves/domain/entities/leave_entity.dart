@@ -45,9 +45,15 @@ class LeaveEntity extends Equatable {
   final String? shortCode;
   final DateTime fromDate;
   final DateTime? toDate;
+  final String? dayType;
+  final String? startHalf;
+  final String? endHalf;
+  final String? leaveStartTime;
+  final String? leaveEndTime;
   final int? noOfDays;
   final String reason;
   final String? subject;
+  final String? description;
   final LeaveStatus status;
   final DateTime appliedDate;
   final String? rejectRemark;
@@ -60,9 +66,15 @@ class LeaveEntity extends Equatable {
     this.shortCode,
     required this.fromDate,
     this.toDate,
+    this.dayType,
+    this.startHalf,
+    this.endHalf,
+    this.leaveStartTime,
+    this.leaveEndTime,
     this.noOfDays,
     required this.reason,
     this.subject,
+    this.description,
     required this.status,
     required this.appliedDate,
     this.rejectRemark,
@@ -77,9 +89,15 @@ class LeaveEntity extends Equatable {
     shortCode,
     fromDate,
     toDate,
+    dayType,
+    startHalf,
+    endHalf,
+    leaveStartTime,
+    leaveEndTime,
     noOfDays,
     reason,
     subject,
+    description,
     status,
     appliedDate,
     rejectRemark,

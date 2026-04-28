@@ -54,8 +54,8 @@ class AttendanceRegularizeUpdateRequest {
   final int id;
   final String requestFor;
   final String requestDate;
-  final String checkIn;
-  final String checkOut;
+  final String? checkIn;
+  final String? checkOut;
   final int statusUpdatedBy;
   final String description;
 

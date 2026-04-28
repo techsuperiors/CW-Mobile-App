@@ -29,6 +29,7 @@ class RaiseOnDutyRequestBloc
         startHalf: event.startHalf,
         endHalf: event.endHalf,
         userId: event.userId,
+        requestId: event.requestId,
       ),
     );
 

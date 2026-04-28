@@ -66,7 +66,7 @@ class LeaveDetailPage extends StatelessWidget {
   }
 }
 
-class _LeaveDetailView extends StatelessWidget {
+class _LeaveDetailView extends StatefulWidget {
   final LeaveEntity leaveEntity;
   final bool isApprovalMode;
 
@@ -75,6 +75,13 @@ class _LeaveDetailView extends StatelessWidget {
     required this.isApprovalMode,
   });
 
+  @override
+  State<_LeaveDetailView> createState() => _LeaveDetailViewState();
+}
+
+class _LeaveDetailViewState extends State<_LeaveDetailView> {
+  bool _shouldRefreshListing = false;
+
   LeaveEntity _mapDetailToEditableLeave(LeaveDetailModel detail) {
     return LeaveEntity(
       id: detail.id.toString(),
@@ -82,9 +89,15 @@ class _LeaveDetailView extends StatelessWidget {
       shortCode: detail.shortCode,
       fromDate: detail.startDate,
       toDate: detail.dayType.toLowerCase() == 'single' ? null : detail.endDate,
+      dayType: detail.dayType,
+      startHalf: detail.startHalf,
+      endHalf: detail.endHalf,
+      leaveStartTime: detail.leaveStartTime,
+      leaveEndTime: detail.leaveEndTime,
       noOfDays: detail.noOfDays.toInt(),
       reason: detail.reason,
       subject: detail.subject,
+      description: detail.description,
       status: _mapStatus(detail.status),
       appliedDate: detail.requestDate,
       rejectRemark: detail.rejectRemark,
@@ -121,278 +134,291 @@ class _LeaveDetailView extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    return ResponsiveScaffold(
-      backgroundColor: AppColors.backgroundMedium,
-      appBar: AppBar(
-        elevation: 0,
-        forceMaterialTransparency: true,
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        leading: GestureDetector(
-          onTap: () => Navigator.of(context).pop(),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.arrow_back_ios,
-                color: Theme.of(context).colorScheme.primary,
-                size: screenWidth * 0.048,
-              ),
-              Flexible(
-                child: Text(
-                  'Back',
-                  style: AppTextStyles.bodyMedium(context).copyWith(
-                    fontWeight: FontWeight.w400,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.of(context).pop(_shouldRefreshListing);
+      },
+      child: ResponsiveScaffold(
+        backgroundColor: AppColors.backgroundMedium,
+        appBar: AppBar(
+          elevation: 0,
+          forceMaterialTransparency: true,
+          backgroundColor: AppColors.background,
+          foregroundColor: AppColors.textPrimary,
+          leading: GestureDetector(
+            onTap: () => Navigator.of(context).pop(_shouldRefreshListing),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.arrow_back_ios,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: screenWidth * 0.048,
                 ),
-              ),
-            ],
+                Flexible(
+                  child: Text(
+                    'Back',
+                    style: AppTextStyles.bodyMedium(context).copyWith(
+                      fontWeight: FontWeight.w400,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        leadingWidth: 110,
-        title: BlocBuilder<LeaveDetailBloc, LeaveDetailState>(
-          builder: (ctx, state) {
-            final title =
-                state is LeaveDetailLoaded
-                    ? state.detail.leaveType
-                    : leaveEntity.leaveType;
-            return Text(
-              isApprovalMode ? 'Leave Approval' : title,
-              style: AppTextStyles.heading4(context).copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            );
-          },
-        ),
-        centerTitle: true,
-        actions: [
-          BlocBuilder<LeaveDetailBloc, LeaveDetailState>(
-            builder: (context, state) {
-              if (state is LeaveDetailLoaded) {
-                final bool isPending =
-                    state.detail.status.toLowerCase() == 'pending';
-                final menuActions = <Map<String, String>>[
-                  if (isPending && !isApprovalMode)
-                    {'value': 'Edit', 'icon': AppAssets.editIconwfh},
-                  if (isPending && !isApprovalMode)
-                    {'value': 'Withdraw', 'icon': AppAssets.withdrawIcon},
-                  {'value': 'Activity', 'icon': AppAssets.activityIcon},
-                ];
+          leadingWidth: 110,
+          title: BlocBuilder<LeaveDetailBloc, LeaveDetailState>(
+            builder: (ctx, state) {
+              final title =
+                  state is LeaveDetailLoaded
+                      ? state.detail.leaveType
+                      : widget.leaveEntity.leaveType;
+              return Text(
+                widget.isApprovalMode ? 'Leave Approval' : title,
+                style: AppTextStyles.heading4(context).copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              );
+            },
+          ),
+          centerTitle: true,
+          actions: [
+            BlocBuilder<LeaveDetailBloc, LeaveDetailState>(
+              builder: (context, state) {
+                if (state is LeaveDetailLoaded) {
+                  final bool isPending =
+                      state.detail.status.toLowerCase() == 'pending';
+                  final menuActions = <Map<String, String>>[
+                    if (isPending && !widget.isApprovalMode)
+                      {'value': 'Edit', 'icon': AppAssets.editIconwfh},
+                    if (isPending && !widget.isApprovalMode)
+                      {'value': 'Withdraw', 'icon': AppAssets.withdrawIcon},
+                    {'value': 'Activity', 'icon': AppAssets.activityIcon},
+                  ];
 
-                Future<void> handleAction(String value) async {
-                  switch (value) {
-                    case 'Edit':
-                      final editableLeave = _mapDetailToEditableLeave(
-                        state.detail,
-                      );
-                      final bool? updated = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (_) =>
-                                  ApplyLeavePage(leaveRequest: editableLeave),
-                        ),
-                      );
-
-                      if (updated == true && context.mounted) {
-                        context.read<LeaveDetailBloc>().add(
-                          FetchLeaveDetail(int.tryParse(leaveEntity.id) ?? 0),
+                  Future<void> handleAction(String value) async {
+                    switch (value) {
+                      case 'Edit':
+                        final editableLeave = _mapDetailToEditableLeave(
+                          state.detail,
                         );
-                      }
-                      break;
-                    case 'Withdraw':
-                      _showWithdrawDialog(context, state.detail);
-                      break;
-                    case 'Activity':
-                      _showActivitySheet(context, state.detail);
-                      break;
-                  }
-                }
-
-                if (menuActions.length >= 2) {
-                  return PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
-                    onSelected: handleAction,
-                    itemBuilder: (context) {
-                      return menuActions.map((action) {
-                        return PopupMenuItem(
-                          value: action['value'],
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: screenWidth * 0.05,
-                                height: screenHeight * 0.05,
-                                child: SvgPicture.asset(action['icon']!),
-                              ),
-                              SizedBox(width: screenWidth * 0.02),
-                              Text(
-                                action['value']!,
-                                style: AppTextStyles.heading5(context).copyWith(
-                                  fontWeight: FontWeight.w400,
-                                  color: AppColors.textHeading,
-                                ),
-                              ),
-                            ],
+                        final bool? updated = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (_) =>
+                                    ApplyLeavePage(leaveRequest: editableLeave),
                           ),
                         );
-                      }).toList();
-                    },
-                  );
-                }
 
-                if (menuActions.length == 1) {
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () => handleAction(menuActions.first['value']!),
-                    child: Padding(
-                      padding: EdgeInsets.only(right: screenWidth * 0.06),
-                      child: SizedBox(
-                        width: screenWidth * 0.06,
-                        height: screenHeight * 0.03,
-                        child: SvgPicture.asset(menuActions.first['icon']!),
+                        if (updated == true && context.mounted) {
+                          setState(() {
+                            _shouldRefreshListing = true;
+                          });
+                          context.read<LeaveDetailBloc>().add(
+                            FetchLeaveDetail(
+                              int.tryParse(widget.leaveEntity.id) ?? 0,
+                            ),
+                          );
+                        }
+                        break;
+                      case 'Withdraw':
+                        _showWithdrawDialog(context, state.detail);
+                        break;
+                      case 'Activity':
+                        _showActivitySheet(context, state.detail);
+                        break;
+                    }
+                  }
+
+                  if (menuActions.length >= 2) {
+                    return PopupMenuButton<String>(
+                      icon: Icon(Icons.more_vert, color: AppColors.textPrimary),
+                      onSelected: handleAction,
+                      itemBuilder: (context) {
+                        return menuActions.map((action) {
+                          return PopupMenuItem(
+                            value: action['value'],
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: screenWidth * 0.05,
+                                  height: screenHeight * 0.05,
+                                  child: SvgPicture.asset(action['icon']!),
+                                ),
+                                SizedBox(width: screenWidth * 0.02),
+                                Text(
+                                  action['value']!,
+                                  style: AppTextStyles.heading5(context)
+                                      .copyWith(
+                                        fontWeight: FontWeight.w400,
+                                        color: AppColors.textHeading,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList();
+                      },
+                    );
+                  }
+
+                  if (menuActions.length == 1) {
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => handleAction(menuActions.first['value']!),
+                      child: Padding(
+                        padding: EdgeInsets.only(right: screenWidth * 0.06),
+                        child: SizedBox(
+                          width: screenWidth * 0.06,
+                          height: screenHeight * 0.03,
+                          child: SvgPicture.asset(menuActions.first['icon']!),
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  }
+
+                  return const SizedBox.shrink();
                 }
 
                 return const SizedBox.shrink();
+              },
+            ),
+          ],
+        ),
+        bottomNavigationBar:
+            widget.isApprovalMode
+                ? BottomNavBar(
+                  currentIndex: 4,
+                  onTap: NavigationHelper.getBottomNavHandler(context),
+                )
+                : BottomNavBar(
+                  currentIndex: 3,
+                  onTap: NavigationHelper.getBottomNavHandler(context),
+                ),
+        body: BlocListener<LeaveDetailBloc, LeaveDetailState>(
+          listenWhen: (previous, current) {
+            if (current is LeaveDetailError) {
+              return previous is! LeaveDetailInitial &&
+                  previous is! LeaveDetailLoading;
+            }
+            return current is LeaveDetailWithdrawn ||
+                current is LeaveStatusUpdated ||
+                current is LeaveCommentAdded;
+          },
+          listener: (context, state) {
+            if (state is LeaveDetailWithdrawn) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+              Navigator.of(
+                context,
+              ).pop(true); // Pop back to list and signal refresh
+            } else if (state is LeaveDetailError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    ErrorMessageMapper.toUserFriendlyMessage(state.message),
+                  ),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            } else if (state is LeaveStatusUpdated) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+              Navigator.of(context).pop(true);
+            } else if (state is LeaveCommentAdded) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            }
+          },
+          child: BlocBuilder<LeaveDetailBloc, LeaveDetailState>(
+            builder: (ctx, state) {
+              if (state is LeaveDetailLoading || state is LeaveDetailInitial) {
+                return const Center(child: CircularProgressIndicator());
               }
-
+              if (state is LeaveDetailError) {
+                return ApiErrorState(
+                  rawMessage: state.message,
+                  title: 'Unable to load leave details',
+                  onRetry:
+                      () => ctx.read<LeaveDetailBloc>().add(
+                        FetchLeaveDetail(int.tryParse(widget.leaveEntity.id) ?? 0),
+                      ),
+                );
+              }
+              if (state is LeaveDetailWithdrawing) {
+                return Stack(
+                  children: [
+                    _DetailContent(
+                      detail: state.detail,
+                      leaveEntity: widget.leaveEntity,
+                      isApprovalMode: widget.isApprovalMode,
+                    ),
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
+                  ],
+                );
+              }
+              if (state is LeaveCommentSubmitting) {
+                return Stack(
+                  children: [
+                    _DetailContent(
+                      detail: state.detail,
+                      leaveEntity: widget.leaveEntity,
+                      isApprovalMode: widget.isApprovalMode,
+                    ),
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
+                  ],
+                );
+              }
+              if (state is LeaveDetailStatusUpdating) {
+                return Stack(
+                  children: [
+                    _DetailContent(
+                      detail: state.detail,
+                      leaveEntity: widget.leaveEntity,
+                      isApprovalMode: widget.isApprovalMode,
+                    ),
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
+                  ],
+                );
+              }
+              if (state is LeaveDetailLoaded) {
+                return _DetailContent(
+                  detail: state.detail,
+                  leaveEntity: widget.leaveEntity,
+                  isApprovalMode: widget.isApprovalMode,
+                );
+              }
               return const SizedBox.shrink();
             },
           ),
-        ],
-      ),
-      bottomNavigationBar:
-          isApprovalMode
-              ? BottomNavBar(
-            currentIndex: 4,
-            onTap: NavigationHelper.getBottomNavHandler(context),
-          )
-              : BottomNavBar(
-                currentIndex: 3,
-                onTap: NavigationHelper.getBottomNavHandler(context),
-              ),
-      body: BlocListener<LeaveDetailBloc, LeaveDetailState>(
-        listenWhen: (previous, current) {
-          if (current is LeaveDetailError) {
-            return previous is! LeaveDetailInitial &&
-                previous is! LeaveDetailLoading;
-          }
-          return current is LeaveDetailWithdrawn ||
-              current is LeaveStatusUpdated ||
-              current is LeaveCommentAdded;
-        },
-        listener: (context, state) {
-          if (state is LeaveDetailWithdrawn) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.success,
-              ),
-            );
-            Navigator.of(
-              context,
-            ).pop(true); // Pop back to list and signal refresh
-          } else if (state is LeaveDetailError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  ErrorMessageMapper.toUserFriendlyMessage(state.message),
-                ),
-                backgroundColor: AppColors.error,
-              ),
-            );
-          } else if (state is LeaveStatusUpdated) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.success,
-              ),
-            );
-            Navigator.of(context).pop(true);
-          } else if (state is LeaveCommentAdded) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.success,
-              ),
-            );
-          }
-        },
-        child: BlocBuilder<LeaveDetailBloc, LeaveDetailState>(
-          builder: (ctx, state) {
-            if (state is LeaveDetailLoading || state is LeaveDetailInitial) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (state is LeaveDetailError) {
-              return ApiErrorState(
-                rawMessage: state.message,
-                title: 'Unable to load leave details',
-                onRetry:
-                    () => ctx.read<LeaveDetailBloc>().add(
-                      FetchLeaveDetail(int.tryParse(leaveEntity.id) ?? 0),
-                    ),
-              );
-            }
-            if (state is LeaveDetailWithdrawing) {
-              return Stack(
-                children: [
-                  _DetailContent(
-                    detail: state.detail,
-                    leaveEntity: leaveEntity,
-                    isApprovalMode: isApprovalMode,
-                  ),
-                  Container(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    child: const Center(child: CircularProgressIndicator()),
-                  ),
-                ],
-              );
-            }
-            if (state is LeaveCommentSubmitting) {
-              return Stack(
-                children: [
-                  _DetailContent(
-                    detail: state.detail,
-                    leaveEntity: leaveEntity,
-                    isApprovalMode: isApprovalMode,
-                  ),
-                  Container(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    child: const Center(child: CircularProgressIndicator()),
-                  ),
-                ],
-              );
-            }
-            if (state is LeaveDetailStatusUpdating) {
-              return Stack(
-                children: [
-                  _DetailContent(
-                    detail: state.detail,
-                    leaveEntity: leaveEntity,
-                    isApprovalMode: isApprovalMode,
-                  ),
-                  Container(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    child: const Center(child: CircularProgressIndicator()),
-                  ),
-                ],
-              );
-            }
-            if (state is LeaveDetailLoaded) {
-              return _DetailContent(
-                detail: state.detail,
-                leaveEntity: leaveEntity,
-                isApprovalMode: isApprovalMode,
-              );
-            }
-            return const SizedBox.shrink();
-          },
         ),
       ),
     );

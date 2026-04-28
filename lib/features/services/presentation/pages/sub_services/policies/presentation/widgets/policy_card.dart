@@ -104,6 +104,7 @@ class PolicyCard extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
+                // git commit -m "capture Location based on permission -feat added "
                 Flexible(
                   child: Container(
                     decoration: BoxDecoration(
@@ -164,15 +165,16 @@ class PolicyCard extends StatelessWidget {
               fontWeight: FontWeight.w400,
               color: AppColors.textSecondary,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        SizedBox(width: screenWidth * 0.042), // ~4.2% of screen width
+        SizedBox(width: screenWidth * 0.032), // ~4.2% of screen width
         Expanded(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               if (shouldShowAvatar) ...[
-                SizedBox(width: screenWidth * 0.021), // ~2.1% of screen width
+                SizedBox(width: screenWidth * 0.016), // ~2.1% of screen width
                 _buildAvatar(
                   context: context,
                   name: avatarFallbackName ?? value,
@@ -181,7 +183,7 @@ class PolicyCard extends StatelessWidget {
                   fallbackColor: avatarFallbackColor,
                 ),
               ],
-              SizedBox(width: screenWidth * 0.021), // ~2.1% of screen width
+              SizedBox(width: screenWidth * 0.016), // ~2.1% of screen width
               Flexible(
                 child: Text(
                   displayValue,
@@ -190,7 +192,7 @@ class PolicyCard extends StatelessWidget {
                     color: AppColors.textPrimary,
                   ),
                   textAlign: TextAlign.right,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

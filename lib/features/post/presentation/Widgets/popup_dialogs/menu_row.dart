@@ -38,7 +38,7 @@ class MenuRow extends StatelessWidget {
         AppSpacing.hSm,
         Text(
           label,
-          style: AppTextStyles.bodyMedium(context).copyWith(
+          style: AppTextStyles.bodyMediumHeading(context).copyWith(
             fontWeight: FontWeight.w500,
             color: color ?? const Color(0xFF3A414D),
           ),

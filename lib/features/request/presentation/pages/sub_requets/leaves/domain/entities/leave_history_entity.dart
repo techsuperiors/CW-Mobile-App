@@ -13,6 +13,8 @@ class LeaveHistoryEntity extends Equatable {
   final String profileUrl;
   final String profileColor;
   final DateTime date;
+  final DateTime? leaveStartDate;
+  final DateTime? leaveEndDate;
   final String remarks;
   final String performedBy;
 
@@ -28,6 +30,8 @@ class LeaveHistoryEntity extends Equatable {
     required this.profileUrl,
     required this.profileColor,
     required this.date,
+    required this.leaveStartDate,
+    required this.leaveEndDate,
     required this.remarks,
     required this.performedBy,
   });
@@ -45,6 +49,8 @@ class LeaveHistoryEntity extends Equatable {
     profileUrl,
     profileColor,
     date,
+    leaveStartDate,
+    leaveEndDate,
     remarks,
     performedBy,
   ];

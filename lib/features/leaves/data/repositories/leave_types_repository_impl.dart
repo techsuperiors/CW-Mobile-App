@@ -145,6 +145,8 @@ class LeaveTypesRepositoryImpl implements LeaveTypesRepository {
     required String dayType,
     required String description,
     required int requestTo,
+    String? leaveStartTime,
+    String? leaveEndTime,
   }) async {
     if (await networkInfo.isConnected) {
       try {
@@ -162,6 +164,8 @@ class LeaveTypesRepositoryImpl implements LeaveTypesRepository {
           dayType: dayType,
           description: description,
           requestTo: requestTo,
+          leaveStartTime: leaveStartTime,
+          leaveEndTime: leaveEndTime,
         );
 
         final response = await remoteDataSource.updateLeave(request);

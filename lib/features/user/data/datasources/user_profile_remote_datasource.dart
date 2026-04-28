@@ -31,7 +31,9 @@ class UserProfileResponse {
 /// User Profile remote data source interface
 abstract class UserProfileRemoteDataSource {
   Future<UserProfileModel> getUserProfile();
-  Future<bool> getAllowAllUsers({required int userId});
+  Future<UserProfileExtendedFlagsModel> getExtendedProfileFlags({
+    required int userId,
+  });
 }
 
 /// User Profile remote data source implementation
@@ -79,7 +81,9 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   }
 
   @override
-  Future<bool> getAllowAllUsers({required int userId}) async {
+  Future<UserProfileExtendedFlagsModel> getExtendedProfileFlags({
+    required int userId,
+  }) async {
     try {
       final payload = encodeData({'user_id': userId});
       final response = await apiClient.get(
@@ -99,14 +103,28 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
       }
 
       final data = responseData['data'] as Map<String, dynamic>?;
-      return data?['allow_all_users'] as bool? ?? false;
+      final userAttendancePolicy =
+          data?['userAttendancePolicy'] as Map<String, dynamic>? ?? const {};
+      final workFromHome =
+          userAttendancePolicy['work_from_home'] as Map<String, dynamic>? ??
+              const {};
+
+      return UserProfileExtendedFlagsModel(
+        allowAllUsers: data?['allow_all_users'] as bool? ?? false,
+        enabledWorkFromHome:
+            userAttendancePolicy['enabled_work_from_home'] as bool? ?? false,
+        halfDayWfhEnabled:
+            workFromHome['half_day_wfh_enabled'] as bool? ?? false,
+      );
     } on ServerException {
       rethrow;
     } catch (e) {
       if (e is ServerException) {
         rethrow;
       }
-      throw ServerException('Failed to get allow_all_users: ${e.toString()}');
+      throw ServerException(
+        'Failed to get extended profile flags: ${e.toString()}',
+      );
     }
   }
 }

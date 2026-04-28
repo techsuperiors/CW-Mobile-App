@@ -29,15 +29,20 @@ class ApplyWfhPage extends StatefulWidget {
 }
 
 class _ApplyWfhPageState extends State<ApplyWfhPage> {
+  static const String _singleDayWfhOption = 'Single Day WFH';
+  static const String _multipleDayWfhOption = 'Multiple Day WFH';
+  static const String _halfDayWfhOption = 'Half Day WFH';
+  static const List<String> _halfDayOptions = ['First Half', 'Second Half'];
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _subjectController;
   late final TextEditingController _descriptionController;
 
-  String? _selectedWfhDuration = 'Single Day WFH';
+  String? _selectedWfhDuration = _singleDayWfhOption;
   DateTime? _fromDate;
   String _fromHalfDay = 'First Half';
   DateTime? _toDate;
   String _toHalfDay = 'Second Half';
+  bool _isWorkFromAnywhere = false;
   bool _isSubmitting = false;
 
   @override
@@ -54,10 +59,29 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
   void _initializeFormFromWfhRequest(WfhRequestModel wfhRequest) {
     _fromDate = wfhRequest.fromDate;
     _toDate = wfhRequest.toDate;
-    _selectedWfhDuration =
-        wfhRequest.toDate == null ? 'Single Day WFH' : 'Multiple Day WFH';
-    _descriptionController.text = wfhRequest.reason;
+    switch (wfhRequest.requestType) {
+      case 'half_day':
+        _selectedWfhDuration = _halfDayWfhOption;
+        _toDate = null;
+        _fromHalfDay = _apiHalfToDisplay(wfhRequest.startHalf);
+        break;
+      case 'multiple':
+        _selectedWfhDuration = _multipleDayWfhOption;
+        _fromHalfDay = _apiHalfToDisplay(wfhRequest.startHalf);
+        _toHalfDay = _apiHalfToDisplay(
+          wfhRequest.endHalf,
+          fallback: 'Second Half',
+        );
+        break;
+      case 'single':
+      default:
+        _selectedWfhDuration = _singleDayWfhOption;
+        _toDate = null;
+        break;
+    }
+    _descriptionController.text = wfhRequest.description ?? wfhRequest.reason;
     _subjectController.text = wfhRequest.subject ?? wfhRequest.reason;
+    _isWorkFromAnywhere = wfhRequest.isAnywhere ?? false;
   }
 
   @override
@@ -68,16 +92,21 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
   }
 
   Future<void> _selectDate(BuildContext context, bool isFromDate) async {
-    final DateTime initialDate =
+    final today = DateUtils.dateOnly(DateTime.now());
+    final lastDate = today.add(const Duration(days: 365));
+    final rawInitialDate =
         isFromDate
             ? (_fromDate ?? DateTime.now())
             : (_toDate ?? _fromDate ?? DateTime.now());
+    final initialDate = DateUtils.dateOnly(
+      rawInitialDate.isBefore(today) ? today : rawInitialDate,
+    );
 
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      firstDate: today,
+      lastDate: lastDate,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -108,13 +137,24 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
     return halfDay == 'First Half' ? 'first_half' : 'second_half';
   }
 
+  String _apiHalfToDisplay(String? apiHalf, {String fallback = 'First Half'}) {
+    switch (apiHalf?.trim().toLowerCase()) {
+      case 'first_half':
+        return 'First Half';
+      case 'second_half':
+        return 'Second Half';
+      default:
+        return fallback;
+    }
+  }
+
   Future<void> _submitWfhRequest() async {
     if (!_formKey.currentState!.validate()) return;
     if (_fromDate == null) {
       _showError('Please select a date');
       return;
     }
-    if (_selectedWfhDuration == 'Multiple Day WFH' && _toDate == null) {
+    if (_selectedWfhDuration == _multipleDayWfhOption && _toDate == null) {
       _showError('Please select an end date');
       return;
     }
@@ -151,13 +191,25 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
       }
 
       // 2. Condition-based Payload Construction
-      final isSingleDay = _selectedWfhDuration == 'Single Day WFH';
-      final requestType = isSingleDay ? 'single' : 'multiple';
+      final isSingleDay = _selectedWfhDuration == _singleDayWfhOption;
+      final isHalfDay = _selectedWfhDuration == _halfDayWfhOption;
+      final isMultipleDay = _selectedWfhDuration == _multipleDayWfhOption;
+      final requestType =
+          isHalfDay
+              ? 'half_day'
+              : isMultipleDay
+              ? 'multiple'
+              : 'single';
       final dateFormat = DateFormat('yyyy-MM-dd');
 
       final DateTime startDate = _fromDate!;
       final DateTime endDate =
-          isSingleDay ? _fromDate! : (_toDate ?? _fromDate!);
+          isMultipleDay ? (_toDate ?? _fromDate!) : _fromDate!;
+
+      if (isMultipleDay && endDate.isBefore(startDate)) {
+        _showError('End date cannot be before start date');
+        return;
+      }
 
       Map<String, dynamic> payload = {
         'subject': _subjectController.text.trim(),
@@ -169,23 +221,48 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
       };
 
       if (isSingleDay) {
+        payload['is_anywhere'] = _isWorkFromAnywhere;
         payload['wfh_request_date'] = startDate.toUtc().toIso8601String();
+      } else if (isHalfDay) {
+        payload['wfh_request_date'] = startDate.toUtc().toIso8601String();
+        if (widget.wfhRequest == null) {
+          payload['is_anywhere'] = _isWorkFromAnywhere;
+          payload['start_half'] = _halfDayToApi(_fromHalfDay);
+        }
       } else {
+        payload['is_anywhere'] = _isWorkFromAnywhere;
         payload['wfh_request_date'] = startDate.toUtc().toIso8601String();
         payload['wfh_to_request_date'] = endDate.toUtc().toIso8601String();
         payload['start_half'] = _halfDayToApi(_fromHalfDay);
         payload['end_half'] = _halfDayToApi(_toHalfDay);
       }
 
+      if (widget.wfhRequest != null) {
+        final requestId =
+            int.tryParse(
+              widget.wfhRequest!.attendanceRequestId ?? widget.wfhRequest!.id,
+            ) ??
+            0;
+        payload['request_id'] = requestId;
+        payload.remove('is_anywhere');
+      }
+
       debugPrint('WFH final payload: $payload');
 
       // 3. Encode and Post
       final encodedData = encodeData(payload);
-      final response = await apiClient.post(
-        AppUrls.wfhRequestRaise,
-        data: {'payload': encodedData},
-        options: Options(headers: {'Content-Type': 'application/json'}),
-      );
+      final response =
+          widget.wfhRequest != null
+              ? await apiClient.put(
+                AppUrls.wfhRequestRaise,
+                data: {'payload': encodedData},
+                options: Options(headers: {'Content-Type': 'application/json'}),
+              )
+              : await apiClient.post(
+                AppUrls.wfhRequestRaise,
+                data: {'payload': encodedData},
+                options: Options(headers: {'Content-Type': 'application/json'}),
+              );
 
       final responseData = response.data as Map<String, dynamic>;
 
@@ -307,18 +384,25 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
                 label: 'WFH Duration',
                 value: _selectedWfhDuration,
                 hint: 'Select WFH Duration',
-                items: ['Single Day WFH', 'Multiple Day WFH'],
+                items: const [
+                  _singleDayWfhOption,
+                  _multipleDayWfhOption,
+                  _halfDayWfhOption,
+                ],
                 onChanged: (value) {
                   setState(() {
                     _selectedWfhDuration = value;
-                    if (value == 'Single Day WFH') {
+                    if (value != _multipleDayWfhOption) {
                       _toDate = null;
+                    }
+                    if (value == _singleDayWfhOption) {
+                      _fromHalfDay = 'First Half';
                     }
                   });
                 },
               ),
               // Show date fields based on WFH Duration selection
-              if (_selectedWfhDuration == 'Single Day WFH') ...[
+              if (_selectedWfhDuration == _singleDayWfhOption) ...[
                 SizedBox(height: screenHeight * 0.02),
                 Text(
                   'Date',
@@ -336,7 +420,47 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
                   hint: 'Select Date',
                   onTap: () => _selectDate(context, true),
                 ),
-              ] else if (_selectedWfhDuration == 'Multiple Day WFH') ...[
+              ] else if (_selectedWfhDuration == _halfDayWfhOption) ...[
+                SizedBox(height: screenHeight * 0.02),
+                Text(
+                  'Date',
+                  style: AppTextStyles.labelLarge(
+                    context,
+                  ).copyWith(color: AppColors.textHeading),
+                ),
+                SizedBox(height: screenHeight * 0.01),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: _buildDateField(
+                        context,
+                        value:
+                            _fromDate != null
+                                ? DateFormat('dd MMM yyyy').format(_fromDate!)
+                                : null,
+                        hint: 'Select Date',
+                        onTap: () => _selectDate(context, true),
+                      ),
+                    ),
+                    SizedBox(width: screenWidth * 0.02),
+                    Expanded(
+                      flex: 1,
+                      child: _buildDropdownField(
+                        context,
+                        hint: 'Select Half',
+                        value: _fromHalfDay,
+                        items: _halfDayOptions,
+                        onChanged: (value) {
+                          setState(() {
+                            _fromHalfDay = value ?? 'First Half';
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ] else if (_selectedWfhDuration == _multipleDayWfhOption) ...[
                 SizedBox(height: screenHeight * 0.02),
                 // From
                 Text(
@@ -367,7 +491,7 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
                         context,
                         hint: 'Select Half',
                         value: _fromHalfDay,
-                        items: ['First Half', 'Second Half'],
+                        items: _halfDayOptions,
                         onChanged: (value) {
                           setState(() {
                             _fromHalfDay = value ?? 'First Half';
@@ -407,7 +531,7 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
                         context,
                         hint: 'Select Half',
                         value: _toHalfDay,
-                        items: ['First Half', 'Second Half'],
+                        items: _halfDayOptions,
                         onChanged: (value) {
                           setState(() {
                             _toHalfDay = value ?? 'Second Half';
@@ -419,6 +543,42 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
                 ),
               ],
               SizedBox(height: screenHeight * 0.02),
+              if (widget.wfhRequest == null) ...[
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border)
+                  ),
+                  child: Column(
+                    children: [
+                      CheckboxListTile(
+                        value: _isWorkFromAnywhere,
+                        onChanged:
+                            _isSubmitting
+                                ? null
+                                : (value) {
+                                  setState(() {
+                                    _isWorkFromAnywhere = value ?? false;
+                                  });
+                                },
+                        title: Text(
+                          'Work From Anywhere',
+                          style: AppTextStyles.labelLarge(
+                            context,
+                          ).copyWith(color: AppColors.textHeading),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        activeColor: AppColors.attendanceTeal,
+                        checkColor: AppColors.textWhite,
+                        hoverColor: Colors.transparent,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: screenHeight * 0.01),
+              ],
               // Description
               AppTextField(
                 label: 'Description',
@@ -502,8 +662,7 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
     String? hint,
     required List<String> items,
     required Function(String?) onChanged,
-  })
-  {
+  }) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
@@ -528,7 +687,7 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
           padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02),
 
           child: DropdownButtonFormField<String>(
-            value: value,
+            initialValue: value,
             isExpanded: true,
             menuMaxHeight: screenHeight * 0.35,
 
@@ -542,7 +701,6 @@ class _ApplyWfhPageState extends State<ApplyWfhPage> {
                 horizontal: screenWidth * 0.04,
                 vertical: screenHeight * 0.018,
               ),
-
             ),
             items:
                 items.map((String item) {

@@ -12,6 +12,7 @@ import '../../../../../../../attendance/domain/entities/attendance_details.dart'
 import '../../../../../../../attendance/presentation/bloc/attendance_punch_bloc.dart';
 import '../../../../../../../attendance/presentation/bloc/attendance_punch_event.dart';
 import '../../../../../../../attendance/presentation/bloc/attendance_punch_state.dart';
+import '../../../../../../../attendance/presentation/utils/attendance_punch_reconciliation_helper.dart';
 
 /// Today's Time Utilization card with timer and Punch In button
 class TimeUtilizationCard extends StatefulWidget {
@@ -49,12 +50,8 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
   }
 
   bool _getServerPunchedIn() {
-    return TimeUtils.isActivePunchSession(
-      status: widget.attendanceDetails?.status,
-      entries: widget.attendanceDetails?.entries,
-      punchType: widget.attendanceDetails?.punchType,
-      punchIn: widget.attendanceDetails?.punchIn,
-      punchOut: widget.attendanceDetails?.punchOut,
+    return AttendanceSessionStateHelper.isActiveSession(
+      widget.attendanceDetails,
     );
   }
 
@@ -128,21 +125,17 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
     final actions = await _offlineLocalDataSource.getPendingActions();
     if (!mounted) return;
 
+    final resolvedState = PendingAttendanceSessionHelper.resolve(
+      actions: actions,
+      serverPunchedIn: _getServerPunchedIn(),
+      serverVirtualPunchInTime: _getServerVirtualPunchInTime(),
+      baseWorkedSeconds: _getPreviousWorkedSeconds(),
+    );
+
     setState(() {
-      _localPunchedInOverride = null;
-      _frozenWorkedHoursOverride = null;
-
-      if (actions.isEmpty) {
-        if (!_getServerPunchedIn()) {
-          _virtualPunchInTime = null;
-        }
-        return;
-      }
-
-      // Pending offline punches should not be shown as a completed
-      // attendance state until the server confirms the sync.
-      _virtualPunchInTime =
-          _getServerPunchedIn() ? _getServerVirtualPunchInTime() : null;
+      _localPunchedInOverride = resolvedState.localPunchedInOverride;
+      _virtualPunchInTime = resolvedState.virtualPunchInTime;
+      _frozenWorkedHoursOverride = resolvedState.frozenWorkedHoursOverride;
     });
   }
 
@@ -176,6 +169,7 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
           punchIn: widget.attendanceDetails?.punchIn,
           punchOut: widget.attendanceDetails?.punchOut,
           punchInIp: widget.attendanceDetails?.punchInIp,
+          isActiveSessionOverride: _getServerPunchedIn(),
         );
       }
     });
@@ -364,6 +358,17 @@ class _TimeUtilizationCardState extends State<TimeUtilizationCard> {
           SnackBar(
             content: Text(state.message),
             backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } else if (state is AttendancePendingSyncExpired) {
+      _hydratePendingOfflineState();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(state.message),
+            backgroundColor: AppColors.warning,
+            duration: const Duration(seconds: 4),
           ),
         );
       }

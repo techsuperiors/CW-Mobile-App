@@ -20,10 +20,13 @@ import '../../bloc/raise_on_duty_state.dart';
 import '../../data/datasources/on_duty_remote_datasource.dart';
 import '../../data/repositories/on_duty_repository_impl.dart';
 import '../../domain/usecases/raise_on_duty_request.dart';
+import '../../models/on_duty_request_model.dart';
 
 /// Form page to raise an On-Duty request
 class OnDutyRequestPage extends StatefulWidget {
-  const OnDutyRequestPage({super.key});
+  final OnDutyRequestModel? onDutyRequest;
+
+  const OnDutyRequestPage({super.key, this.onDutyRequest});
 
   @override
   State<OnDutyRequestPage> createState() => _OnDutyRequestPageState();
@@ -35,7 +38,6 @@ class _OnDutyRequestPageState extends State<OnDutyRequestPage> {
   late final TextEditingController _descriptionController;
   late final RaiseOnDutyRequestBloc _bloc;
 
-  String _requestTo = '';
   String _requestType = 'single'; // 'single' or 'multiple'
   DateTime? _startDate;
   DateTime? _endDate;
@@ -60,6 +62,8 @@ class _OnDutyRequestPageState extends State<OnDutyRequestPage> {
   String _formatDisplayDate(DateTime date) =>
       DateFormat('dd MMM yyyy').format(date);
 
+  bool get _isEditMode => widget.onDutyRequest != null;
+
   @override
   void initState() {
     super.initState();
@@ -73,6 +77,20 @@ class _OnDutyRequestPageState extends State<OnDutyRequestPage> {
     _bloc = RaiseOnDutyRequestBloc(
       raiseOnDutyRequestUseCase: RaiseOnDutyRequestUseCase(repository),
     );
+
+    if (widget.onDutyRequest != null) {
+      _initializeFromRequest(widget.onDutyRequest!);
+    }
+  }
+
+  void _initializeFromRequest(OnDutyRequestModel request) {
+    _subjectController.text = request.subject ?? '';
+    _descriptionController.text = request.reason;
+    _requestType = request.requestType == 'multiple' ? 'multiple' : 'single';
+    _startDate = request.fromDate;
+    _endDate = request.requestType == 'multiple' ? request.toDate : null;
+    _startHalf = request.startHalf ?? 'first_half';
+    _endHalf = request.endHalf ?? 'second_half';
   }
 
   @override
@@ -126,6 +144,10 @@ class _OnDutyRequestPageState extends State<OnDutyRequestPage> {
         endHalf: finalEndHalf,
         // Use overridden value
         userId: userId,
+        requestId:
+            widget.onDutyRequest != null
+                ? int.tryParse(widget.onDutyRequest!.id)
+                : null,
       ),
     );
   }
@@ -140,8 +162,6 @@ class _OnDutyRequestPageState extends State<OnDutyRequestPage> {
   }
 
   Future<void> _selectDate(bool isStart) async {
-    final initial =
-        isStart ? (_startDate ?? DateTime.now()) : (_endDate ?? DateTime.now());
     final picked = await showDatePicker(
       context: context,
       // initialDate: initial,
@@ -245,7 +265,7 @@ class _OnDutyRequestPageState extends State<OnDutyRequestPage> {
                   ),
                 ),
                 title: Text(
-                  'Raise On-Duty Request',
+                  _isEditMode ? 'Edit On-Duty Request' : 'Raise On-Duty Request',
                   style: AppTextStyles.heading4(context).copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -506,7 +526,9 @@ class _OnDutyRequestPageState extends State<OnDutyRequestPage> {
                                     ),
                                   )
                                   : Text(
-                                    'Submit Request',
+                                    _isEditMode
+                                        ? 'Update Request'
+                                        : 'Submit Request',
                                     style: AppTextStyles.buttonLarge(
                                       context,
                                     ).copyWith(color: AppColors.textWhite),
@@ -577,7 +599,7 @@ class _OnDutyRequestPageState extends State<OnDutyRequestPage> {
           padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
 
           child: DropdownButtonFormField<String>(
-            value: value,
+            initialValue: value,
             isExpanded: true,
             borderRadius: BorderRadius.circular(12),
             decoration: InputDecoration(

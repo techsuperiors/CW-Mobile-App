@@ -22,6 +22,8 @@ class UpdateLeaveUseCase {
     required String dayType,
     required String description,
     required int requestTo,
+    String? leaveStartTime,
+    String? leaveEndTime,
   }) async {
     return repository.updateLeave(
       leaveId: leaveId,
@@ -37,6 +39,8 @@ class UpdateLeaveUseCase {
       dayType: dayType,
       description: description,
       requestTo: requestTo,
+      leaveStartTime: leaveStartTime,
+      leaveEndTime: leaveEndTime,
     );
   }
 }

@@ -32,6 +32,7 @@ class AppColors {
   static const Color textWhite = Color(0xFFFFFFFF);
   static const Color textHeading = Color(0xFF121212);
 
+
   // Background Colors
   static const Color background = Color(0xFFFFFFFF);
   static const Color backgroundMediumLight = Color(0xFFf3f8fd);
@@ -144,6 +145,8 @@ class AppColors {
   static const Color approvalSheetReject = Color(0xFFF04438); // rejected
   static const Color approvalSheetWithdrawn = Color(0xFFF79009); // withdrawn
   static const Color approvalSheetPending = Color(0xFF2196F3); // default/pending
+  static const Color completedcolor = Color(0xFF2E7D32);
+  static const Color ongoingColorbg = Color(0xFFFFF3E0);
 
   // Login Page Colors
   static const Color loginHeaderTeal = Color(0xFF0B7F7F); // Dark teal for login header

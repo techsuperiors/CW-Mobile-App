@@ -93,8 +93,8 @@ class AttendanceRegularizeRepositoryImpl
     required int id,
     required String requestFor,
     required String requestDate,
-    required String checkIn,
-    required String checkOut,
+    String? checkIn,
+    String? checkOut,
     required int statusUpdatedBy,
     required String description,
   }) async {

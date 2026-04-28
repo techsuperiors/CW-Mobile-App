@@ -120,6 +120,8 @@ class UpdateLeave extends LeaveRequestEvent {
   final String dayType;
   final String description;
   final int requestTo;
+  final String? leaveStartTime;
+  final String? leaveEndTime;
 
   const UpdateLeave({
     required this.leaveId,
@@ -135,6 +137,8 @@ class UpdateLeave extends LeaveRequestEvent {
     required this.dayType,
     required this.description,
     required this.requestTo,
+    this.leaveStartTime,
+    this.leaveEndTime,
   });
 
   @override
@@ -152,5 +156,7 @@ class UpdateLeave extends LeaveRequestEvent {
         dayType,
         description,
         requestTo,
+        leaveStartTime ?? '',
+        leaveEndTime ?? '',
       ];
 }

@@ -430,7 +430,7 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
             Divider(height: screenHeight * 0.03, color: AppColors.border),
             _buildDetailRow(
               context,
-              'Check In:',
+              'In Time:',
               DateFormat('dd MMM yyyy, hh:mm a').format(checkIn),
               screenWidth,
             ),
@@ -439,7 +439,7 @@ class _OvertimeDetailPageState extends State<OvertimeDetailPage> {
             Divider(height: screenHeight * 0.03, color: AppColors.border),
             _buildDetailRow(
               context,
-              'Check Out:',
+              'Out Time:',
               DateFormat('dd MMM yyyy, hh:mm a').format(checkOut),
               screenWidth,
             ),

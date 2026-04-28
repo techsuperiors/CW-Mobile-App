@@ -103,6 +103,7 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
     return BlocProvider.value(
       value: _leaveRequestBloc,
       child: ResponsiveScaffold(
+        backgroundColor: AppColors.backgroundLight,
         appBar: AppBar(
           forceMaterialTransparency: true,
           elevation: 0,

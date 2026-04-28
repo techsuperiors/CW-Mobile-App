@@ -21,6 +21,7 @@ class RaiseOnDutyRequestUseCase
       startHalf: params.startHalf,
       endHalf: params.endHalf,
       userId: params.userId,
+      requestId: params.requestId,
     );
   }
 }
@@ -34,6 +35,7 @@ class RaiseOnDutyRequestParams extends Params {
   final String startHalf;
   final String endHalf;
   final int userId;
+  final int? requestId;
 
   const RaiseOnDutyRequestParams({
     required this.subject,
@@ -44,6 +46,7 @@ class RaiseOnDutyRequestParams extends Params {
     required this.startHalf,
     required this.endHalf,
     required this.userId,
+    this.requestId,
   });
 
   @override
@@ -56,5 +59,6 @@ class RaiseOnDutyRequestParams extends Params {
         startHalf,
         endHalf,
         userId,
+        requestId ?? 0,
       ];
 }

@@ -22,6 +22,8 @@ class AppUrls {
   // User endpoints
   static const String getUserProfile = '/api/mobile/app/users/profile';
   static const String getUserProfileExtended = '/api/users/profile';
+  static const String userProfileBasicDetails =
+      '/api/users/profile/basic/details';
 
   // static const String updateUserProfile = '/api/api/mobile/app/users/profile';
   // https://app.collectivwork.com/api/attendance/punchOut
@@ -65,20 +67,34 @@ class AppUrls {
   static const String documentDirectoryDetails =
       '/api/documents/directory/details';
   static const String documentUpload = '/api/documents/upload';
+  static const String usersList = '/api/users/list';
 
   // Visit & Geo Tracking endpoints
   static const String visitCreate = '/api/field/tracking/visit/create';
   static const String visitList = '/api/field/tracking/visit/list';
+  static const String visitDetails = '/api/field/tracking/visit/details';
   static const String visitActivityCreate =
       '/api/field/tracking/visit/activity/create';
+  static const String visitActivityUpdate =
+      '/api/field/tracking/visit/activity/update';
+  static const String visitActivityDetails =
+      '/api/field/tracking/visit/activity/details';
+  static const String visitActivityStart =
+      '/api/field/tracking/visit/activity/start';
+  static const String visitActivityEnd =
+      '/api/field/tracking/visit/activity/end';
+  static const String visitActivityDelete =
+      '/api/field/tracking/visit/activity/delete';
   static const String visitCustomerList = '/api/field/tracking/customer/list';
+  static const String visitCustomerCreate =
+      '/api/field/tracking/customer/create';
+  static const String visitCustomerDetails =
+      '/api/field/tracking/customer/details';
   static const String visitAddressList = '/api/field/tracking/address/list';
-
-  // Posts endpoints
-  // static const String posts = '/api/api/mobile/app/posts';
-
-  // Approval endpoints
-  // static const String approvals = '/api/api/mobile/app/approvals';
+  static const String visitAddressCreate =
+      '/api/field/tracking/address/create';
+  static const String visitAddressDetails =
+      '/api/field/tracking/address/details';
 
   // Agreement endpoints
   static const String agreementList = '/api/employee/agreement/assigned/list';

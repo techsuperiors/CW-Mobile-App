@@ -56,8 +56,8 @@ class UpdateRegularize extends ApplyRegularizeEvent {
   final int id;
   final String requestDate;
   final String requestFor;
-  final String checkIn;
-  final String checkOut;
+  final String? checkIn;
+  final String? checkOut;
   final int statusUpdatedBy;
   final String description;
 
@@ -76,8 +76,8 @@ class UpdateRegularize extends ApplyRegularizeEvent {
         id,
         requestDate,
         requestFor,
-        checkIn,
-        checkOut,
+        checkIn ?? '',
+        checkOut ?? '',
         statusUpdatedBy,
         description,
       ];

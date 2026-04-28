@@ -176,9 +176,9 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
   String _convertRequestTypeForUpdate(RegularizeRequestType requestType) {
     switch (requestType) {
       case RegularizeRequestType.punchIn:
-        return 'punch-in';
+        return 'checkIn';
       case RegularizeRequestType.punchOut:
-        return 'punch-out';
+        return 'checkOut';
       case RegularizeRequestType.both:
         return 'both';
     }
@@ -256,6 +256,23 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
       }
     }
 
+    if (_punchInTime != null && _punchOutTime != null) {
+      final punchInMinutes = _timeOfDayToMinutes(_punchInTime!);
+      final punchOutMinutes = _timeOfDayToMinutes(_punchOutTime!);
+
+      if (punchInMinutes >= punchOutMinutes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Punch-in time should be before punch-out time.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+    }
+
     final resolvedReason =
         _selectedReason == 'Other'
             ? _otherReasonController.text.trim()
@@ -309,22 +326,13 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
 
     // Dispatch apply regularize event
     if (widget.regularizeRequest != null) {
-      final updateCheckIn =
-          checkIn ??
-          _formatDateTime(_attendanceDate!, const TimeOfDay(hour: 9, minute: 0));
-      final updateCheckOut =
-          checkOut ??
-          _formatDateTime(
-            _attendanceDate!,
-            const TimeOfDay(hour: 18, minute: 0),
-          );
       _applyRegularizeBloc.add(
         UpdateRegularize(
           id: int.tryParse(widget.regularizeRequest!.id) ?? 0,
           requestDate: _formatDate(_attendanceDate!),
           requestFor: _convertRequestTypeForUpdate(_requestType),
-          checkIn: updateCheckIn,
-          checkOut: updateCheckOut,
+          checkIn: checkIn,
+          checkOut: checkOut,
           statusUpdatedBy: statusUpdatedBy,
           description: _descriptionController.text.trim(),
         ),
@@ -472,6 +480,8 @@ class _ApplyRegularizePageState extends State<ApplyRegularizePage> {
     final period = time.hour < 12 ? 'AM' : 'PM';
     return '$hour:$minute $period';
   }
+
+  int _timeOfDayToMinutes(TimeOfDay time) => time.hour * 60 + time.minute;
 
   bool get _showsPunchInField =>
       _requestType == RegularizeRequestType.punchIn ||

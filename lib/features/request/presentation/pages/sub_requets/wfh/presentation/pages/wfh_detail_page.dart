@@ -227,8 +227,11 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
     DateFormat dateFormat,
     DateFormat dateTimeFormat,
   ) {
-    final isSingleDayRequest =
-        (widget.wfhRequest.requestType ?? '').toLowerCase() == 'single';
+    final normalizedRequestType =
+        (widget.wfhRequest.requestType ?? '').toLowerCase();
+    final isSingleDayRequest = normalizedRequestType == 'single';
+    final isHalfDayRequest = normalizedRequestType == 'half_day';
+    final isMultipleDayRequest = normalizedRequestType == 'multiple';
 
     return Container(
       decoration: BoxDecoration(
@@ -357,7 +360,7 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
           _buildDetailRow(
             context,
             'Request Type:',
-            isSingleDayRequest ? 'Single Day' : 'Multiple Days',
+            _getRequestTypeLabel(normalizedRequestType),
 
             screenWidth,
             screenHeight,
@@ -366,9 +369,7 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
           _buildDetailRow(
             context,
             'WFH Type:',
-            ((widget.wfhRequest.requestType ?? '').toLowerCase() == 'single'
-                ? 'single'
-                : 'multiple'),
+            _getRequestTypeLabel(normalizedRequestType),
             screenWidth,
             screenHeight,
           ),
@@ -376,19 +377,19 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
           _buildDetailRow(
             context,
             'No. of Days:',
-            widget.wfhRequest.numberOfDays.toString().padLeft(2, '0'),
+            _formatNumberOfDays(widget.wfhRequest.numberOfDays),
             screenWidth,
             screenHeight,
           ),
           Divider(height: screenHeight * 0.03, color: AppColors.border),
           _buildDetailRow(
             context,
-            isSingleDayRequest ? 'On:' : 'From:',
+            isSingleDayRequest || isHalfDayRequest ? 'On:' : 'From:',
             dateFormat.format(widget.wfhRequest.fromDate),
             screenWidth,
             screenHeight,
           ),
-          if (!isSingleDayRequest) ...[
+          if (isMultipleDayRequest) ...[
             Divider(height: screenHeight * 0.03, color: AppColors.border),
             _buildDetailRow(
               context,
@@ -559,9 +560,7 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
           ),
           SizedBox(height: screenHeight * 0.012),
           Text(
-            widget.wfhRequest.reason.isNotEmpty
-                ? widget.wfhRequest.reason
-                : (widget.wfhRequest.subject ?? 'No description provided'),
+            _descriptionText,
             style: AppTextStyles.bodySmall(
               context,
             ).copyWith(color: AppColors.textSecondary, height: 1.5),
@@ -611,6 +610,33 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
     );
   }
 
+  String get _descriptionText {
+    final description = widget.wfhRequest.description?.trim();
+    if (description != null && description.isNotEmpty) {
+      return description;
+    }
+    return 'No description provided';
+  }
+
+  String _getRequestTypeLabel(String requestType) {
+    switch (requestType) {
+      case 'half_day':
+        return 'Half Day';
+      case 'multiple':
+        return 'Multiple Days';
+      case 'single':
+      default:
+        return 'Single Day';
+    }
+  }
+
+  String _formatNumberOfDays(num numberOfDays) {
+    if (numberOfDays % 1 == 0) {
+      return numberOfDays.toInt().toString().padLeft(2, '0');
+    }
+    return numberOfDays.toString();
+  }
+
   Widget _buildCommentsSection(
     BuildContext context,
     double screenWidth,
@@ -623,7 +649,7 @@ class _WfhDetailPageState extends State<WfhDetailPage> {
         border: Border.all(color: AppColors.border, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
             spreadRadius: 0,
@@ -1277,7 +1303,9 @@ class _WfhActivityTile extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,

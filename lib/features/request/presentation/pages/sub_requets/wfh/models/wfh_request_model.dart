@@ -29,12 +29,15 @@ class WfhApproverSnapshot {
 
 class WfhRequestModel {
   final String id;
-  final int numberOfDays;
+  final num numberOfDays;
   final DateTime fromDate;
   final DateTime? toDate; // null for single day WFH
   final String reason;
   final String? subject;
+  final String? description;
   final String? requestType; // 'single', 'multiple'
+  final String? startHalf;
+  final String? endHalf;
   final WfhStatus status;
   final DateTime appliedDate;
   final String? rejectRemark;
@@ -50,7 +53,10 @@ class WfhRequestModel {
     this.toDate,
     required this.reason,
     this.subject,
+    this.description,
     this.requestType,
+    this.startHalf,
+    this.endHalf,
     required this.status,
     required this.appliedDate,
     this.rejectRemark,
@@ -74,7 +80,7 @@ class WfhRequestModel {
 
     return WfhRequestModel(
       id: json['id'].toString(),
-      numberOfDays: (json['number_of_days'] as num?)?.toInt() ?? 1,
+      numberOfDays: (json['number_of_days'] as num?) ?? 1,
       fromDate:
       (DateTime.tryParse(json['start_date'] ?? '')?.toLocal()) ??
           DateTime.now(),
@@ -86,7 +92,10 @@ class WfhRequestModel {
 
       reason: json['reason'] as String? ?? '',
       subject: json['subject'] as String?,
+      description: json['description'] as String?,
       requestType: json['request_type'] as String?,
+      startHalf: json['start_half'] as String?,
+      endHalf: json['end_half'] as String?,
       status: _parseStatus(json['request_status'] as String? ?? 'Pending'),
 
       appliedDate:
@@ -172,12 +181,15 @@ class WfhRequestModel {
 
   WfhRequestModel copyWith({
     String? id,
-    int? numberOfDays,
+    num? numberOfDays,
     DateTime? fromDate,
     DateTime? toDate,
     String? reason,
     String? subject,
+    String? description,
     String? requestType,
+    String? startHalf,
+    String? endHalf,
     WfhStatus? status,
     DateTime? appliedDate,
     String? rejectRemark,
@@ -193,7 +205,10 @@ class WfhRequestModel {
       toDate: toDate ?? this.toDate,
       reason: reason ?? this.reason,
       subject: subject ?? this.subject,
+      description: description ?? this.description,
       requestType: requestType ?? this.requestType,
+      startHalf: startHalf ?? this.startHalf,
+      endHalf: endHalf ?? this.endHalf,
       status: status ?? this.status,
       appliedDate: appliedDate ?? this.appliedDate,
       rejectRemark: rejectRemark ?? this.rejectRemark,
